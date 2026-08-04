@@ -167,3 +167,4 @@ enum BookingStatus {
   COMPLETED
   CANCELLED
 }
+// AI Advisor Tables added 
