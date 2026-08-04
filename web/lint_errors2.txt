@@ -1,0 +1,398 @@
+﻿
+D:\AgriRent_AI\web\src\app\dashboard\admin\page.tsx
+  44:5  error  Error: Cannot access variable before it is declared
+
+`fetchAdminData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\admin\page.tsx:44:5
+  42 |
+  43 |   useEffect(() => {
+> 44 |     fetchAdminData();
+     |     ^^^^^^^^^^^^^^ `fetchAdminData` accessed before it is declared
+  45 |   }, []);
+  46 |
+  47 |   const fetchAdminData = async () => {
+
+D:\AgriRent_AI\web\src\app\dashboard\admin\page.tsx:47:3
+  45 |   }, []);
+  46 |
+> 47 |   const fetchAdminData = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 48 |     try {
+     | ^^^^^^^^^
+> 49 |       const response = await api.get('/analytics/admin');
+     ΓÇª
+     | ^^^^^^^^^
+> 90 |     }
+     | ^^^^^^^^^
+> 91 |   };
+     | ^^^^^ `fetchAdminData` is declared here
+  92 |
+  93 |   const handleToggleUserStatus = async (id: string, currentStatus: string) => {
+  94 |     try {  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\dashboard\equipment\page.tsx
+  60:5  error  Error: Cannot access variable before it is declared
+
+`fetchMyEquipment` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\equipment\page.tsx:60:5
+  58 |
+  59 |   useEffect(() => {
+> 60 |     fetchMyEquipment();
+     |     ^^^^^^^^^^^^^^^^ `fetchMyEquipment` accessed before it is declared
+  61 |   }, []);
+  62 |
+  63 |   useEffect(() => {
+
+D:\AgriRent_AI\web\src\app\dashboard\equipment\page.tsx:77:3
+   75 |   }, [search, category, equipment]);
+   76 |
+>  77 |   const fetchMyEquipment = async () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  78 |     try {
+      | ^^^^^^^^^
+>  79 |       const response = await api.get('/equipment/my');
+      ΓÇª
+      | ^^^^^^^^^
+> 128 |     }
+      | ^^^^^^^^^
+> 129 |   };
+      | ^^^^^ `fetchMyEquipment` is declared here
+  130 |
+  131 |   const handleOpenEdit = (item: any) => {
+  132 |     setEditingItem(item);  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\dashboard\farmer\page.tsx
+  43:5  error  Error: Cannot access variable before it is declared
+
+`fetchData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\farmer\page.tsx:43:5
+  41 |
+  42 |   useEffect(() => {
+> 43 |     fetchData();
+     |     ^^^^^^^^^ `fetchData` accessed before it is declared
+  44 |   }, []);
+  45 |
+  46 |   const fetchData = async () => {
+
+D:\AgriRent_AI\web\src\app\dashboard\farmer\page.tsx:46:3
+  44 |   }, []);
+  45 |
+> 46 |   const fetchData = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 47 |     try {
+     | ^^^^^^^^^
+> 48 |       const [bookingsRes, analyticsRes] = await Promise.all([
+     ΓÇª
+     | ^^^^^^^^^
+> 59 |     }
+     | ^^^^^^^^^
+> 60 |   };
+     | ^^^^^ `fetchData` is declared here
+  61 |
+  62 |   const handleCancelBooking = async (id: string) => {
+  63 |     try {  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\dashboard\guides\[crop]\page.tsx
+  30:5  error  Error: Cannot access variable before it is declared
+
+`fetchGuide` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\guides\[crop]\page.tsx:30:5
+  28 |
+  29 |   useEffect(() => {
+> 30 |     fetchGuide();
+     |     ^^^^^^^^^^ `fetchGuide` accessed before it is declared
+  31 |   }, [crop]);
+  32 |
+  33 |   const fetchGuide = async () => {
+
+D:\AgriRent_AI\web\src\app\dashboard\guides\[crop]\page.tsx:33:3
+  31 |   }, [crop]);
+  32 |
+> 33 |   const fetchGuide = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 34 |     try {
+     | ^^^^^^^^^
+> 35 |       const response = await api.get('/guides');
+     ΓÇª
+     | ^^^^^^^^^
+> 43 |     }
+     | ^^^^^^^^^
+> 44 |   };
+     | ^^^^^ `fetchGuide` is declared here
+  45 |
+  46 |   if (loading) {
+  47 |     return (  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\dashboard\guides\page.tsx
+  17:5  error  Error: Cannot access variable before it is declared
+
+`fetchData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\guides\page.tsx:17:5
+  15 |
+  16 |   useEffect(() => {
+> 17 |     fetchData();
+     |     ^^^^^^^^^ `fetchData` accessed before it is declared
+  18 |   }, []);
+  19 |
+  20 |   const fetchData = async () => {
+
+D:\AgriRent_AI\web\src\app\dashboard\guides\page.tsx:20:3
+  18 |   }, []);
+  19 |
+> 20 |   const fetchData = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 21 |     try {
+     | ^^^^^^^^^
+> 22 |       const [guidesRes, techRes] = await Promise.all([
+     ΓÇª
+     | ^^^^^^^^^
+> 32 |     }
+     | ^^^^^^^^^
+> 33 |   };
+     | ^^^^^ `fetchData` is declared here
+  34 |
+  35 |   const crops = Object.keys(guidesData);
+  36 |  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\dashboard\layout.tsx
+  197:12  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+D:\AgriRent_AI\web\src\app\dashboard\layout.tsx:197:12
+  195 |
+  196 |         <div className="p-4 border-t border-slate-200/50 dark:border-slate-800/50">
+> 197 |           <NavLink href="/dashboard/profile" icon={Settings} label={t('profile_settings')} exact />
+      |            ^^^^^^^ This component is created during render
+  198 |         </div>
+  199 |       </aside>
+  200 |
+
+D:\AgriRent_AI\web\src\app\dashboard\layout.tsx:104:19
+  102 |   };
+  103 |
+> 104 |   const NavLink = ({ href, icon: Icon, label, exact = false }: { href: string, icon: any, label: string, exact?: boolean }) => {
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 105 |     const isActive = exact ? pathname === href : pathname.startsWith(href) && (href !== '/dashboard' || pathname === '/dashboard');
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 106 |     return (
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 119 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 120 |   };
+      | ^^^^ The component is created during render here
+  121 |
+  122 |   const renderSidebarLinks = () => {
+  123 |     if (role === 'ADMIN') {  react-hooks/static-components
+
+D:\AgriRent_AI\web\src\app\dashboard\marketplace\page.tsx
+  50:5  error  Error: Cannot access variable before it is declared
+
+`fetchEquipment` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\marketplace\page.tsx:50:5
+  48 |   // Read URL search params on mount
+  49 |   useEffect(() => {
+> 50 |     fetchEquipment();
+     |     ^^^^^^^^^^^^^^ `fetchEquipment` accessed before it is declared
+  51 |   }, []);
+  52 |
+  53 |   const fetchEquipment = async () => {
+
+D:\AgriRent_AI\web\src\app\dashboard\marketplace\page.tsx:53:3
+   51 |   }, []);
+   52 |
+>  53 |   const fetchEquipment = async () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  54 |     try {
+      | ^^^^^^^^^
+>  55 |       const response = await api.get('/equipment');
+      ΓÇª
+      | ^^^^^^^^^
+> 195 |     }
+      | ^^^^^^^^^
+> 196 |   };
+      | ^^^^^ `fetchEquipment` is declared here
+  197 |
+  198 |   // Extract query parameter if passed e.g., ?search=Tractor
+  199 |   useEffect(() => {  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\dashboard\notifications\page.tsx
+  36:25  error  Error: Cannot access variable before it is declared
+
+`getInitialNotificationsByRole` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\notifications\page.tsx:36:25
+  34 |     // Generate role-specific initial alerts if none exist
+  35 |     if (notifications.length === 0) {
+> 36 |       const generated = getInitialNotificationsByRole(role);
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `getInitialNotificationsByRole` accessed before it is declared
+  37 |       setNotifications(generated);
+  38 |       setLocalNotifications(generated);
+  39 |     } else {
+
+D:\AgriRent_AI\web\src\app\dashboard\notifications\page.tsx:44:3
+   42 |   }, [notifications, role]);
+   43 |
+>  44 |   const getInitialNotificationsByRole = (userRole: string) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  45 |     const timestamp = '10 mins ago';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  46 |     switch (userRole) {
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 129 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 130 |   };
+      | ^^^^^ `getInitialNotificationsByRole` is declared here
+  131 |
+  132 |   const handleMarkAsRead = (id: string) => {
+  133 |     markAsRead(id);  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\dashboard\page.tsx
+  34:5  error  Error: Cannot access variable before it is declared
+
+`fetchData` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\dashboard\page.tsx:34:5
+  32 |
+  33 |   useEffect(() => {
+> 34 |     fetchData();
+     |     ^^^^^^^^^ `fetchData` accessed before it is declared
+  35 |   }, []);
+  36 |
+  37 |   const fetchData = async () => {
+
+D:\AgriRent_AI\web\src\app\dashboard\page.tsx:37:3
+  35 |   }, []);
+  36 |
+> 37 |   const fetchData = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 38 |     try {
+     | ^^^^^^^^^
+> 39 |       const [bookingsRes, analyticsRes] = await Promise.all([
+     ΓÇª
+     | ^^^^^^^^^
+> 52 |     }
+     | ^^^^^^^^^
+> 53 |   };
+     | ^^^^^ `fetchData` is declared here
+  54 |
+  55 |   const handleUpdateStatus = async (id: string, status: 'ACCEPTED' | 'REJECTED') => {
+  56 |     try {  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\app\login\page.tsx
+  248:7  error  Error: Cannot access variable before it is declared
+
+`handleVerifyForgotOtp` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\app\login\page.tsx:248:7
+  246 |   useEffect(() => {
+  247 |     if (otpInput.length === 6 && forgotStep === 2 && !loading) {
+> 248 |       handleVerifyForgotOtp(undefined, otpInput);
+      |       ^^^^^^^^^^^^^^^^^^^^^ `handleVerifyForgotOtp` accessed before it is declared
+  249 |     }
+  250 |   }, [otpInput, forgotStep]);
+  251 |
+
+D:\AgriRent_AI\web\src\app\login\page.tsx:283:3
+  281 |   };
+  282 |
+> 283 |   const handleVerifyForgotOtp = async (e?: React.FormEvent, autoCode?: string) => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 284 |     if (e) e.preventDefault();
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 285 |     const code = autoCode || otpInput;
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 313 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 314 |   };
+      | ^^^^^ `handleVerifyForgotOtp` is declared here
+  315 |
+  316 |   const handleResetPassword = async (e: React.FormEvent) => {
+  317 |     e.preventDefault();  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\components\AuthProvider.tsx
+  43:19  error  Error: Cannot access variable before it is declared
+
+`fetchProfile` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\components\AuthProvider.tsx:43:19
+  41 |           if (supabaseSession) {
+  42 |             setSession(supabaseSession);
+> 43 |             await fetchProfile(supabaseSession.access_token);
+     |                   ^^^^^^^^^^^^ `fetchProfile` accessed before it is declared
+  44 |           }
+  45 |         }
+  46 |       } catch (e) {
+
+D:\AgriRent_AI\web\src\components\AuthProvider.tsx:72:3
+  70 |   }, []);
+  71 |
+> 72 |   const fetchProfile = async (token: string) => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 73 |     try {
+     | ^^^^^^^^^
+> 74 |       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+     ΓÇª
+     | ^^^^^^^^^
+> 81 |     }
+     | ^^^^^^^^^
+> 82 |   };
+     | ^^^^^ `fetchProfile` is declared here
+  83 |
+  84 |   const isAuthRoute = pathname === '/login';
+  85 |   const hasSession = !!session && !!user;  react-hooks/immutability
+
+D:\AgriRent_AI\web\src\components\ToastProvider.tsx
+  27:7   error  Error: Cannot access variable before it is declared
+
+`removeToast` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+D:\AgriRent_AI\web\src\components\ToastProvider.tsx:27:7
+  25 |     setToasts((prev) => [...prev, { id, type, message }]);
+  26 |     setTimeout(() => {
+> 27 |       removeToast(id);
+     |       ^^^^^^^^^^^ `removeToast` accessed before it is declared
+  28 |     }, 5000);
+  29 |   }, []);
+  30 |
+
+D:\AgriRent_AI\web\src\components\ToastProvider.tsx:31:3
+  29 |   }, []);
+  30 |
+> 31 |   const removeToast = useCallback((id: string) => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 32 |     setToasts((prev) => prev.filter((t) => t.id !== id));
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 33 |   }, []);
+     | ^^^^^^^^^^ `removeToast` is declared here
+  34 |
+  35 |   return (
+  36 |     <ToastContext.Provider value={{ showToast }}>  react-hooks/immutability
+  31:35  error  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This value was memoized in source but not in compilation output.
+
+D:\AgriRent_AI\web\src\components\ToastProvider.tsx:31:35
+  29 |   }, []);
+  30 |
+> 31 |   const removeToast = useCallback((id: string) => {
+     |                                   ^^^^^^^^^^^^^^^^^
+> 32 |     setToasts((prev) => prev.filter((t) => t.id !== id));
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 33 |   }, []);
+     | ^^^^ Could not preserve existing memoization
+  34 |
+  35 |   return (
+  36 |     <ToastContext.Provider value={{ showToast }}>                                                                                                                                                                                                                                          react-hooks/preserve-manual-memoization
+
+Γ£û 13 problems (13 errors, 0 warnings)
+

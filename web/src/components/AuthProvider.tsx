@@ -1,46 +1,67 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { api } from '@/lib/api';
+import { useTranslation } from "react-i18next";
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { session, setSession, setUser } = useStore();
+    const { t } = useTranslation();
+  const { session, setSession, user, setUser } = useStore();
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const isInitialized = useRef(false);
 
   useEffect(() => {
-    // Check if we have a persisted dev session
-    const savedSession = localStorage.getItem('agrorent_dev_session');
-    if (savedSession) {
-      const parsed = JSON.parse(savedSession);
-      setSession(parsed.session);
-      setUser(parsed.user);
-      setLoading(false);
-      return;
-    }
+    if (isInitialized.current) return;
+    isInitialized.current = true;
 
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.access_token);
-      } else {
+    // Safety timeout to ensure login page is reachable
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    async function initAuth() {
+      try {
+        // 1. Check if we already have a session and user in the store (Persisted)
+        if (session && user) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${session.access_token}`;
+          try {
+            const response = await api.get('/auth/me');
+            setUser(response.data);
+          } catch (err) {
+            console.error('Session validation failed', err);
+          }
+        } else {
+          // 2. Check Supabase session
+          const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+          if (supabaseSession) {
+            setSession(supabaseSession);
+            await fetchProfile(supabaseSession.access_token);
+          }
+        }
+      } catch (e) {
+        console.error('Auth initialization failed', e);
+      } finally {
+        clearTimeout(timeout);
         setLoading(false);
       }
-    });
+    }
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.access_token);
-      } else {
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (newSession) {
+          setSession(newSession);
+          await fetchProfile(newSession.access_token);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null as any);
         setLoading(false);
       }
     });
@@ -48,51 +69,54 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProfile = async (token: string) => {
+  async function fetchProfile(token: string) {
     try {
-      // Force token onto api client immediately
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const response = await api.get('/auth/me');
       setUser(response.data);
     } catch (error: any) {
       console.error('Failed to fetch user profile', error);
-      if (error.response?.status === 401) {
-        // Stale session, clear it
-        setSession(null);
-        supabase.auth.signOut();
-      }
     } finally {
       setLoading(false);
     }
   };
 
+  const isAuthRoute = pathname === '/login';
+  const hasSession = !!session && !!user;
+
   useEffect(() => {
-    const isAuthRoute = pathname === '/login';
+    if (loading) return;
 
-    // Check for dev-token in session or localStorage if in dev mode
-    const isDevSession = session?.access_token === 'dev-token';
-
-    if (!session && !isAuthRoute) {
+    if (!hasSession && !isAuthRoute) {
       router.replace('/login');
-    } else if (session && isAuthRoute && !loading) {
-      // Role-based redirection
-      const user = useStore.getState().user;
+    } else if (hasSession && isAuthRoute) {
       if (user?.role === 'FARMER') {
-        router.replace('/dashboard/marketplace');
-      } else if (user?.role === 'OWNER') {
-        router.replace('/dashboard');
+        router.replace('/dashboard/farmer');
       } else {
         router.replace('/dashboard');
       }
     }
-  }, [session, loading, pathname, router]);
+  }, [session, user, loading, pathname, router]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+          <p className="mt-4 text-gray-500 font-medium">{t('loading_agrorent_ai')}</p>
+        </div>
       </div>
     );
+  }
+
+  // Allow login page to render even if session check failed
+  if (isAuthRoute) {
+    return <>{children}</>;
+  }
+
+  // Protect other routes
+  if (!hasSession) {
+    return null;
   }
 
   return <>{children}</>;

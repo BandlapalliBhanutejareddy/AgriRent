@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String           @id @default(cuid())
+  phone          String?
+  name           String
+  createdAt      DateTime         @default(now())
+  email          String           @unique
+  password       String
+  profileImage   String?
+  role           Role
+  authId         String?          @unique
+  isVerified     Boolean          @default(true)
+  isSuspended    Boolean          @default(false)
+  pushToken      String?
+  bookings       Booking[]
+  equipments     Equipment[]
+  messages       Message[]
+  notifications  Notification[]
+  savedEquipment SavedEquipment[]
+}
+
+model Equipment {
+  id             String           @id @default(cuid())
+  category       String
+  description    String
+  pricePerDay    Float
+  imageUrl       String
+  ownerId        String
+  createdAt      DateTime         @default(now())
+  available      Boolean          @default(true)
+  title          String
+  location       String?
+  latitude       Float?
+  longitude      Float?
+  bookings       Booking[]
+  owner          User             @relation(fields: [ownerId], references: [id])
+  savedEquipment SavedEquipment[]
+
+  @@unique([title, ownerId])
+  @@index([ownerId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  farmerId      String
+  equipmentId   String
+  startDate     DateTime
+  endDate       DateTime
+  createdAt     DateTime      @default(now())
+  status        BookingStatus
+  totalPrice    Float?
+  amountPaid    Float?
+  paymentId     String?
+  paymentStatus String        @default("PENDING")
+  equipment     Equipment     @relation(fields: [equipmentId], references: [id])
+  farmer        User          @relation(fields: [farmerId], references: [id])
+  messages      Message[]
+
+  @@index([farmerId])
+  @@index([equipmentId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  relatedId String?
+  type      String?
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model SavedEquipment {
+  id          String    @id @default(cuid())
+  userId      String
+  equipmentId String
+  createdAt   DateTime  @default(now())
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, equipmentId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  bookingId String
+  senderId  String
+  text      String
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  sender    User     @relation(fields: [senderId], references: [id])
+
+  @@index([bookingId])
+  @@index([senderId])
+}
+
+model FarmingGuide {
+  id                   String   @id @default(cuid())
+  cropName             String
+  stepOrder            Int
+  stepTitle            String
+  description          String
+  imageUrl             String
+  smartTip             String
+  recommendedEquipment String
+  createdAt            DateTime @default(now())
+}
+
+model ModernTechnique {
+  id                  String   @id @default(cuid())
+  title               String
+  description         String
+  relatedCrop         String
+  equipmentSuggestion String
+  imageUrl            String
+  createdAt           DateTime @default(now())
+}
+
+model OTPVerification {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  purpose   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  FARMER
+  OWNER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}

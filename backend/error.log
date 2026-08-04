@@ -1,0 +1,550 @@
+[2026-05-11T08:13:17.170Z] undefined
+---
+[2026-05-11T08:14:27.462Z] undefined
+---
+[2026-05-11T08:35:50.026Z] undefined
+---
+[2026-05-11T08:36:17.891Z] undefined
+---
+[2026-05-12T04:00:23.595Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:01:17.002Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:01:46.985Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:05:44.012Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:09:23.471Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:34:05.703Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:42:57.268Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:51:12.555Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `db.ezylxyrtnodxthdgynvn.supabase.co:5432`
+
+Please make sure your database server is running at `db.ezylxyrtnodxthdgynvn.supabase.co:5432`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-12T04:54:57.255Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\routes\auth.ts:70:36
+
+  67   return;
+  68 }
+  69 
+→ 70 const user = await prisma.user.findUnique(
+Can't reach database server at `db.ezylxyrtnodxthdgynvn.supabase.co:5432`
+
+Please make sure your database server is running at `db.ezylxyrtnodxthdgynvn.supabase.co:5432`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:34:30.807Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:34:32.642Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:34:39.567Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:34:40.426Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:35:34.016Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:35:35.390Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:37:33.028Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:37:34.609Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:37:55.879Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:37:56.765Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:39:27.291Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:39:28.193Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:40:37.626Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:40:38.920Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:42:08.308Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:42:09.796Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:59:30.679Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T05:59:32.271Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T06:00:13.384Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T06:00:14.709Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T06:00:39.093Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T06:00:39.896Z] PrismaClientKnownRequestError: 
+Invalid `prisma.equipment.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\equipment.ts:48:46
+
+  45 if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
+  46 if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+  47 
+→ 48 const equipment = await prisma.equipment.findMany(
+The column `Equipment.latitude` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T06:02:21.379Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-22T06:02:22.674Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:181:43
+
+  178   where.equipment = { ownerId: userId };
+  179 }
+  180 
+→ 181 const bookings = await prisma.booking.findMany(
+The column `Booking.paymentStatus` does not exist in the current database.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-05-31T05:58:05.365Z] PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\middlewares\authMiddleware.ts:24:38
+
+  21 // Simple token validation (in production, use JWT)
+  22 if (token.startsWith('demo-token-')) {
+  23   const userId = token.split('demo-token-')[1];
+→ 24   const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-06-02T14:24:06.021Z] PrismaClientKnownRequestError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\middlewares\authMiddleware.ts:24:38
+
+  21 // Simple token validation (in production, use JWT)
+  22 if (token.startsWith('demo-token-')) {
+  23   const userId = token.split('demo-token-')[1];
+→ 24   const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-06-02T14:26:04.494Z] PrismaClientKnownRequestError: 
+Invalid `prisma.user.findUnique()` invocation in
+D:\AgriRent_AI\backend\src\middlewares\authMiddleware.ts:24:38
+
+  21 // Simple token validation (in production, use JWT)
+  22 if (token.startsWith('demo-token-')) {
+  23   const userId = token.split('demo-token-')[1];
+→ 24   const user = await prisma.user.findUnique(
+Can't reach database server at `aws-1-ap-northeast-1.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-northeast-1.pooler.supabase.com:6543`.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---
+[2026-06-04T06:14:10.102Z] PrismaClientKnownRequestError: 
+Invalid `prisma.booking.findMany()` invocation in
+D:\AgriRent_AI\backend\src\routes\bookings.ts:253:43
+
+  250   where.equipment = { ownerId: userId };
+  251 }
+  252 
+→ 253 const bookings = await prisma.booking.findMany(
+Server has closed the connection.
+    at $n.handleRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:7315)
+    at $n.handleAndLogRequestError (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+---

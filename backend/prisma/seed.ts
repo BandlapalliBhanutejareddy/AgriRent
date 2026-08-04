@@ -1,142 +1,81 @@
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcrypt'
 
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🌱 Starting database seeding...');
 
-  const farmer = await prisma.user.upsert({
-    where: { phone: '+919876543210' },
-    update: {},
-    create: {
-      phone: '+919876543210',
-      name: 'Rajesh Kumar',
-      role: 'FARMER',
-      location: 'Nashik, Maharashtra',
-    },
-  })
-
-  const owner = await prisma.user.upsert({
-    where: { phone: '+919876543211' },
-    update: {},
-    create: {
-      phone: '+919876543211',
-      name: 'Amit Patil',
-      role: 'OWNER',
-      location: 'Pune, Maharashtra',
-    },
-  })
-
-  // Equipment Data
-  const equipmentData = [
+  // 1. Create Users with hashed passwords
+  const users = [
     {
-      name: 'Mahindra Novo 605 DI',
-      category: 'TRACTOR',
-      description: 'Powerful 50 HP tractor with advanced hydraulics, perfect for heavy-duty plowing and haulage.',
-      pricePerDay: 1800,
-      imageUrl: 'https://images.unsplash.com/photo-1592982537447-6f2b6e1b7823?q=80&w=800&auto=format&fit=crop',
-      location: 'Nashik, Maharashtra'
+      name: "Agro Owner",
+      email: "owner@agrorent.ai",
+      password: await bcrypt.hash("Owner@123", 10),
+      role: "OWNER",
+      phone: "+919876543210"
     },
     {
-      name: 'John Deere W70 Harvester',
-      category: 'HARVESTER',
-      description: 'High-performance multi-crop harvester designed for minimal grain loss and maximum efficiency.',
-      pricePerDay: 3500,
-      imageUrl: 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?q=80&w=800&auto=format&fit=crop',
-      location: 'Pune, Maharashtra'
+      name: "Agro Farmer",
+      email: "farmer@agrorent.ai",
+      password: await bcrypt.hash("Farmer@123", 10),
+      role: "FARMER",
+      phone: "+919876543211"
+    },
+    {
+      name: "Agro Admin",
+      email: "admin@agrorent.ai",
+      password: await bcrypt.hash("Admin@123", 10),
+      role: "ADMIN",
+      phone: "+919876543212"
     }
   ];
 
-  for (const item of equipmentData) {
-    await prisma.equipment.create({
-      data: { ...item, ownerId: owner.id }
+  for (const u of users) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      update: u,
+      create: u,
     });
   }
 
-  // Farming Guides
-  await prisma.farmingGuide.createMany({
-    data: [
+  const owner = await prisma.user.findUnique({ where: { email: "owner@agrorent.ai" } });
+
+  if (owner) {
+    // 2. Create Demo Equipment
+    const equipments = [
       {
-        cropName: 'Rice',
-        stepTitle: 'Land Preparation',
-        description: 'Plow the field twice and perform puddling to create a soft, level surface.',
-        imageUrl: 'https://images.unsplash.com/photo-1594398044700-1482421319c5?q=80&w=800&auto=format&fit=crop',
-        stepOrder: 1,
-        smartTip: 'Ensure proper leveling to maintain uniform water depth.',
-        recommendedEquipment: 'Tractor, Rotavator'
+        title: "John Deere 5050 D Tractor",
+        description: "50 HP, Dual Clutch, Power Steering. Perfect for medium scale farming.",
+        category: "TRACTORS",
+        pricePerDay: 1500,
+        imageUrl: "https://images.unsplash.com/photo-1594411130691-e407137f8846?auto=format&fit=crop&q=80&w=800",
+        ownerId: owner.id,
+        available: true,
+        location: "Punjab, India"
       },
       {
-        cropName: 'Potato',
-        stepTitle: 'Ridge Planting',
-        description: 'Plant tubers in ridges spaced 60 cm apart at a depth of 7-10 cm.',
-        imageUrl: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?q=80&w=800&auto=format&fit=crop',
-        stepOrder: 1,
-        smartTip: 'Use medium-sized tubers for optimal yield.',
-        recommendedEquipment: 'Potato Planter, Tractor'
-      }
-    ]
-  });
-
-  // Modern Techniques
-  await prisma.modernTechnique.createMany({
-    data: [
-      {
-        title: 'Precision Drip Irrigation',
-        description: 'Delivering water directly to the root zone increases potato yield by up to 30%.',
-        imageUrl: 'https://images.unsplash.com/photo-1595113316349-9fa4eb24f884?q=80&w=800&auto=format&fit=crop',
-        relatedCrop: 'Potato',
-        equipmentSuggestion: 'Drip System Kit'
-      }
-    ]
-  });
-
-  // Sample Bookings
-  const equipment = await prisma.equipment.findMany({ take: 2 });
-  if (equipment.length >= 2) {
-    await prisma.booking.create({
-      data: {
-        equipmentId: equipment[0].id,
-        farmerId: farmer.id,
+        title: "Mahindra Arjun 555 DI",
+        description: "High performance tractor with advanced features for deep plowing.",
+        category: "TRACTORS",
+        pricePerDay: 1200,
+        imageUrl: "https://images.unsplash.com/photo-1592919016382-70678625902b?auto=format&fit=crop&q=80&w=800",
         ownerId: owner.id,
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 86400000 * 3),
-        totalPrice: equipment[0].pricePerDay * 3,
-        status: 'ACCEPTED'
+        available: true,
+        location: "Haryana, India"
       }
-    });
+    ];
 
-    await prisma.booking.create({
-      data: {
-        equipmentId: equipment[1].id,
-        farmerId: farmer.id,
-        ownerId: owner.id,
-        startDate: new Date(Date.now() + 86400000 * 7),
-        endDate: new Date(Date.now() + 86400000 * 10),
-        totalPrice: equipment[1].pricePerDay * 3,
-        status: 'PENDING'
-      }
-    });
+    for (const e of equipments) {
+      await prisma.equipment.upsert({
+        where: { title_ownerId: { title: e.title, ownerId: e.ownerId } },
+        update: e,
+        create: e
+      });
+    }
   }
 
-  // Notifications
-  await prisma.notification.createMany({
-    data: [
-      {
-        userId: farmer.id,
-        title: 'Booking Accepted!',
-        message: `Your request for equipment was approved.`,
-        type: 'BOOKING_UPDATE'
-      },
-      {
-        userId: owner.id,
-        title: 'New Booking Request',
-        message: `A farmer wants to rent your equipment.`,
-        type: 'NEW_BOOKING'
-      }
-    ]
-  });
-
-  console.log('✅ Database seeded with Demo Data successfully');
+  console.log('✅ Database seeded with Secure Users and Equipment successfully');
 }
 
 main()

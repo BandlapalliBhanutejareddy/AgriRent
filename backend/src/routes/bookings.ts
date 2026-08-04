@@ -1,11 +1,11 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth, requireRole, AuthRequest } from '../middlewares/authMiddleware';
 import { validate } from '../middlewares/validate';
 import { createBookingSchema, updateBookingStatusSchema } from '../schemas';
+import { prisma } from '../lib/prisma';
+import { sendPushNotification } from '../lib/push';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Create Booking (Farmer Only)
 router.post('/', requireAuth, requireRole('FARMER'), validate(createBookingSchema), async (req: AuthRequest, res: Response): Promise<void> => {
@@ -14,9 +14,9 @@ router.post('/', requireAuth, requireRole('FARMER'), validate(createBookingSchem
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // 1. Verify Equipment and Owner
+    // 1. Verify Equipment
     const equipment = await prisma.equipment.findUnique({
-      where: { id: equipmentId, isDeleted: false },
+      where: { id: String(equipmentId) },
       include: { owner: true }
     });
 
@@ -25,7 +25,7 @@ router.post('/', requireAuth, requireRole('FARMER'), validate(createBookingSchem
       return;
     }
 
-    if (!equipment.isAvailable) {
+    if (!equipment.available) {
       res.status(400).json({ error: 'Equipment is currently marked as unavailable' });
       return;
     }
@@ -33,11 +33,21 @@ router.post('/', requireAuth, requireRole('FARMER'), validate(createBookingSchem
     // 2. Check Overlapping Dates
     const overlappingBookings = await prisma.booking.findMany({
       where: {
-        equipmentId,
-        status: { in: ['PENDING', 'ACCEPTED', 'ACTIVE'] },
-        isDeleted: false,
+        equipmentId: String(equipmentId),
+        status: { in: ['PENDING', 'ACCEPTED'] },
         OR: [
-          { startDate: { lte: end }, endDate: { gte: start } }
+          {
+            AND: [
+              { startDate: { lte: start } },
+              { endDate: { gte: start } }
+            ]
+          },
+          {
+            AND: [
+              { startDate: { lte: end } },
+              { endDate: { gte: end } }
+            ]
+          }
         ]
       }
     });
@@ -48,40 +58,49 @@ router.post('/', requireAuth, requireRole('FARMER'), validate(createBookingSchem
     }
 
     // Calculate Price
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
+    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
     const totalPrice = days * equipment.pricePerDay;
 
     // Create Booking
     const booking = await prisma.booking.create({
       data: {
-        farmerId: req.prismaUser.id,
-        ownerId: equipment.ownerId,
-        equipmentId,
+        farmerId: String(req.prismaUser.id),
+        equipmentId: String(equipmentId),
         startDate: start,
         endDate: end,
-        totalPrice,
-        status: 'PENDING'
+        status: 'PENDING',
+        totalPrice
       }
     });
 
-    // Generate Notification for Owner
+    // Generate Notification for Owner (in-app)
     await prisma.notification.create({
       data: {
         userId: equipment.ownerId,
         title: 'New Booking Request',
-        message: `You have a new booking request for ${equipment.name}`,
+        message: `You have a new booking request for ${equipment.title} from ${req.prismaUser.name}`,
         type: 'BOOKING_REQUEST',
         relatedId: booking.id
       }
     });
 
+    // Send push notification to owner
+    if (equipment.owner?.pushToken) {
+      await sendPushNotification(equipment.owner.pushToken, {
+        title: '🔔 New Booking Request',
+        body: `${req.prismaUser.name} wants to rent your ${equipment.title}`,
+        data: { bookingId: booking.id, screen: 'owner/requests' }
+      });
+    }
+
     res.status(201).json(booking);
   } catch (error) {
+    console.error('Create booking error:', error);
     res.status(500).json({ error: 'Failed to create booking request' });
   }
 });
 
-// Booking Status Update: owner and farmer actions
+// Booking Status Update
 router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { status } = req.body;
@@ -89,7 +108,10 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { equipment: true }
+      include: { 
+        equipment: true,
+        farmer: true
+      }
     });
 
     if (!booking) {
@@ -100,34 +122,25 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
     const role = req.prismaUser.role;
     const userId = req.prismaUser.id;
 
+    const isOwner = booking.equipment.ownerId === userId;
+    const isFarmer = booking.farmerId === userId;
+
     if (role === 'OWNER') {
-      if (booking.ownerId !== userId) {
+      if (!isOwner) {
         res.status(403).json({ error: 'You do not have permission to manage this booking' });
         return;
       }
       if (status !== 'ACCEPTED' && status !== 'REJECTED') {
-        res.status(403).json({ error: 'Owners can only accept or reject booking requests' });
-        return;
-      }
-      if (booking.status !== 'PENDING') {
-        res.status(400).json({ error: 'Only pending bookings can be accepted or rejected' });
+        res.status(400).json({ error: 'Owners can only accept or reject booking requests' });
         return;
       }
     } else if (role === 'FARMER') {
-      if (booking.farmerId !== userId) {
+      if (!isFarmer) {
         res.status(403).json({ error: 'You do not own this booking' });
         return;
       }
-      if (status === 'ACTIVE' && booking.status !== 'ACCEPTED') {
-        res.status(400).json({ error: 'Only accepted bookings can be started' });
-        return;
-      }
-      if (status === 'COMPLETED' && booking.status !== 'ACTIVE') {
-        res.status(400).json({ error: 'Only active bookings can be completed' });
-        return;
-      }
-      if (status !== 'ACTIVE' && status !== 'COMPLETED') {
-        res.status(403).json({ error: 'Farmers can only start or complete bookings' });
+      if (status !== 'CANCELLED') {
+        res.status(400).json({ error: 'Farmers can only cancel their own booking requests' });
         return;
       }
     } else if (role !== 'ADMIN') {
@@ -137,66 +150,127 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
 
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
-      data: { status }
+      data: { status: status as any },
+      include: {
+        equipment: { include: { owner: { select: { id: true, pushToken: true } } } },
+        farmer: { select: { id: true, name: true, pushToken: true } }
+      }
     });
 
-    const recipientId = role === 'OWNER' ? booking.farmerId : booking.ownerId;
-    const title = role === 'OWNER'
-      ? `Booking ${status}`
-      : status === 'ACTIVE'
-        ? 'Rental Started'
-        : 'Equipment Returned';
-    const message = role === 'OWNER'
-      ? `Your equipment booking has been ${status.toLowerCase()}`
-      : status === 'ACTIVE'
-        ? 'Your owner has marked the rental as active.'
-        : 'Your rental has been completed.';
+    // In-app notification
+    const recipientId = isOwner ? booking.farmerId : booking.equipment.ownerId;
+    const notifTitle = `Booking ${status}`;
+    const notifMessage = `The booking for ${booking.equipment.title} has been ${status.toLowerCase()} by the ${role.toLowerCase()}.`;
 
     await prisma.notification.create({
       data: {
         userId: recipientId,
-        title,
-        message,
-        type: status,
+        title: notifTitle,
+        message: notifMessage,
+        type: 'BOOKING_UPDATE',
         relatedId: booking.id
       }
     });
 
+    // Push notifications
+    const statusEmoji: Record<string, string> = {
+      ACCEPTED: '✅', REJECTED: '❌', COMPLETED: '🎉', CANCELLED: '🚫'
+    };
+    const emoji = statusEmoji[status] || '📋';
+
+    // Notify farmer when owner acts
+    if (isOwner && updatedBooking.farmer?.pushToken) {
+      await sendPushNotification(updatedBooking.farmer.pushToken, {
+        title: `${emoji} Booking ${status}`,
+        body: `Your booking for ${booking.equipment.title} was ${status.toLowerCase()}`,
+        data: { bookingId: booking.id, screen: 'bookings' }
+      });
+    }
+
+    // Notify owner when farmer cancels
+    if (isFarmer && updatedBooking.equipment?.owner?.pushToken) {
+      await sendPushNotification(updatedBooking.equipment.owner.pushToken, {
+        title: `${emoji} Booking Cancelled`,
+        body: `A farmer cancelled their booking for ${booking.equipment.title}`,
+        data: { bookingId: booking.id, screen: 'owner/requests' }
+      });
+    }
+
     res.json(updatedBooking);
   } catch (error) {
+    console.error('Update Booking Status Error:', error);
     res.status(500).json({ error: 'Failed to update booking status' });
   }
 });
 
-// Get User's Bookings (Farmer or Owner view)
-router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+// Get Owner's Bookings specifically
+router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      where: { equipment: { ownerId: req.prismaUser.id } },
+      include: {
+        equipment: { select: { id: true, title: true, category: true, imageUrl: true } },
+        farmer: { select: { id: true, name: true, email: true, phone: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(bookings);
+  } catch (error) {
+    console.error('Owner bookings fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch owner bookings' });
+  }
+});
+
+// Admin: get all bookings
+router.get('/admin/all', requireAuth, requireRole('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      include: {
+        equipment: { select: { id: true, title: true } },
+        farmer: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch all bookings' });
+  }
+});
+
+// Get User's Bookings
+router.get('/', requireAuth, async (req: AuthRequest, res: Response, next: any): Promise<void> => {
   try {
     const role = req.prismaUser.role;
-    
-    let bookings;
+    const userId = req.prismaUser.id;
+
+    let where: any = {};
     if (role === 'FARMER') {
-      bookings = await prisma.booking.findMany({
-        where: { farmerId: req.prismaUser.id, isDeleted: false },
-        include: { equipment: true, owner: { select: { name: true, phone: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
+      where.farmerId = userId;
     } else if (role === 'OWNER') {
-      bookings = await prisma.booking.findMany({
-        where: { ownerId: req.prismaUser.id, isDeleted: false },
-        include: { equipment: true, farmer: { select: { name: true, phone: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
-    } else {
-      // Admin gets all (not deleted)
-      bookings = await prisma.booking.findMany({ 
-        where: { isDeleted: false },
-        orderBy: { createdAt: 'desc' } 
-      });
+      where.equipment = { ownerId: userId };
     }
+
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: {
+        equipment: {
+          include: {
+            owner: {
+              select: { id: true, name: true, phone: true }
+            }
+          }
+        },
+        farmer: {
+          select: { id: true, name: true, phone: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     res.json(bookings);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch bookings' });
+    console.error('Bookings Fetch Error:', error);
+    next(error);
   }
 });
 

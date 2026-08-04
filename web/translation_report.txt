@@ -1,0 +1,29 @@
+translation_report.txt
+
+Files scanned: 30
+Hardcoded strings found: 8
+
+File:
+app/dashboard/equipment/page.tsx
+Strings:
+- {t('remove', { defaultValue: 'Remove' })} Fleet Machine
+
+File:
+app/login/page.tsx
+Strings:
+- +91 9876543210
+- ••••••••
+- ••••••
+
+File:
+components/ErrorBoundary.tsx
+Strings:
+- Something went wrong
+- We encountered an unexpected error. Don't worry, your data is safe.
+- Try Again
+
+File:
+lib/api.ts
+Strings:
+- Offline Mode Active: Loading cached data.
+

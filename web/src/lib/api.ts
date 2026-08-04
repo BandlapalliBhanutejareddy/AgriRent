@@ -10,11 +10,14 @@ export const api = axios.create({
   },
 });
 
-// Automatically attach the JWT token to every request
+// Automatically attach the token to every request
 api.interceptors.request.use((config) => {
   const session = useStore.getState().session;
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
+  // Support both Supabase access_token and our custom token
+  const token = session?.access_token || session?.token;
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -22,11 +25,19 @@ api.interceptors.request.use((config) => {
 // Response Interceptor to unwrap normalized data
 api.interceptors.response.use(
   (response) => {
-    // If the response follows our normalization pattern { success, data }
+    let finalData = response.data;
     if (response.data && response.data.success === true && response.data.data !== undefined) {
-      return { ...response, data: response.data.data };
+      finalData = response.data.data;
     }
-    return response;
+    const finalResponse = { ...response, data: finalData };
+
+    if (typeof window !== 'undefined' && response.config.method?.toUpperCase() === 'GET') {
+      try {
+        localStorage.setItem(`@cache_${response.config.url}`, JSON.stringify(finalData));
+      } catch (e) {}
+    }
+
+    return finalResponse;
   },
   (error) => {
     if (error.response) {
@@ -35,22 +46,30 @@ api.interceptors.response.use(
       // Handle Session Expiration
       if (status === 401) {
         useStore.getState().logout();
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('agrorent_dev_session');
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
           window.location.href = '/login?expired=true';
         }
-      }
-      
-      // Handle Rate Limiting
-      if (status === 429) {
-        console.warn('Rate limit exceeded');
-        // Toast will be handled by the calling component or a global listener
       }
       
       // Map normalized error messages if present
       if (data && data.success === false && data.message) {
         error.message = data.message;
+      } else if (data && data.error) {
+        error.message = data.error;
       }
+    } else if (error.request) {
+      if (typeof window !== 'undefined' && error.config?.url && error.config?.method?.toUpperCase() === 'GET') {
+        try {
+          const cached = localStorage.getItem(`@cache_${error.config.url}`);
+          if (cached) {
+            import('react-hot-toast').then(({ toast }) => {
+               toast.error('Offline Mode Active: Loading cached data.', { icon: '📡' });
+            }).catch(()=>{});
+            return Promise.resolve({ data: JSON.parse(cached), status: 200, isOffline: true });
+          }
+        } catch(e) {}
+      }
+      error.message = 'No Internet Connection. Please check your network.';
     }
     return Promise.reject(error);
   }

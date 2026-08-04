@@ -13,8 +13,12 @@ import {
   Tractor
 } from 'lucide-react';
 import Link from 'next/link';
+import { useStore } from '@/store/useStore';
+import { useTranslation } from "react-i18next";
 
 export default function CropGuideDetail() {
+    const { t } = useTranslation();
+  const { user } = useStore();
   const params = useParams();
   const router = useRouter();
   const crop = params.crop as string;
@@ -26,7 +30,7 @@ export default function CropGuideDetail() {
     fetchGuide();
   }, [crop]);
 
-  const fetchGuide = async () => {
+  async function fetchGuide() {
     try {
       const response = await api.get('/guides');
       const cropGuides = response.data[crop] || [];
@@ -54,17 +58,14 @@ export default function CropGuideDetail() {
         <div className="p-4 bg-slate-100 rounded-full text-slate-400">
           <Search size={48} />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900">No Guide Found</h2>
+        <h2 className="text-2xl font-bold text-slate-900">{t('no_guide_found')}</h2>
         <p className="text-slate-500 text-center max-w-md">
-          We don't have a specific guide for <span className="font-bold text-slate-900">{crop}</span> yet. 
-          Check back later as we expand our knowledge base.
-        </p>
+          {t('we_don_t_have_a_specific_guide_for')}<span className="font-bold text-slate-900">{crop}</span> {t('yet_check_back_later_as_we_expand_our_kn')}</p>
         <Link 
           href="/dashboard/guides"
           className="flex items-center gap-2 text-emerald-600 font-bold hover:gap-3 transition-all"
         >
-          <ArrowLeft size={18} /> Back to Guides
-        </Link>
+          <ArrowLeft size={18} /> {t('back_to_guides')}</Link>
       </div>
     );
   }
@@ -83,12 +84,12 @@ export default function CropGuideDetail() {
             <ArrowLeft size={24} />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight capitalize">{crop} Mastery Guide</h1>
-            <p className="text-slate-500">Master every stage of your {crop} cultivation journey.</p>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight capitalize">{crop} {t('mastery_guide')}</h1>
+            <p className="text-slate-500">{t('master_every_stage_of_your')}{crop} {t('cultivation_journey')}</p>
           </div>
         </div>
         <div className="hidden md:flex items-center gap-3">
-          <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Progress</span>
+          <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">{t('progress')}</span>
           <div className="w-48 h-2 bg-slate-200 rounded-full overflow-hidden">
             <div 
               className="h-full bg-emerald-500 transition-all duration-500" 
@@ -115,7 +116,7 @@ export default function CropGuideDetail() {
                </div>
              )}
              <div className="absolute top-6 left-6 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg">
-                Step {stepData.stepOrder} of {steps.length}
+                {t('step')}{stepData.stepOrder} {t('of')}{steps.length}
              </div>
           </div>
 
@@ -132,7 +133,7 @@ export default function CropGuideDetail() {
                 <Lightbulb size={24} className="text-emerald-600" />
               </div>
               <div>
-                <h4 className="font-bold text-emerald-900 text-lg mb-1">Smart Tip</h4>
+                <h4 className="font-bold text-emerald-900 text-lg mb-1">{t('smart_tip')}</h4>
                 <p className="text-emerald-700 font-medium">
                   {stepData.smartTip || 'Follow local weather forecasts to time this activity perfectly for maximum yield.'}
                 </p>
@@ -150,8 +151,7 @@ export default function CropGuideDetail() {
                   : 'text-slate-600 hover:bg-white hover:shadow-md'
               }`}
             >
-              <ChevronLeft size={20} /> Previous
-            </button>
+              <ChevronLeft size={20} /> {t('previous')}</button>
             <div className="flex items-center gap-2">
                {steps.map((_, idx) => (
                  <div 
@@ -167,14 +167,14 @@ export default function CropGuideDetail() {
                 onClick={() => router.push('/dashboard/guides')}
                 className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all transform hover:-translate-y-1"
               >
-                Complete Guide <CheckCircle2 size={20} />
+                {t('complete_guide')}<CheckCircle2 size={20} />
               </button>
             ) : (
               <button
                 onClick={() => setCurrentStep(prev => Math.min(steps.length - 1, prev + 1))}
                 className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 shadow-lg shadow-slate-200 transition-all transform hover:-translate-y-1"
               >
-                Next Step <ChevronRight size={20} />
+                {t('next_step')}<ChevronRight size={20} />
               </button>
             )}
           </div>
@@ -183,8 +183,8 @@ export default function CropGuideDetail() {
         {/* Right: Sidebar Info */}
         <div className="space-y-8">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-            <h3 className="text-xl font-bold text-slate-900">Recommended Tools</h3>
-            <p className="text-sm text-slate-500">Based on this step, we recommend using the following machinery for best results.</p>
+            <h3 className="text-xl font-bold text-slate-900">{t('recommended_tools')}</h3>
+            <p className="text-sm text-slate-500">{t('based_on_this_step_we_recommend_using_th')}</p>
             
             <div className="space-y-4">
                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group cursor-pointer hover:border-emerald-200 transition-all">
@@ -194,33 +194,34 @@ export default function CropGuideDetail() {
                     </div>
                     <div>
                       <p className="font-bold text-slate-900 text-sm">{stepData.recommendedEquipment || 'General Machinery'}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Essential for {stepData.stepTitle}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t('essential_for')}{stepData.stepTitle}</p>
                     </div>
                   </div>
                   <Search size={16} className="text-slate-300 group-hover:text-emerald-500" />
                </div>
                
                <Link 
-                 href="/dashboard/equipment/new"
+                 href={user?.role === 'FARMER' 
+                   ? `/dashboard/marketplace?search=${encodeURIComponent(stepData.recommendedEquipment || '')}`
+                   : `/dashboard/equipment/new?suggestion=${encodeURIComponent(stepData.recommendedEquipment || '')}`
+                 }
                  className="block w-full py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-bold text-center text-sm hover:bg-emerald-100 transition-colors"
                >
-                 Add This to My Fleet
+                 {user?.role === 'FARMER' ? 'Rent Recommended Machinery' : 'Add Machinery to My Fleet'}
                </Link>
             </div>
           </div>
 
           <div className="bg-slate-900 p-8 rounded-3xl text-white relative overflow-hidden">
              <div className="relative z-10 space-y-4">
-                <h3 className="text-2xl font-bold">Need help with your {crop}?</h3>
+                <h3 className="text-2xl font-bold">{t('need_help_with_your')}{crop}?</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Our AI advisor can help you optimize your yield based on soil type and weather.
-                </p>
+                  {t('our_ai_advisor_can_help_you_optimize_you')}</p>
                 <Link 
                   href="/dashboard/ai-advisor"
                   className="inline-flex items-center gap-2 bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-600 transition-all"
                 >
-                  Consult AI Advisor
-                </Link>
+                  {t('consult_ai_advisor')}</Link>
              </div>
              <div className="absolute -bottom-10 -right-10 opacity-20">
                 <Lightbulb size={160} />

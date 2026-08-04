@@ -1,11 +1,5 @@
 import { Request, Response } from 'express';
-import { createClient } from '@supabase/supabase-js';
-import { PrismaClient } from '@prisma/client';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 // Extend the Express Request interface to include the user
 export interface AuthRequest extends Request {
@@ -24,43 +18,25 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: any): P
 
     const token = authHeader.split(' ')[1];
     
-    // Developer Bypass for testing
-    if (token === 'dev-token' && process.env.NODE_ENV !== 'production') {
-      const devUser = await prisma.user.findFirst({
-        where: { role: req.path.includes('owner') || req.path.includes('equipment') ? 'OWNER' : 'FARMER' }
+    // Simple token validation (in production, use JWT)
+    if (token.startsWith('demo-token-')) {
+      const userId = token.split('demo-token-')[1];
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
       });
       
-      if (devUser) {
-        req.user = { id: devUser.authId || devUser.id, email: devUser.email || 'dev@agrorent.com' };
-        req.prismaUser = devUser;
+      if (user) {
+        req.user = { id: user.id, email: user.email };
+        req.prismaUser = user;
         next();
         return;
       }
     }
 
-    // Verify token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error || !user) {
-      res.status(401).json({ error: 'Invalid or expired token' });
-      return;
-    }
-
-    // Attach Supabase user to request
-    req.user = user;
-
-    // Fetch corresponding Prisma user to ensure role/auth sync
-    const prismaUser = await prisma.user.findUnique({
-      where: { authId: user.id }
-    });
-
-    if (prismaUser) {
-      req.prismaUser = prismaUser;
-    }
-
-    next();
+    res.status(401).json({ error: 'Invalid token' });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error during authentication' });
+    console.error('Auth Middleware Error:', err);
+    next(err);
   }
 };
 

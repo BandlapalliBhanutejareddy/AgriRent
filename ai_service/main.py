@@ -36,6 +36,17 @@ class RecommendationResponse(BaseModel):
     reasoning: str
     source: str # 'mock' or 'gemini'
 
+class TranslationRequest(BaseModel):
+    title: str
+    description: str
+
+class SearchIntentRequest(BaseModel):
+    query: str
+
+class GenerateImageRequest(BaseModel):
+    category: str
+    description: str
+
 @app.get("/")
 def read_root():
     return {"status": "AI Service is running", "gemini_enabled": model is not None}
@@ -129,3 +140,75 @@ async def recommend_equipment(query: CropQuery):
         reasoning=reasoning,
         source="mock"
     )
+
+@app.post("/translate-listing")
+async def translate_listing(req: TranslationRequest):
+    if not model:
+        # Fallback if no Gemini
+        return {
+            "titleEn": req.title, "titleTe": req.title, "titleHi": req.title, "titleTa": req.title, "titleKn": req.title,
+            "descriptionEn": req.description, "descriptionTe": req.description, "descriptionHi": req.description, "descriptionTa": req.description, "descriptionKn": req.description
+        }
+    
+    prompt = f"""
+    Translate the following agricultural equipment listing into English (en), Telugu (te), Hindi (hi), Tamil (ta), and Kannada (kn).
+    Respond strictly in valid JSON format exactly like this, without markdown blocks:
+    {{
+      "titleEn": "...", "titleTe": "...", "titleHi": "...", "titleTa": "...", "titleKn": "...",
+      "descriptionEn": "...", "descriptionTe": "...", "descriptionHi": "...", "descriptionTa": "...", "descriptionKn": "..."
+    }}
+
+    Title: {req.title}
+    Description: {req.description}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        if text.startswith('```json'): text = text[7:]
+        if text.endswith('```'): text = text[:-3]
+        import json
+        return json.loads(text.strip())
+    except Exception as e:
+        print(f"Translation Error: {e}")
+        return {
+            "titleEn": req.title, "titleTe": req.title, "titleHi": req.title, "titleTa": req.title, "titleKn": req.title,
+            "descriptionEn": req.description, "descriptionTe": req.description, "descriptionHi": req.description, "descriptionTa": req.description, "descriptionKn": req.description
+        }
+
+@app.post("/search-intent")
+async def search_intent(req: SearchIntentRequest):
+    if not model:
+        return {"keywords": req.query.lower()}
+        
+    prompt = f"""
+    You are a search intent parser for an agricultural equipment platform.
+    Extract the main equipment keyword (in English) from this user query. The query might be in a regional Indian language (Telugu, Hindi, etc.) or complex natural language.
+    Query: "{req.query}"
+    
+    Return ONLY a single English keyword (e.g., tractor, harvester, cultivator, seed drill).
+    """
+    try:
+        response = model.generate_content(prompt)
+        keyword = response.text.strip().lower()
+        return {"keywords": keyword}
+    except Exception as e:
+        print(f"Search Intent Error: {e}")
+        return {"keywords": req.query.lower()}
+
+@app.post("/generate-equipment-image")
+async def generate_equipment_image(req: GenerateImageRequest):
+    # Mocking image generation for now, as Gemini flash doesn't generate images
+    # We will return a predefined set of stock images based on the category
+    stock_images = {
+        "TRACTOR": "https://images.unsplash.com/photo-1592860956272-9eb5d8c366ff?auto=format&fit=crop&q=80&w=800",
+        "HARVESTER": "https://images.unsplash.com/photo-1625244724120-1fd1d34d00f6?auto=format&fit=crop&q=80&w=800",
+        "IMPLEMENT": "https://images.unsplash.com/photo-1589922253303-3b03867dfb61?auto=format&fit=crop&q=80&w=800",
+        "CULTIVATOR": "https://images.unsplash.com/photo-1590089851695-1f9e80c8df63?auto=format&fit=crop&q=80&w=800",
+        "ROTAVATOR": "https://images.unsplash.com/photo-1586016335359-54bc72159670?auto=format&fit=crop&q=80&w=800"
+    }
+    
+    cat = req.category.upper()
+    url = stock_images.get(cat, stock_images["TRACTOR"])
+    return {"imageUrl": url}
+

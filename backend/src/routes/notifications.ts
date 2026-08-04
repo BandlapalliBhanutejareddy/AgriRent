@@ -1,16 +1,17 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middlewares/authMiddleware';
+import { prisma } from '../lib/prisma';
+import { emitToUser } from '../lib/socket';
 
 const router = Router();
-const prisma = new PrismaClient();
 
-// Get User's Notifications
-router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+// Get user notifications
+router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const notifications = await prisma.notification.findMany({
-      where: { userId: req.prismaUser.id },
-      orderBy: { createdAt: 'desc' }
+      where: { userId: String(req.prismaUser.id) },
+      orderBy: { createdAt: 'desc' },
+      take: 50
     });
     res.json(notifications);
   } catch (error) {
@@ -18,31 +19,52 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   }
 });
 
-// Mark Notification as Read
-router.put('/:id/read', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+// Mark notification as read
+router.put('/:id/read', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const notificationId = String(req.params.id);
-    
-    // Check ownership
-    const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
-    if (!notification) {
-      res.status(404).json({ error: 'Notification not found' });
-      return;
-    }
-    
-    if (notification.userId !== req.prismaUser.id) {
-      res.status(403).json({ error: 'Not authorized to update this notification' });
-      return;
-    }
-
-    const updated = await prisma.notification.update({
-      where: { id: notificationId },
-      data: { isRead: true }
+    await prisma.notification.update({
+      where: { 
+        id: notificationId,
+        userId: String(req.prismaUser.id) // Ensure ownership
+      },
+      data: { read: true }
     });
-    
-    res.json(updated);
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update notification' });
+  }
+});
+
+// Mark all as read
+router.put('/read-all', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { 
+        userId: String(req.prismaUser.id),
+        read: false
+      },
+      data: { read: true }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update notifications' });
+  }
+});
+
+// Delete notification
+router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const notificationId = String(req.params.id);
+    await prisma.notification.delete({
+      where: { 
+        id: notificationId,
+        userId: String(req.prismaUser.id) 
+      }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete notification' });
   }
 });
 

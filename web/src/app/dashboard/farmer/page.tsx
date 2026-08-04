@@ -2,25 +2,71 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Calendar, Tractor, Clock, CheckCircle, Search, MapPin } from 'lucide-react';
+import { 
+  Calendar, 
+  Tractor, 
+  Clock, 
+  CheckCircle, 
+  Search, 
+  MapPin, 
+  CloudSun, 
+  Sparkles, 
+  ArrowRight,
+  TrendingUp,
+  AlertCircle
+} from 'lucide-react';
 import Link from 'next/link';
+import { useStore } from '@/store/useStore';
+import { useTranslation } from 'react-i18next';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function FarmerDashboard() {
+  const { t } = useTranslation();
+  const { user } = useStore();
   const [bookings, setBookings] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const weather = {
+    temp: '32°C',
+    condition: t('mostly_sunny', { defaultValue: 'Mostly Sunny' }),
+    location: 'Nellore, Andhra Pradesh',
+    advice: t('weather_advice', { defaultValue: 'Excellent weather window for harvesting Kharif crops. Avoid sowing until humidity levels stabilize next week.' })
+  };
+
+  const aiSuggestions = [
+    { name: 'John Deere Harvester', reason: t('rec_reason_1', { defaultValue: 'Ideal for rapid paddy harvesting based on local forecast.' }) },
+    { name: 'Laser Land Leveler', reason: t('rec_reason_2', { defaultValue: 'Saves water usage up to 35% during rice transplantation.' }) }
+  ];
+
   useEffect(() => {
-    fetchBookings();
+    fetchData();
   }, []);
 
-  const fetchBookings = async () => {
+  async function fetchData() {
     try {
-      const response = await api.get('/bookings');
-      setBookings(response.data);
+      const [bookingsRes, analyticsRes] = await Promise.all([
+        api.get('/bookings'),
+        api.get('/analytics/farmer')
+      ]);
+      setBookings(bookingsRes.data);
+      setAnalytics(analyticsRes.data);
     } catch (error) {
-      console.error('Failed to fetch bookings', error);
+      console.error('Failed to fetch data', error);
+      setBookings([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  async function handleCancelBooking(id: string) {
+    try {
+      await api.put(`/bookings/${id}/status`, { status: 'CANCELLED' });
+      setBookings(prev => 
+        prev.map(b => b.id === id ? { ...b, status: 'CANCELLED' } : b)
+      );
+    } catch (error) {
+      console.error('Failed to cancel booking', error);
     }
   };
 
@@ -29,105 +75,239 @@ export default function FarmerDashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="space-y-8 animate-pulse">
+        <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-[32px]" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-32 bg-white rounded-3xl border border-slate-100 animate-pulse" />
+            <div key={i} className="h-32 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
           ))}
         </div>
-        <div className="h-96 bg-white rounded-3xl border border-slate-100 animate-pulse" />
+        <div className="h-96 bg-slate-200 dark:bg-slate-800 rounded-[32px]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Farmer Dashboard</h1>
-          <p className="text-slate-500 mt-1">Manage your rentals and find new equipment for your farm.</p>
+    <div className="space-y-8 animate-in fade-in duration-700">
+      
+      {/* Welcome Greeting Hero Box */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-900 p-8 md:p-10 rounded-[32px] text-white shadow-2xl shadow-emerald-900/20 border border-emerald-500/30 relative overflow-hidden backdrop-blur-xl">
+        <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full blur-[80px] bg-teal-400/30" />
+        <div className="absolute top-10 right-10 w-40 h-40 rounded-full blur-[60px] bg-emerald-400/20" />
+        
+        <div className="relative z-10 space-y-3">
+          <span className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest bg-white/10 backdrop-blur-md text-white rounded-xl border border-white/20 shadow-sm inline-flex items-center gap-1.5">
+            <Sparkles size={12} /> {t('farmer_suite', { defaultValue: 'Farmer Suite' })}
+          </span>
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-2">
+            {t('good_morning', { defaultValue: 'Good Morning,' })} {user?.name || t('farmer', { defaultValue: 'Farmer' })} 🌾
+          </h1>
+          <p className="text-emerald-50 max-w-xl text-sm font-medium leading-relaxed opacity-90">
+            {t('farmer_hero_desc', { defaultValue: 'Browse state-of-the-art agricultural machinery, consult your AI Farm Advisor, and track scheduled rentals.' })}
+          </p>
         </div>
-        <Link 
-          href="/dashboard/marketplace"
-          className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-200"
-        >
-          <Search size={20} />
-          Find Equipment
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl w-fit mb-4">
-              <CheckCircle size={22} />
-           </div>
-           <p className="text-sm text-slate-500 font-medium">Active Rentals</p>
-           <p className="text-2xl font-bold text-slate-900 mt-1">{activeBookings.length}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl w-fit mb-4">
-              <Clock size={22} />
-           </div>
-           <p className="text-sm text-slate-500 font-medium">Pending Requests</p>
-           <p className="text-2xl font-bold text-slate-900 mt-1">{pendingBookings.length}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl w-fit mb-4">
-              <Calendar size={22} />
-           </div>
-           <p className="text-sm text-slate-500 font-medium">Total Bookings</p>
-           <p className="text-2xl font-bold text-slate-900 mt-1">{bookings.length}</p>
+        <div className="relative z-10 shrink-0">
+          <Link 
+            href="/dashboard/marketplace"
+            className="flex items-center gap-2 px-6 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/30 font-black rounded-2xl transition-all shadow-xl hover:shadow-emerald-900/30 hover:-translate-y-1"
+          >
+            <Search size={18} />
+            {t('find_machinery', { defaultValue: 'Find Machinery' })}
+          </Link>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-900">Your Recent Bookings</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Weather Card */}
+        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('weather_insight', { defaultValue: 'Weather Insight' })}</span>
+              <CloudSun className="text-amber-500" size={24} />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black text-slate-800 dark:text-white tracking-tighter">{weather.temp}</span>
+              <span className="text-sm font-bold text-slate-400">{weather.condition}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 mt-3 text-xs font-bold">
+              <MapPin size={14} className="text-emerald-500" />
+              <span>{weather.location}</span>
+            </div>
+          </div>
+          <div className="mt-6 pt-5 border-t border-slate-200/50 dark:border-slate-800/50 text-xs flex items-start gap-3 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-2xl">
+            <AlertCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+            <p className="font-semibold leading-relaxed text-emerald-800 dark:text-emerald-300">{weather.advice}</p>
+          </div>
+        </div>
+
+        {/* AI Recommendations */}
+        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('ai_recommendations_title', { defaultValue: 'AI Farm Advisor Recommendations' })}</span>
+              <Sparkles className="text-emerald-500 animate-pulse" size={20} />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {aiSuggestions.map((rec, i) => (
+                <div key={i} className="p-5 bg-gradient-to-br from-slate-50 to-white dark:from-slate-800/40 dark:to-slate-800/10 border border-slate-200/60 dark:border-slate-700/50 rounded-2xl space-y-2 hover:border-emerald-500/30 transition-colors shadow-sm">
+                  <h4 className="font-black text-sm text-slate-800 dark:text-white tracking-tight">{rec.name}</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{rec.reason}</p>
+                  <Link 
+                    href={`/dashboard/marketplace?search=${encodeURIComponent(rec.name)}`}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mt-2 group"
+                  >
+                    {t('locate_nearby', { defaultValue: 'Locate nearby' })} <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <Link 
+            href="/dashboard/ai-advisor"
+            className="flex items-center justify-center gap-2 mt-6 py-3.5 bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all"
+          >
+            {t('consult_full_ai', { defaultValue: 'Consult Full AI Advisor' })}
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('spending_trends', { defaultValue: 'Spending Trends (Actual)' })}</span>
+            <TrendingUp size={20} className="text-emerald-500" />
+          </div>
+          <div className="h-[250px] w-full">
+            {analytics?.spendingGraph?.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={analytics.spendingGraph} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.1} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(val) => `₹${val}`} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)' }}
+                    itemStyle={{ color: '#10B981', fontWeight: 'bold' }}
+                    labelStyle={{ color: '#64748b', fontWeight: 'bold', fontSize: '10px', textTransform: 'uppercase' }}
+                  />
+                  <Area type="monotone" dataKey="total" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorSpend)" activeDot={{ r: 6, strokeWidth: 0, fill: '#10B981' }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 space-y-3 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                <TrendingUp size={32} className="opacity-50" />
+                <span className="text-xs font-bold uppercase tracking-wider">{t('no_spending_data', { defaultValue: 'No Spending Data Yet' })}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex items-center justify-between group hover:border-emerald-500/50 transition-all duration-300">
+            <div>
+              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('active_rentals', { defaultValue: 'Active Rentals' })}</span>
+              <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{activeBookings.length}</h3>
+              <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1">● {t('deployed', { defaultValue: 'Deployed' })}</span>
+            </div>
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl group-hover:scale-110 transition-transform">
+              <CheckCircle size={24} />
+            </div>
+          </div>
+
+          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex items-center justify-between group hover:border-amber-500/50 transition-all duration-300">
+            <div>
+              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('pending_requests', { defaultValue: 'Pending Requests' })}</span>
+              <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{pendingBookings.length}</h3>
+              <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1 mt-1">● {t('waiting', { defaultValue: 'Waiting' })}</span>
+            </div>
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform">
+              <Clock size={24} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="rentals" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[32px] shadow-sm border border-slate-200/50 dark:border-slate-800/50 overflow-hidden">
+        <div className="p-6 md:p-8 border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center bg-slate-50/30 dark:bg-slate-800/10">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{t('rental_history', { defaultValue: 'Rental History' })}</h3>
+            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mt-1">{t('track_orders', { defaultValue: 'Track and manage your orders' })}</p>
+          </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
-                <th className="p-5">Equipment</th>
-                <th className="p-5">Owner</th>
-                <th className="p-5">Dates</th>
-                <th className="p-5">Total Cost</th>
-                <th className="p-5">Status</th>
+              <tr className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30">
+                <th className="p-6 font-black">{t('machinery', { defaultValue: 'Machinery' })}</th>
+                <th className="p-6 font-black">{t('owner_detail', { defaultValue: 'Owner Detail' })}</th>
+                <th className="p-6 font-black">{t('active_dates', { defaultValue: 'Active Dates' })}</th>
+                <th className="p-6 font-black">{t('pricing', { defaultValue: 'Pricing' })}</th>
+                <th className="p-6 font-black">{t('status', { defaultValue: 'Status' })}</th>
+                <th className="p-6 font-black text-right">{t('actions', { defaultValue: 'Actions' })}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30">
               {bookings.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center text-slate-500">
-                    No bookings found. <Link href="/dashboard/marketplace" className="text-emerald-600 font-bold">Start browsing equipment!</Link>
+                  <td colSpan={6} className="p-16 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-4 max-w-sm mx-auto">
+                      <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 rounded-full shadow-sm">
+                        <Tractor size={32} />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-800 dark:text-white text-lg">{t('no_rentals', { defaultValue: 'No Rentals Scheduled' })}</h4>
+                        <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                          {t('no_rentals_desc', { defaultValue: 'You haven\'t requested any machinery rentals yet. Connect with verified fleet owners to lease top-tier machinery.' })}
+                        </p>
+                      </div>
+                      <Link 
+                        href="/dashboard/marketplace" 
+                        className="mt-4 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/20 hover:-translate-y-0.5"
+                      >
+                        {t('explore_marketplace')}</Link>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 bookings.map((booking) => (
-                  <tr key={booking.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-5">
-                       <div className="font-bold text-slate-900">{booking.equipment?.name}</div>
-                       <div className="text-xs text-slate-400 uppercase font-bold">{booking.equipment?.category}</div>
+                  <tr key={booking.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
+                    <td className="p-6">
+                       <div className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight">{booking.equipment?.title}</div>
+                       <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{booking.equipment?.category}</div>
                     </td>
-                    <td className="p-5">
-                       <div className="font-bold text-slate-700">{booking.owner?.name}</div>
-                       <div className="text-xs text-slate-500">{booking.owner?.phone}</div>
+                    <td className="p-6">
+                       <div className="font-bold text-slate-700 dark:text-slate-300 text-sm">{booking.owner?.name}</div>
+                       <div className="text-[10px] text-slate-400 font-black tracking-widest mt-1">{booking.owner?.phone}</div>
                     </td>
-                    <td className="p-5 text-sm text-slate-600">
+                    <td className="p-6 text-slate-600 dark:text-slate-400 font-medium text-xs">
                        {new Date(booking.startDate).toLocaleDateString()} - {new Date(booking.endDate).toLocaleDateString()}
                     </td>
-                    <td className="p-5 font-bold text-slate-900">₹{booking.totalPrice.toLocaleString()}</td>
-                    <td className="p-5">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
-                        ${booking.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 
-                          booking.status === 'ACCEPTED' || booking.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
-                          booking.status === 'REJECTED' ? 'bg-red-50 text-red-600 border border-red-100' : 
-                          'bg-slate-50 text-slate-500'}`}
+                    <td className="p-6 font-black text-slate-900 dark:text-white">₹{booking.totalPrice.toLocaleString()}</td>
+                    <td className="p-6">
+                      <span className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm
+                        ${booking.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50' : 
+                          booking.status === 'ACCEPTED' || booking.status === 'ACTIVE' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' : 
+                          booking.status === 'REJECTED' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/50' : 
+                          'bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50'}`}
                       >
                         {booking.status}
                       </span>
+                    </td>
+                    <td className="p-6 text-right">
+                      {booking.status === 'PENDING' && (
+                        <button 
+                          onClick={() => handleCancelBooking(booking.id)}
+                          className="px-4 py-2 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                        >
+                          {t('cancel')}</button>
+                      )}
                     </td>
                   </tr>
                 ))

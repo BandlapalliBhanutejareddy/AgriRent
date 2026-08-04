@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Get all Farming Guides grouped by Crop
 router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -25,6 +24,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
     res.json(groupedGuides);
   } catch (error) {
+    console.error('Failed to fetch farming guides:', error);
     res.status(500).json({ error: 'Failed to fetch farming guides' });
   }
 });
@@ -35,10 +35,13 @@ router.get('/techniques', async (req: Request, res: Response): Promise<void> => 
     const techniques = await prisma.modernTechnique.findMany({
       orderBy: { createdAt: 'desc' }
     });
+    
     res.json(techniques);
   } catch (error) {
+    console.error('Failed to fetch modern techniques:', error);
     res.status(500).json({ error: 'Failed to fetch modern techniques' });
   }
 });
 
 export default router;
+

@@ -1,0 +1,22 @@
+--- SELENIUM COMPATIBILITY REPORT ---
+
+Data-TestID Verification:
+-------------------------
+login-button        ✅ Verified (src/app/login/page.tsx)
+register-button     ✅ Verified (src/app/login/page.tsx)
+logout-button       ✅ Verified (src/app/dashboard/layout.tsx)
+language-switcher   ✅ Verified (src/components/LanguageSwitcher.tsx)
+language-select     ✅ Verified (src/components/LanguageSwitcher.tsx)
+profile-save        ✅ Verified (src/app/dashboard/profile/page.tsx)
+equipment-search    ✅ Verified (src/app/dashboard/marketplace/page.tsx)
+booking-submit      ✅ Verified (src/app/dashboard/marketplace/page.tsx)
+admin-save          ✅ Verified (src/app/dashboard/admin/page.tsx)
+admin-delete-user   ✅ Verified (src/app/dashboard/admin/page.tsx)
+advisor-submit      ✅ Verified (src/app/dashboard/ai-advisor/page.tsx)
+advisor-speak       ✅ Verified (src/app/dashboard/ai-advisor/page.tsx)
+create-equipment    ✅ Verified (src/app/dashboard/equipment/new/page.tsx)
+edit-equipment      ✅ Verified (src/app/dashboard/equipment/page.tsx)
+delete-equipment    ✅ Verified (src/app/dashboard/equipment/page.tsx)
+
+Summary:
+All 15 required `data-testid` selectors are strictly present and uniquely mapped to their respective interactive elements. Selectors are stable and independent of standard CSS or localization class mutations.

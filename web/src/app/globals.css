@@ -4,6 +4,65 @@
 
 @layer base {
   body {
-    @apply bg-background text-gray-900;
+    @apply bg-slate-50 text-slate-900 transition-colors duration-300 antialiased;
+  }
+  
+  html.dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
+
+  input, select, textarea {
+    color: #111827 !important;
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+  }
+  input::placeholder, textarea::placeholder {
+    color: #6B7280 !important;
+    opacity: 1 !important;
+  }
+  
+  html.dark input, html.dark select, html.dark textarea {
+    color: #F9FAFB !important;
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+  }
+  html.dark input::placeholder, html.dark textarea::placeholder {
+    color: #9CA3AF !important;
+    opacity: 1 !important;
+  }
+
+  /* Custom Smooth Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 dark:bg-slate-800 rounded-full hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors;
+  }
+}
+
+@layer utilities {
+  /* Premium Glassmorphic container styles */
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-slate-200/60 shadow-sm transition-all duration-350;
+  }
+  
+  .dark-glass-card {
+    @apply dark:bg-slate-900/70 dark:backdrop-blur-md dark:border-slate-800/60 dark:shadow-2xl/20 transition-all duration-350;
+  }
+
+  .premium-gradient-indigo {
+    @apply bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 dark:from-slate-950 dark:via-indigo-950/80 dark:to-slate-950;
+  }
+  
+  .premium-gradient-emerald {
+    @apply bg-gradient-to-r from-emerald-600 via-teal-650 to-emerald-700 dark:from-emerald-950/85 dark:via-teal-950/70 dark:to-emerald-950/85;
+  }
+
+  .premium-gradient-purple {
+    @apply bg-gradient-to-r from-purple-900 via-violet-950 to-slate-900 dark:from-slate-950 dark:via-purple-950/80 dark:to-slate-950;
   }
 }

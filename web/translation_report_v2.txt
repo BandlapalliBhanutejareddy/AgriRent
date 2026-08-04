@@ -1,0 +1,226 @@
+translation_report.txt
+
+Files scanned: 30
+Hardcoded strings found: 50
+
+File:
+app/dashboard/admin/page.tsx
+Strings:
+- ([]);
+  const [equipmentList, setEquipmentList] = useState
+- ([]);
+
+  const [activityLogs, setActivityLogs] = useState
+- );
+  }
+
+  return (
+
+File:
+app/dashboard/ai-advisor/page.tsx
+Strings:
+- (null);
+  const [error, setError] = useState
+
+File:
+app/dashboard/equipment/new/page.tsx
+Strings:
+- window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  const [image, setImage] = useState
+- (null);
+  const [imagePreview, setImagePreview] = useState
+- (null);
+
+  const handleImageChange = (e: React.ChangeEvent
+
+File:
+app/dashboard/equipment/page.tsx
+Strings:
+- ([]);
+  const [filteredEquipment, setFilteredEquipment] = useState
+- (null);
+  const [deletingItemId, setDeletingItemId] = useState
+- (null);
+  const [selectedItem, setSelectedItem] = useState
+- );
+  }
+
+  return (
+- {t('remove', { defaultValue: 'Remove' })} Fleet Machine
+
+File:
+app/dashboard/farmer/page.tsx
+Strings:
+- ([]);
+  const [analytics, setAnalytics] = useState
+- );
+  }
+
+  return (
+
+File:
+app/dashboard/guides/page.tsx
+Strings:
+- );
+  }
+
+  return (
+
+File:
+app/dashboard/guides/[crop]/page.tsx
+Strings:
+- );
+  }
+
+  const stepData = steps[currentStep];
+  const progress = ((currentStep + 1) / steps.length) * 100;
+
+  return (
+
+File:
+app/dashboard/layout.tsx
+Strings:
+- );
+      case 'FARMER':
+        return (
+- );
+      case 'OWNER':
+      default:
+        return (
+- );
+    }
+
+    return (
+- );
+  };
+
+  return (
+- ) : (
+                  user?.name?.charAt(0) || role.charAt(0)
+                )}
+
+File:
+app/dashboard/marketplace/page.tsx
+Strings:
+- ([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('All Categories');
+  const [bookingDrafts, setBookingDrafts] = useState
+- );
+  };
+
+  return (
+
+File:
+app/dashboard/notifications/page.tsx
+Strings:
+- ;
+      case 'WARNING':
+        return
+- ;
+      case 'MODERATION':
+      case 'BOOKING':
+        return
+- ;
+      case 'AI':
+        return
+- ;
+      case 'INFO':
+      default:
+        return
+- !n.read).length;
+
+  return (
+
+File:
+app/dashboard/page.tsx
+Strings:
+- ([]);
+  const [analytics, setAnalytics] = useState
+- (null);
+  const [loading, setLoading] = useState(true);
+  const [selectedBooking, setSelectedBooking] = useState
+- );
+  }
+
+  return (
+- b.equipment).length}
+
+File:
+app/login/page.tsx
+Strings:
+- (null);
+  const [deliveryStatus, setDeliveryStatus] = useState
+- +91 9876543210
+- ••••••••
+- ••••••
+
+File:
+components/ErrorBoundary.tsx
+Strings:
+- Something went wrong
+- We encountered an unexpected error. Don't worry, your data is safe.
+- Try Again
+
+File:
+components/LanguageSwitcher.tsx
+Strings:
+- l.code === i18n.language) || languages[0];
+
+  return (
+
+File:
+components/ToastProvider.tsx
+Strings:
+- void;
+}
+
+const ToastContext = createContext
+- t.id !== id));
+  }, []);
+
+  return (
+- ,
+    error:
+- ,
+    warning:
+- ,
+    info:
+
+File:
+lib/api.ts
+Strings:
+- Offline Mode Active: Loading cached data.
+
+File:
+lib/config.ts
+Strings:
+- Critical configuration missing. Check console.
+
+File:
+store/chatStore.ts
+Strings:
+- void;
+}
+
+export const useChatStore = create
+
+File:
+store/notificationStore.ts
+Strings:
+- void;
+}
+
+export const useNotificationStore = create
+
+File:
+store/useStore.ts
+Strings:
+- void;
+}
+
+export const useStore = create
+
