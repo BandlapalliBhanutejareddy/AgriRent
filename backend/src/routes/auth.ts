@@ -1,10 +1,37 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { requireAuth } from '../middlewares/authMiddleware';
 import { sendOtpEmail } from '../lib/email';
 
 const router = Router();
+
+const generateTokens = async (userId: string, req: Request) => {
+  const secret = process.env.JWT_SECRET || 'fallback_secret';
+  
+  // 15 minute access token
+  const accessToken = jwt.sign({ userId }, secret, { expiresIn: '15m' });
+  
+  // 30 day refresh token
+  const refreshToken = crypto.randomBytes(40).toString('hex');
+  const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  
+  // Store session
+  await prisma.session.create({
+    data: {
+      userId,
+      refreshTokenHash,
+      expiresAt,
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.headers['user-agent']
+    }
+  });
+
+  return { accessToken, refreshToken };
+};
 
 // Password validation check utility
 function validatePasswordStrength(password: string): boolean {
@@ -68,15 +95,15 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
     
     // Save OTP to database
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-      'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-      String(email),
-      generatedOtp,
-      'REGISTER',
-      new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry
-    );
+    await prisma.oTPVerification.create({
+      data: {
+        id: 'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        email: String(email),
+        otp: generatedOtp,
+        purpose: 'REGISTER',
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+      }
+    });
 
     // Send real OTP email via Resend (with console log debug backup)
     await sendOtpEmail(String(email), generatedOtp, 'REGISTER');
@@ -90,6 +117,18 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         name: newUser.name,
         role: newUser.role,
         preferredLanguage: newUser.preferredLanguage
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: newUser.id,
+        actorRole: newUser.role,
+        action: 'REGISTER',
+        resource: 'User',
+        resourceId: newUser.id,
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent']
       }
     });
   } catch (error) {
@@ -108,15 +147,16 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Query direct OTP verification table using raw query for maximum compatibility
-    const otps: any[] = await prisma.$queryRawUnsafe(
-      `SELECT * FROM "OTPVerification" 
-       WHERE "email" = $1 AND "otp" = $2 AND "purpose" = $3 
-       ORDER BY "createdAt" DESC LIMIT 1`,
-      String(email),
-      String(otp),
-      String(purpose)
-    );
+    // Query direct OTP verification table using Prisma method
+    const otps = await prisma.oTPVerification.findMany({
+      where: {
+        email: String(email),
+        otp: String(otp),
+        purpose: String(purpose)
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 1
+    });
 
     if (otps.length === 0) {
       res.status(400).json({ success: false, error: 'Invalid OTP verification code' });
@@ -144,11 +184,14 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
     });
 
     // Delete utilized verification code
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM "OTPVerification" WHERE "email" = $1 AND "purpose" = $2`,
-      String(email),
-      String(purpose)
-    );
+    await prisma.oTPVerification.deleteMany({
+      where: {
+        email: String(email),
+        purpose: String(purpose)
+      }
+    });
+
+    const tokens = await generateTokens(updatedUser.id, req);
 
     res.json({
       success: true,
@@ -161,7 +204,8 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
         phone: updatedUser.phone,
         preferredLanguage: updatedUser.preferredLanguage
       },
-      token: 'demo-token-' + updatedUser.id
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
   } catch (error) {
     console.error('OTP Verification Error:', error);
@@ -185,25 +229,25 @@ router.post('/resend-otp', async (req: Request, res: Response): Promise<void> =>
     }
 
     // Invalidate previous OTPs for this purpose
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM "OTPVerification" WHERE "email" = $1 AND "purpose" = $2`,
-      String(email),
-      String(purpose)
-    );
+    await prisma.oTPVerification.deleteMany({
+      where: {
+        email: String(email),
+        purpose: String(purpose)
+      }
+    });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-      user.email,
-      otp,
-      String(purpose),
-      expiresAt,
-      new Date()
-    );
+    await prisma.oTPVerification.create({
+      data: {
+        id: 'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        email: user.email,
+        otp: otp,
+        purpose: String(purpose),
+        expiresAt: expiresAt
+      }
+    });
 
     await sendOtpEmail(user.email, otp, String(purpose));
 
@@ -218,10 +262,11 @@ router.post('/resend-otp', async (req: Request, res: Response): Promise<void> =>
 router.get('/dev-otp', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.query;
-    const otps: any[] = await prisma.$queryRawUnsafe(
-      `SELECT * FROM "OTPVerification" WHERE "email" = $1 ORDER BY "createdAt" DESC LIMIT 1`,
-      String(email)
-    );
+    const otps = await prisma.oTPVerification.findMany({
+      where: { email: String(email) },
+      orderBy: { createdAt: 'desc' },
+      take: 1
+    });
     if (otps.length > 0) {
       res.json({ success: true, otp: otps[0].otp, expiresAt: otps[0].expiresAt, purpose: otps[0].purpose });
     } else {
@@ -251,21 +296,29 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
+    // Invalidate old tokens
+    await prisma.oTPVerification.deleteMany({
+      where: {
+        email: String(email),
+        purpose: 'FORGOT_PASSWORD'
+      }
+    });
 
-    // Save OTP to database
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-      'otp-forgot-' + Date.now(),
-      String(email),
-      generatedOtp,
-      'FORGOT_PASSWORD',
-      new Date(Date.now() + 5 * 60 * 1000)
-    );
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins expiry for reset
+
+    await prisma.oTPVerification.create({
+      data: {
+        id: 'pwd-reset-' + Date.now(),
+        email: String(email),
+        otp: otp,
+        purpose: 'FORGOT_PASSWORD',
+        expiresAt: expiresAt
+      }
+    });
 
     // Send real recovery OTP email via Resend
-    await sendOtpEmail(String(email), generatedOtp, 'FORGOT_PASSWORD');
+    await sendOtpEmail(String(email), otp, 'FORGOT_PASSWORD');
 
     res.json({
       success: true,
@@ -411,6 +464,17 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (!user) {
+      await prisma.auditLog.create({
+        data: {
+          actorId: 'anonymous',
+          actorRole: 'UNKNOWN',
+          action: 'FAILED_LOGIN',
+          resource: 'Auth',
+          metadata: JSON.stringify({ reason: 'Invalid email', email }),
+          ip: req.ip || req.connection.remoteAddress,
+          userAgent: req.headers['user-agent']
+        }
+      });
       res.status(401).json({ success: false, error: 'Invalid credentials' });
       return;
     }
@@ -419,20 +483,21 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     if (!user.isVerified) {
       // Auto-trigger fresh registration OTP for convenient user verification
       const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
-      await prisma.$executeRawUnsafe(
-        `DELETE FROM "OTPVerification" WHERE "email" = $1 AND "purpose" = $2`,
-        String(email),
-        'REGISTER'
-      );
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
-         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-        'otp-resend-' + Date.now(),
-        String(email),
-        generatedOtp,
-        'REGISTER',
-        new Date(Date.now() + 5 * 60 * 1000)
-      );
+      await prisma.oTPVerification.deleteMany({
+        where: {
+          email: String(email),
+          purpose: 'REGISTER'
+        }
+      });
+      await prisma.oTPVerification.create({
+        data: {
+          id: 'otp-resend-' + Date.now(),
+          email: String(email),
+          otp: generatedOtp,
+          purpose: 'REGISTER',
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+        }
+      });
 
       // Send real resend OTP email via Resend
       await sendOtpEmail(String(email), generatedOtp, 'REGISTER');
@@ -446,6 +511,17 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     if (user.isSuspended) {
+      await prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          actorRole: user.role,
+          action: 'FAILED_LOGIN',
+          resource: 'Auth',
+          metadata: JSON.stringify({ reason: 'Account suspended' }),
+          ip: req.ip || req.connection.remoteAddress,
+          userAgent: req.headers['user-agent']
+        }
+      });
       res.status(403).json({ success: false, error: 'Account suspended by administrator' });
       return;
     }
@@ -458,6 +534,17 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       if (user.password === String(password)) {
         console.warn(`Plain text password match for ${email}.`);
       } else {
+        await prisma.auditLog.create({
+          data: {
+            actorId: user.id,
+            actorRole: user.role,
+            action: 'FAILED_LOGIN',
+            resource: 'Auth',
+            metadata: JSON.stringify({ reason: 'Invalid password' }),
+            ip: req.ip || req.connection.remoteAddress,
+            userAgent: req.headers['user-agent']
+          }
+        });
         res.status(401).json({ success: false, error: 'Invalid credentials' });
         return;
       }
@@ -471,6 +558,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       });
     }
 
+    const tokens = await generateTokens(authenticatedUser.id, req);
+
     res.json({
       success: true,
       user: {
@@ -481,7 +570,19 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         phone: authenticatedUser.phone,
         preferredLanguage: authenticatedUser.preferredLanguage
       },
-      token: 'demo-token-' + authenticatedUser.id
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: authenticatedUser.id,
+        actorRole: authenticatedUser.role,
+        action: 'LOGIN',
+        resource: 'Auth',
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent']
+      }
     });
   } catch (error) {
     console.error('Login Route Error:', error);
@@ -499,6 +600,95 @@ router.get('/me', requireAuth, async (req: any, res: Response): Promise<void> =>
     res.json(req.prismaUser);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// 8. Refresh Token Endpoint
+router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      res.status(400).json({ error: 'Refresh token required' });
+      return;
+    }
+
+    // Find all active sessions, we have to check hashes
+    const activeSessions = await prisma.session.findMany({
+      where: {
+        revokedAt: null,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    let validSession = null;
+    for (const session of activeSessions) {
+      const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
+      if (isMatch) {
+        validSession = session;
+        break;
+      }
+    }
+
+    if (!validSession) {
+      res.status(401).json({ error: 'Invalid or expired refresh token' });
+      return;
+    }
+
+    // Revoke the old session (Token Rotation)
+    await prisma.session.update({
+      where: { id: validSession.id },
+      data: { revokedAt: new Date() }
+    });
+
+    // Generate new tokens
+    const tokens = await generateTokens(validSession.userId, req);
+
+    res.json({
+      success: true,
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    });
+  } catch (error) {
+    console.error('Refresh Token Error:', error);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+// 9. Logout Endpoint
+router.post('/logout', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      const activeSessions = await prisma.session.findMany({
+        where: { revokedAt: null }
+      });
+      for (const session of activeSessions) {
+        if (await bcrypt.compare(refreshToken, session.refreshTokenHash)) {
+          await prisma.session.update({
+            where: { id: session.id },
+            data: { revokedAt: new Date() }
+          });
+          
+          const user = await prisma.user.findUnique({ where: { id: session.userId } });
+          if (user) {
+            await prisma.auditLog.create({
+              data: {
+                actorId: user.id,
+                actorRole: user.role,
+                action: 'LOGOUT',
+                resource: 'Auth',
+                ip: req.ip || req.connection.remoteAddress,
+                userAgent: req.headers['user-agent']
+              }
+            });
+          }
+          break;
+        }
+      }
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to logout' });
   }
 });
 

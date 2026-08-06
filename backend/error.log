@@ -548,3 +548,15 @@ Server has closed the connection.
     at $n.request (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:121:6307)
     at async l (D:\AgriRent_AI\backend\node_modules\@prisma\client\runtime\library.js:130:9633)
 ---
+[2026-08-06T11:00:11.347Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\src\index.ts:35:23)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---

@@ -26,6 +26,7 @@ model User {
   messages          Message[]
   notifications     Notification[]
   savedEquipment    SavedEquipment[]
+  sessions          Session[]
 }
 
 model Equipment {
@@ -122,6 +123,40 @@ model Message {
   @@index([bookingId])
   @@index([senderId])
 }
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  revokedAt        DateTime?
+  ipAddress        String?
+  userAgent        String?
+  
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  String
+  action     String
+  resource   String
+  resourceId String?
+  ip         String?
+  userAgent  String?
+  metadata   String?  // JSON string
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}
+
 
 model FarmingGuide {
   id                   String   @id @default(cuid())

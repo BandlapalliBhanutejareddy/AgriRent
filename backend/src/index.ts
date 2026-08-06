@@ -8,43 +8,101 @@ import compression from 'compression';
 import { responseMiddleware, errorMiddleware } from './middlewares/responseMiddleware';
 import { initSocket } from './lib/socket';
 
-dotenv.config();
+import { validateEnv } from './config/env';
+
+// Validate environment variables on startup
+validateEnv();
 
 const app = express();
 const server = http.createServer(app);
 initSocket(server);
 const port = process.env.PORT || 4000;
 
-// 1. CORS FIRST (Essential for all responses including errors)
-app.use(cors());
+import crypto from 'crypto';
+
+// Strict CORS Whitelist
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://your-vercel-domain.vercel.app',
+  'https://www.agrorent.ai'
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json());
 
-// Simple request logger
+// Structured Logger with Request IDs
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  const reqId = crypto.randomUUID();
+  req.headers['x-request-id'] = reqId;
+  res.setHeader('x-request-id', reqId);
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] [${reqId}] ${req.method} ${req.url} ${res.statusCode} - ${duration}ms`);
+  });
+  
   next();
 });
 
-// Security Middleware
-app.use(helmet());
+// Security Middleware (Helmet)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://checkout.razorpay.com"],
+      frameSrc: ["'self'", "https://api.razorpay.com"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.razorpay.com"]
+    },
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  xFrameOptions: { action: 'deny' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  dnsPrefetchControl: { allow: false }
+}));
 app.use(compression());
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10000, // Relaxed for dashboard concurrent requests
-  message: 'Rate limit exceeded',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', apiLimiter);
+// Granular Rate Limiters
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: 'Too many auth requests' });
+const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: 3, message: 'Too many OTP requests' });
+const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, message: 'AI request limit reached' });
+const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: 'Too many payment requests' });
+const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, message: 'Rate limit exceeded' });
+
+app.use('/api/', generalLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/api/ai', aiLimiter);
+app.use('/api/payments', paymentsLimiter);
 
 import { sanitize } from './middlewares/sanitize';
+import { prisma } from './lib/prisma';
 
 app.use(sanitize);
 app.use(responseMiddleware);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'AgroRent API is running!' });
+});
+
+app.get('/api/ready', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ready', database: 'connected' });
+  } catch (error) {
+    res.status(503).json({ status: 'unready', database: 'disconnected' });
+  }
 });
 
 import authRoutes from './routes/auth';
@@ -77,15 +135,35 @@ app.use('/api/analytics', analyticsRoutes);
 app.use((err: any, req: Request, res: Response, next: any) => {
   const fs = require('fs');
   const path = require('path');
-  const errorLog = `[${new Date().toISOString()}] ${err.stack}\n---\n`;
+  const reqId = req.headers['x-request-id'] || 'unknown';
+  const errorLog = `[${new Date().toISOString()}] [${reqId}] ${err.stack}\n---\n`;
   fs.appendFileSync(path.join(__dirname, '../error.log'), errorLog);
   errorMiddleware(err, req, res, next);
 });
 
-server.listen(port, () => {
+const activeServer = server.listen(port, () => {
   console.log(`Backend server running on http://localhost:${port}`);
 });
 
-// Force keep-alive
+// Graceful Shutdown
+const shutdown = async (signal: string) => {
+  console.log(`\n${signal} signal received: closing HTTP server`);
+  activeServer.close(async () => {
+    console.log('HTTP server closed');
+    try {
+      await prisma.$disconnect();
+      console.log('Prisma connection disconnected');
+      process.exit(0);
+    } catch (err) {
+      console.error('Error during disconnection', err);
+      process.exit(1);
+    }
+  });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Force keep-alive (Development only)
 setInterval(() => {}, 10000);
 

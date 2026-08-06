@@ -40,6 +40,18 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
         contents: contextPrompt,
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.prismaUser.id,
+        actorRole: req.prismaUser.role,
+        action: 'AI_PROMPT_EXECUTED',
+        resource: 'AI',
+        metadata: JSON.stringify({ prompt, language }),
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent']
+      }
+    });
+
     res.json({ reply: response.text });
   } catch (error: any) {
     console.error('AI Advisor Error:', error);

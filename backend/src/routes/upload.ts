@@ -5,15 +5,32 @@ import { requireAuth, AuthRequest } from '../middlewares/authMiddleware';
 import { processImage } from '../lib/imageProcessor';
 
 const router = Router();
+import path from 'path';
+
+const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic'];
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only images are allowed'));
+    // Check MIME type
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return cb(new Error('Invalid file type. Only JPEG, PNG, WEBP, and HEIC are allowed.'));
     }
+
+    // Check extension
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      return cb(new Error('Invalid file extension.'));
+    }
+
+    // Reject executable content explicitly
+    if (ext === '.exe' || ext === '.sh' || ext === '.bat' || ext === '.js') {
+      return cb(new Error('Executable files are not allowed.'));
+    }
+
+    cb(null, true);
   }
 });
 

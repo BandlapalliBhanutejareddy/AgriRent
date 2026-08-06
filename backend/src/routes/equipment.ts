@@ -343,6 +343,19 @@ router.delete('/:id', requireAuth, requireRole('OWNER'), async (req: AuthRequest
       where: { id: equipmentId }
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.prismaUser.id,
+        actorRole: req.prismaUser.role,
+        action: 'DELETE_EQUIPMENT',
+        resource: 'Equipment',
+        resourceId: equipmentId,
+        metadata: JSON.stringify({ title: existingEquipment.title }),
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent']
+      }
+    });
+
     res.json({ message: 'Equipment deleted successfully' });
   } catch (error) {
     console.error('Delete Equipment Error:', error);

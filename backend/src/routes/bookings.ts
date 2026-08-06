@@ -93,6 +93,19 @@ router.post('/', requireAuth, requireRole('FARMER'), validate(createBookingSchem
       });
     }
 
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.prismaUser.id,
+        actorRole: req.prismaUser.role,
+        action: 'CREATE_BOOKING',
+        resource: 'Booking',
+        resourceId: booking.id,
+        metadata: JSON.stringify({ equipmentId, startDate: start, endDate: end, price: totalPrice }),
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent']
+      }
+    });
+
     res.status(201).json(booking);
   } catch (error) {
     console.error('Create booking error:', error);

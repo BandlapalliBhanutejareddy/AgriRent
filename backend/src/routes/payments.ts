@@ -234,6 +234,18 @@ router.post('/:bookingId/refund', requireAuth, async (req: AuthRequest, res: Res
         where: { id: bookingId },
         data: { paymentStatus: 'REFUND_PROCESSING' }
       });
+      await tx.auditLog.create({
+        data: {
+          actorId: req.prismaUser.id,
+          actorRole: req.prismaUser.role,
+          action: 'REFUND_INITIATED',
+          resource: 'PaymentTransaction',
+          resourceId: payment.id,
+          metadata: JSON.stringify({ bookingId, refundId: refund.id }),
+          ip: req.ip || req.connection.remoteAddress,
+          userAgent: req.headers['user-agent']
+        }
+      });
     });
 
     res.json({ success: true, message: 'Refund initiated successfully', refundId: refund.id });
@@ -290,6 +302,18 @@ router.post('/webhook', async (req: Request | any, res: Response): Promise<void>
             where: { id: transaction.bookingId },
             data: { paymentStatus: 'PAID', paymentId: paymentEntity.id, status: 'CONFIRMED' }
           });
+          await tx.auditLog.create({
+            data: {
+              actorId: 'system',
+              actorRole: 'ADMIN',
+              action: 'PAYMENT_CAPTURED',
+              resource: 'PaymentTransaction',
+              resourceId: transaction.id,
+              metadata: JSON.stringify({ orderId, paymentId: paymentEntity.id }),
+              ip: req.ip || req.connection.remoteAddress,
+              userAgent: req.headers['user-agent']
+            }
+          });
         });
       }
     } else if (event === 'payment.failed') {
@@ -323,6 +347,18 @@ router.post('/webhook', async (req: Request | any, res: Response): Promise<void>
           await tx.booking.update({
             where: { id: transaction.bookingId },
             data: { paymentStatus: 'REFUNDED', status: 'CANCELLED' }
+          });
+          await tx.auditLog.create({
+            data: {
+              actorId: 'system',
+              actorRole: 'ADMIN',
+              action: 'REFUND_PROCESSED',
+              resource: 'PaymentTransaction',
+              resourceId: transaction.id,
+              metadata: JSON.stringify({ paymentId, refundId: refundEntity.id, amount: refundEntity.amount / 100 }),
+              ip: req.ip || req.connection.remoteAddress,
+              userAgent: req.headers['user-agent']
+            }
           });
         });
       }
