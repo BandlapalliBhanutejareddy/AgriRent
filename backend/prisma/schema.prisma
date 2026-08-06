@@ -3,59 +3,58 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id             String           @id @default(cuid())
-  phone          String?
-  name           String
-  createdAt      DateTime         @default(now())
-  email          String           @unique
-  password       String
-  profileImage   String?
-  role           Role
-  authId         String?          @unique
-  isVerified     Boolean          @default(true)
-  isSuspended    Boolean          @default(false)
-  pushToken      String?
-  bookings       Booking[]
-  equipments     Equipment[]
-  messages       Message[]
-  notifications  Notification[]
-  savedEquipment SavedEquipment[]
-  preferredLanguage String       @default("en")
+  id                String           @id @default(cuid())
+  phone             String?
+  name              String
+  createdAt         DateTime         @default(now())
+  email             String           @unique
+  password          String
+  profileImage      String?
+  role              String
+  authId            String?          @unique
+  isVerified        Boolean          @default(true)
+  isSuspended       Boolean          @default(false)
+  pushToken         String?
+  preferredLanguage String           @default("en")
+  bookings          Booking[]
+  equipments        Equipment[]
+  messages          Message[]
+  notifications     Notification[]
+  savedEquipment    SavedEquipment[]
 }
 
 model Equipment {
-  id             String           @id @default(cuid())
-  category       String
-  description    String
-  pricePerDay    Float
-  imageUrl       String
-  ownerId        String
-  createdAt      DateTime         @default(now())
-  available      Boolean          @default(true)
-  title          String
-  location       String?
-  latitude       Float?
-  longitude      Float?
-  titleEn        String?
-  titleTe        String?
-  titleHi        String?
-  titleTa        String?
-  titleKn        String?
-  descriptionEn  String?
-  descriptionTe  String?
-  descriptionHi  String?
-  descriptionTa  String?
-  descriptionKn  String?
-  translationVersion Int @default(1)
-  bookings       Booking[]
-  owner          User             @relation(fields: [ownerId], references: [id])
-  savedEquipment SavedEquipment[]
+  id                 String           @id @default(cuid())
+  category           String
+  description        String
+  pricePerDay        Float
+  imageUrl           String
+  ownerId            String
+  createdAt          DateTime         @default(now())
+  available          Boolean          @default(true)
+  title              String
+  location           String?
+  latitude           Float?
+  longitude          Float?
+  titleEn            String?
+  titleTe            String?
+  titleHi            String?
+  titleTa            String?
+  titleKn            String?
+  descriptionEn      String?
+  descriptionTe      String?
+  descriptionHi      String?
+  descriptionTa      String?
+  descriptionKn      String?
+  translationVersion Int              @default(1)
+  bookings           Booking[]
+  owner              User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  savedEquipment     SavedEquipment[]
 
   @@unique([title, ownerId])
   @@index([ownerId])
@@ -64,19 +63,19 @@ model Equipment {
 }
 
 model Booking {
-  id            String        @id @default(cuid())
+  id            String    @id @default(cuid())
   farmerId      String
   equipmentId   String
   startDate     DateTime
   endDate       DateTime
-  createdAt     DateTime      @default(now())
-  status        BookingStatus
+  createdAt     DateTime  @default(now())
+  status        String
   totalPrice    Float?
   amountPaid    Float?
   paymentId     String?
-  paymentStatus String        @default("PENDING")
-  equipment     Equipment     @relation(fields: [equipmentId], references: [id])
-  farmer        User          @relation(fields: [farmerId], references: [id])
+  paymentStatus String    @default("PENDING")
+  farmer        User      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  equipment     Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
   messages      Message[]
 
   @@index([farmerId])
@@ -93,7 +92,7 @@ model Notification {
   createdAt DateTime @default(now())
   relatedId String?
   type      String?
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
@@ -104,8 +103,8 @@ model SavedEquipment {
   userId      String
   equipmentId String
   createdAt   DateTime  @default(now())
-  equipment   Equipment @relation(fields: [equipmentId], references: [id])
-  user        User      @relation(fields: [userId], references: [id])
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, equipmentId])
 }
@@ -116,8 +115,8 @@ model Message {
   senderId  String
   text      String
   createdAt DateTime @default(now())
-  booking   Booking  @relation(fields: [bookingId], references: [id])
-  sender    User     @relation(fields: [senderId], references: [id])
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
   @@index([senderId])
@@ -153,18 +152,3 @@ model OTPVerification {
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
-
-enum Role {
-  FARMER
-  OWNER
-  ADMIN
-}
-
-enum BookingStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  COMPLETED
-  CANCELLED
-}
-// AI Advisor Tables added 

@@ -70,7 +70,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     // Save OTP to database
     await prisma.$executeRawUnsafe(
       `INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
       'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
       String(email),
       generatedOtp,
@@ -111,7 +111,7 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
     // Query direct OTP verification table using raw query for maximum compatibility
     const otps: any[] = await prisma.$queryRawUnsafe(
       `SELECT * FROM "OTPVerification" 
-       WHERE "email" = $1 AND "otp" = $2 AND "purpose" = $3 AND "expiresAt" > NOW() 
+       WHERE "email" = $1 AND "otp" = $2 AND "purpose" = $3 
        ORDER BY "createdAt" DESC LIMIT 1`,
       String(email),
       String(otp),
@@ -119,7 +119,12 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
     );
 
     if (otps.length === 0) {
-      res.status(400).json({ success: false, error: 'Invalid or expired OTP verification code' });
+      res.status(400).json({ success: false, error: 'Invalid OTP verification code' });
+      return;
+    }
+
+    if (new Date(otps[0].expiresAt).getTime() < Date.now()) {
+      res.status(400).json({ success: false, error: 'Expired OTP verification code' });
       return;
     }
 
@@ -251,7 +256,7 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
     // Save OTP to database
     await prisma.$executeRawUnsafe(
       `INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
       'otp-forgot-' + Date.now(),
       String(email),
       generatedOtp,
@@ -293,14 +298,19 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
     // Verify OTP exists and matches
     const otps: any[] = await prisma.$queryRawUnsafe(
       `SELECT * FROM "OTPVerification" 
-       WHERE "email" = $1 AND "otp" = $2 AND "purpose" = $3 AND "expiresAt" > NOW()`,
+       WHERE "email" = $1 AND "otp" = $2 AND "purpose" = $3`,
       String(email),
       String(otp),
       'FORGOT_PASSWORD'
     );
 
     if (otps.length === 0) {
-      res.status(400).json({ success: false, error: 'Invalid or expired OTP code' });
+      res.status(400).json({ success: false, error: 'Invalid OTP code' });
+      return;
+    }
+
+    if (new Date(otps[0].expiresAt).getTime() < Date.now()) {
+      res.status(400).json({ success: false, error: 'Expired OTP code' });
       return;
     }
 
@@ -416,7 +426,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       );
       await prisma.$executeRawUnsafe(
         `INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
-         VALUES ($1, $2, $3, $4, $5, NOW())`,
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
         'otp-resend-' + Date.now(),
         String(email),
         generatedOtp,
@@ -432,6 +442,11 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         error: 'Email address is not verified yet. A fresh verification OTP has been dispatched to your email!',
         email: user.email
       });
+      return;
+    }
+
+    if (user.isSuspended) {
+      res.status(403).json({ success: false, error: 'Account suspended by administrator' });
       return;
     }
 

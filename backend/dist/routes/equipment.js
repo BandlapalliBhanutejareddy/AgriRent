@@ -8,6 +8,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
@@ -15,6 +18,9 @@ const validate_1 = require("../middlewares/validate");
 const schemas_1 = require("../schemas");
 const storage_1 = require("../lib/storage");
 const prisma_1 = require("../lib/prisma");
+const push_1 = require("../lib/push");
+const axios_1 = __importDefault(require("axios"));
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 const router = (0, express_1.Router)();
 // Get Equipment List (With Filters)
 router.get('/', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -34,11 +40,39 @@ router.get('/', (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
             where.category = String(category).toUpperCase();
         }
         if (search) {
-            const searchStr = String(search);
+            const searchStr = String(search).toLowerCase();
+            // Hybrid search: local mapped keyword first
+            const dictionary = {
+                'ట్రాక్టర్': 'tractor', 'tractor': 'tractor', 'ट्रैक्टर': 'tractor', 'டிராக்டர்': 'tractor', 'ಟ್ರಾಕ್ಟರ್': 'tractor',
+                'harvester': 'harvester', 'హార్వెస్టర్': 'harvester', 'हार्वेस्टर': 'harvester', 'அறுவடை இயந்திரம்': 'harvester', 'ಹಾರ್ವೆಸ್ಟರ್': 'harvester',
+                'cultivator': 'cultivator', 'కల్టివేటర్': 'cultivator', 'कल्टीवेटर': 'cultivator', 'சாகுபடியாளர்': 'cultivator', 'ಕಲ್ಟಿವೇಟರ್': 'cultivator',
+                'rotavator': 'rotavator', 'రోటవేటర్': 'rotavator', 'रोटावेटर': 'rotavator', 'ரோட்டாவேட்டர்': 'rotavator', 'ರೊಟಾವೇಟರ್': 'rotavator',
+                'sprayer': 'sprayer', 'స్ప్రేయర్': 'sprayer', 'स्प्रेयर': 'sprayer', 'தெளிப்பான்': 'sprayer', 'ಸಿಂಪಡಿಸುವವನು': 'sprayer',
+                'thresher': 'thresher', 'థ్రెషర్': 'thresher', 'थ्रेशर': 'thresher', 'கதிர் அடிப்பான்': 'thresher', 'ಥ್ರೆಷರ್': 'thresher',
+                'seed drill': 'seed drill', 'సీడ్ డ్రిల్': 'seed drill', 'सीड ड्रिल': 'seed drill', 'விதை துரப்பணம்': 'seed drill', 'ಬೀಜ ಡ್ರಿಲ್': 'seed drill',
+                'power tiller': 'power tiller', 'పవర్ టిల్లర్': 'power tiller', 'पावर टिलर': 'power tiller', 'பவர் டில்லர்': 'power tiller', 'ಪವರ್ ಟಿಲ್ಲರ್': 'power tiller',
+                'rice transplanter': 'rice transplanter', 'రైస్ ట్రాన్స్‌ప్లాంటర్': 'rice transplanter', 'राइस ट्रांसप्लांटर': 'rice transplanter', 'நெல் நாற்று நடும் இயந்திரம்': 'rice transplanter', 'ಭತ್ತದ ನಾಟಿ ಯಂತ್ರ': 'rice transplanter'
+            };
+            let keyword = dictionary[searchStr];
+            if (!keyword) {
+                // Fallback to AI intent
+                try {
+                    const aiResponse = yield axios_1.default.post(`${AI_SERVICE_URL}/search-intent`, { query: searchStr });
+                    keyword = aiResponse.data.keywords;
+                }
+                catch (e) {
+                    keyword = searchStr;
+                }
+            }
             where.OR = [
-                { title: { contains: searchStr, mode: 'insensitive' } },
-                { description: { contains: searchStr, mode: 'insensitive' } },
-                { location: { contains: searchStr, mode: 'insensitive' } }
+                { title: { contains: keyword, mode: 'insensitive' } },
+                { description: { contains: keyword, mode: 'insensitive' } },
+                { category: { contains: keyword, mode: 'insensitive' } },
+                { titleEn: { contains: keyword, mode: 'insensitive' } },
+                { titleTe: { contains: searchStr, mode: 'insensitive' } },
+                { titleHi: { contains: searchStr, mode: 'insensitive' } },
+                { titleTa: { contains: searchStr, mode: 'insensitive' } },
+                { titleKn: { contains: searchStr, mode: 'insensitive' } }
             ];
         }
         if (minPrice || maxPrice) {
@@ -152,18 +186,41 @@ router.post('/', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)
     console.log("CREATE PAYLOAD", req.body);
     try {
         const { title, category, pricePerDay, description, imageUrl, location } = req.body;
+        let finalImageUrl = imageUrl ? String(imageUrl) : '';
+        let transData = {};
+        try {
+            const aiResponse = yield axios_1.default.post(`${AI_SERVICE_URL}/translate-listing`, {
+                title: String(title),
+                description: description ? String(description) : ''
+            });
+            transData = aiResponse.data;
+        }
+        catch (e) {
+            console.warn('AI translation failed, storing without translations', e);
+        }
         const equipment = yield prisma_1.prisma.equipment.create({
             data: {
                 title: String(title),
                 category: String(category).toUpperCase(),
                 pricePerDay: parseFloat(String(pricePerDay)),
                 description: description ? String(description) : '',
-                imageUrl: imageUrl ? String(imageUrl) : '',
+                imageUrl: finalImageUrl,
                 location: location ? String(location) : null,
                 latitude: req.body.latitude ? parseFloat(String(req.body.latitude)) : null,
                 longitude: req.body.longitude ? parseFloat(String(req.body.longitude)) : null,
                 ownerId: String(req.prismaUser.id),
-                available: true
+                available: true,
+                titleEn: transData.titleEn || null,
+                titleTe: transData.titleTe || null,
+                titleHi: transData.titleHi || null,
+                titleTa: transData.titleTa || null,
+                titleKn: transData.titleKn || null,
+                descriptionEn: transData.descriptionEn || null,
+                descriptionTe: transData.descriptionTe || null,
+                descriptionHi: transData.descriptionHi || null,
+                descriptionTa: transData.descriptionTa || null,
+                descriptionKn: transData.descriptionKn || null,
+                translationVersion: 1
             }
         });
         console.log("CREATED", equipment);
@@ -215,6 +272,31 @@ router.put('/:id', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRol
             where: { id: equipmentId },
             data
         });
+        if (data.available === false && existingEquipment.available !== false) {
+            const adminUsers = yield prisma_1.prisma.user.findMany({
+                where: { role: 'ADMIN', pushToken: { not: null } },
+                select: { id: true, pushToken: true }
+            });
+            yield prisma_1.prisma.notification.createMany({
+                data: adminUsers.map(admin => ({
+                    userId: admin.id,
+                    title: 'Equipment flagged for review',
+                    message: `Owner ${req.prismaUser.name} flagged ${equipment.title} as unavailable. Review the listing.`,
+                    type: 'EQUIPMENT_FLAGGED',
+                    relatedId: equipment.id
+                }))
+            });
+            const pushTokens = adminUsers
+                .map(admin => admin.pushToken)
+                .filter(Boolean);
+            if (pushTokens.length > 0) {
+                yield (0, push_1.sendPushNotification)(pushTokens, {
+                    title: 'Equipment flagged for review',
+                    body: `${req.prismaUser.name} marked ${equipment.title} unavailable. Please review.`,
+                    data: { equipmentId: equipment.id, screen: 'admin/alerts' }
+                });
+            }
+        }
         res.json(equipment);
     }
     catch (error) {

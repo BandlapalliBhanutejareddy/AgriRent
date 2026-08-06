@@ -14,6 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendOtpEmail = sendOtpEmail;
 const dotenv_1 = __importDefault(require("dotenv"));
+const nodemailer_1 = __importDefault(require("nodemailer"));
 dotenv_1.default.config();
 function sendOtpEmail(email, otp, purpose) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -25,7 +26,7 @@ function sendOtpEmail(email, otp, purpose) {
             ? `Welcome to AgroRent AI! Your secure 6-digit account activation verification code is ${otp}.`
             : `You requested password recovery. Your secure 6-digit recovery OTP is ${otp}.`;
         const bodyHtml = `
-    <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 16px;">
+    <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px;">
       <h2 style="color: #059669; text-align: center;">AgroRent AI Security Service</h2>
       <p>Hello,</p>
       <p>${purpose === 'REGISTER' ? 'Thank you for signing up with AgroRent AI!' : 'You initiated a secure password recovery request.'}</p>
@@ -36,9 +37,35 @@ function sendOtpEmail(email, otp, purpose) {
     </div>
   `;
         console.log(`[EMAIL DISPATCH] Target: ${email} | Purpose: ${purpose} | Status: Initiated`);
-        if (!apiKey) {
-            console.warn(`[WARNING] RESEND_API_KEY is not set. Emails will not be dispatched.`);
-            return false;
+        if (!apiKey || apiKey === 're_123456789' || apiKey.includes('123456789')) {
+            console.warn(`[WARNING] Valid RESEND_API_KEY is not set. Falling back to Ethereal Testing Mail.`);
+            try {
+                // Create ethereal test account on the fly
+                const testAccount = yield nodemailer_1.default.createTestAccount();
+                const transporter = nodemailer_1.default.createTransport({
+                    host: "smtp.ethereal.email",
+                    port: 587,
+                    secure: false, // true for 465, false for other ports
+                    auth: {
+                        user: testAccount.user, // generated ethereal user
+                        pass: testAccount.pass, // generated ethereal password
+                    },
+                });
+                const info = yield transporter.sendMail({
+                    from: '"AgroRent AI Security" <security@agrorent.dev>',
+                    to: email,
+                    subject: subject,
+                    text: bodyText,
+                    html: bodyHtml,
+                });
+                console.log(`[SUCCESS] Ethereal Email sent! ID: ${info.messageId}`);
+                console.log(`[ETHEREAL MAILBOX] Preview URL: ${nodemailer_1.default.getTestMessageUrl(info)}`);
+                return true;
+            }
+            catch (err) {
+                console.error(`[EXCEPTION] Failed to dispatch via Ethereal:`, err);
+                return false;
+            }
         }
         try {
             const response = yield fetch('https://api.resend.com/emails', {

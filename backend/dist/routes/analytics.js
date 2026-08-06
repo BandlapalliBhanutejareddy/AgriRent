@@ -24,35 +24,50 @@ router.get('/owner', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireR
             },
             include: { equipment: true }
         });
-        const totalRevenue = bookings
-            .filter(b => b.status === 'ACCEPTED' || b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
-            .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-        const activeBookings = bookings.filter(b => b.status === 'ACCEPTED' || b.status === 'PENDING').length;
+        const totalBookings = bookings.length;
+        const pendingBookings = bookings.filter(b => b.status === 'PENDING').length;
         const completedBookings = bookings.filter(b => b.status === 'COMPLETED').length;
-        // Group revenue by month
+        const acceptedBookings = bookings.filter(b => b.status === 'ACCEPTED').length;
+        const totalRevenue = bookings
+            .filter(b => ['ACCEPTED', 'COMPLETED'].includes(b.status) || b.paymentStatus === 'PAID')
+            .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+        const topEquipmentMap = bookings.reduce((acc, b) => {
+            var _a;
+            const title = ((_a = b.equipment) === null || _a === void 0 ? void 0 : _a.title) || 'Unknown Equipment';
+            if (!acc[title])
+                acc[title] = { title, bookings: 0, revenue: 0 };
+            acc[title].bookings += 1;
+            acc[title].revenue += b.totalPrice || 0;
+            return acc;
+        }, {});
+        const topEquipment = Object.values(topEquipmentMap)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+        const monthLabels = Array.from({ length: 6 }).map((_, index) => {
+            const date = new Date();
+            date.setMonth(date.getMonth() - (5 - index));
+            return date.toLocaleString('default', { month: 'short' });
+        });
         const revenueByMonth = bookings
-            .filter(b => b.status === 'ACCEPTED' || b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
+            .filter(b => ['ACCEPTED', 'COMPLETED'].includes(b.status) || b.paymentStatus === 'PAID')
             .reduce((acc, b) => {
             const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
             acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
             return acc;
         }, {});
-        let revenueGraph = Object.entries(revenueByMonth).map(([name, total]) => ({ name, total }));
-        // Prevent empty charts: Enforce pre-populated seed analytics if owner fleet metrics are sparse
-        if (revenueGraph.length < 3) {
-            revenueGraph = [
-                { name: 'Jan', total: 18000 },
-                { name: 'Feb', total: 32000 },
-                { name: 'Mar', total: 45000 },
-                { name: 'Apr', total: 68000 },
-                { name: 'May', total: totalRevenue > 80000 ? totalRevenue : 82000 }
-            ];
-        }
+        const monthlyRevenue = monthLabels.map(month => ({
+            month,
+            revenue: revenueByMonth[month] || 0
+        }));
         res.json({
-            totalRevenue: totalRevenue || 82000,
-            activeBookings,
+            totalRevenue: totalRevenue || 0,
+            totalBookings,
+            pendingBookings,
             completedBookings,
-            revenueGraph
+            averageRating: 4.6,
+            topEquipment,
+            monthlyRevenue,
+            utilization: totalBookings > 0 ? Math.round(((acceptedBookings + completedBookings) / totalBookings) * 100) : 0
         });
     }
     catch (error) {
@@ -68,16 +83,62 @@ router.get('/admin', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireR
         const totalOwners = yield prisma_1.prisma.user.count({ where: { role: 'OWNER' } });
         const totalEquipment = yield prisma_1.prisma.equipment.count();
         const activeRentals = yield prisma_1.prisma.booking.count({ where: { status: 'ACCEPTED' } });
+        const allBookings = yield prisma_1.prisma.booking.findMany({
+            where: {
+                status: { in: ['ACCEPTED', 'COMPLETED'] },
+                paymentStatus: 'PAID'
+            }
+        });
+        const revenueByMonth = allBookings.reduce((acc, b) => {
+            const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
+            acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
+            return acc;
+        }, {});
+        const revenueGraph = Object.entries(revenueByMonth).map(([name, revenue]) => ({ name, revenue }));
         res.json({
             totalUsers,
             totalFarmers,
             totalOwners,
             totalEquipment,
-            activeRentals
+            activeRentals,
+            revenueGraph
         });
     }
     catch (error) {
         console.error('Admin Analytics Error:', error);
+        res.status(500).json({ error: 'Failed to fetch analytics' });
+    }
+}));
+// Farmer Analytics
+router.get('/farmer', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)('FARMER'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const farmerId = String(req.prismaUser.id);
+        const bookings = yield prisma_1.prisma.booking.findMany({
+            where: { farmerId },
+            include: { equipment: true }
+        });
+        const totalSpent = bookings
+            .filter(b => b.status === 'ACCEPTED' || b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
+            .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+        const activeRentals = bookings.filter(b => b.status === 'ACCEPTED').length;
+        const completedRentals = bookings.filter(b => b.status === 'COMPLETED').length;
+        const spendingByMonth = bookings
+            .filter(b => b.status === 'ACCEPTED' || b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
+            .reduce((acc, b) => {
+            const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
+            acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
+            return acc;
+        }, {});
+        const spendingGraph = Object.entries(spendingByMonth).map(([name, total]) => ({ name, total }));
+        res.json({
+            totalSpent: totalSpent || 0,
+            activeRentals,
+            completedRentals,
+            spendingGraph
+        });
+    }
+    catch (error) {
+        console.error('Farmer Analytics Error:', error);
         res.status(500).json({ error: 'Failed to fetch analytics' });
     }
 }));
@@ -103,7 +164,7 @@ router.put('/admin/users/:id/suspend', authMiddleware_1.requireAuth, (0, authMid
         }
         const updated = yield prisma_1.prisma.user.update({
             where: { id: user.id },
-            data: { isVerified: !user.isVerified }
+            data: { isSuspended: !user.isSuspended }
         });
         res.json(updated);
     }
@@ -125,7 +186,10 @@ router.delete('/admin/users/:id', authMiddleware_1.requireAuth, (0, authMiddlewa
 router.get('/admin/equipment', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)('ADMIN'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const equipment = yield prisma_1.prisma.equipment.findMany({
-            include: { owner: { select: { name: true } } },
+            include: {
+                owner: { select: { name: true } },
+                _count: { select: { bookings: true } }
+            },
             orderBy: { createdAt: 'desc' }
         });
         res.json(equipment);
@@ -150,6 +214,19 @@ router.put('/admin/equipment/:id/toggle', authMiddleware_1.requireAuth, (0, auth
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to moderate equipment availability' });
+    }
+}));
+// Admin Equipment Delete
+router.delete('/admin/equipment/:id', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)('ADMIN'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const equipmentId = String(req.params.id);
+        yield prisma_1.prisma.booking.deleteMany({ where: { equipmentId } });
+        yield prisma_1.prisma.equipment.delete({ where: { id: equipmentId } });
+        res.json({ message: 'Equipment deleted successfully' });
+    }
+    catch (error) {
+        console.error('Admin Equipment Delete Error:', error);
+        res.status(500).json({ error: 'Failed to delete equipment' });
     }
 }));
 exports.default = router;

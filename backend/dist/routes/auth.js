@@ -83,7 +83,8 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
                 id: newUser.id,
                 email: newUser.email,
                 name: newUser.name,
-                role: newUser.role
+                role: newUser.role,
+                preferredLanguage: newUser.preferredLanguage
             }
         });
     }
@@ -108,8 +109,16 @@ router.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, funct
             res.status(400).json({ success: false, error: 'Invalid or expired OTP verification code' });
             return;
         }
-        // Mark user as verified
-        yield prisma_1.prisma.user.update({
+        // For FORGOT_PASSWORD: don't delete the OTP or update user here — reset-password will do that
+        if (String(purpose) === 'FORGOT_PASSWORD') {
+            res.json({
+                success: true,
+                message: 'OTP verified. You may now reset your password.'
+            });
+            return;
+        }
+        // Mark user as verified (REGISTER only)
+        const updatedUser = yield prisma_1.prisma.user.update({
             where: { email: String(email) },
             data: { isVerified: true }
         });
@@ -117,12 +126,64 @@ router.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, funct
         yield prisma_1.prisma.$executeRawUnsafe(`DELETE FROM "OTPVerification" WHERE "email" = $1 AND "purpose" = $2`, String(email), String(purpose));
         res.json({
             success: true,
-            message: 'Email OTP validation successful! Account activated.'
+            message: 'Email OTP validation successful! Account activated.',
+            user: {
+                id: updatedUser.id,
+                email: updatedUser.email,
+                name: updatedUser.name,
+                role: updatedUser.role,
+                phone: updatedUser.phone,
+                preferredLanguage: updatedUser.preferredLanguage
+            },
+            token: 'demo-token-' + updatedUser.id
         });
     }
     catch (error) {
         console.error('OTP Verification Error:', error);
         res.status(500).json({ success: false, error: 'Verification failed' });
+    }
+}));
+// 2b. Resend OTP
+router.post('/resend-otp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, purpose } = req.body;
+        if (!email || !purpose) {
+            res.status(400).json({ success: false, error: 'Email and purpose are required' });
+            return;
+        }
+        const user = yield prisma_1.prisma.user.findUnique({ where: { email: String(email) } });
+        if (!user) {
+            res.status(404).json({ success: false, error: 'User not found' });
+            return;
+        }
+        // Invalidate previous OTPs for this purpose
+        yield prisma_1.prisma.$executeRawUnsafe(`DELETE FROM "OTPVerification" WHERE "email" = $1 AND "purpose" = $2`, String(email), String(purpose));
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+        yield prisma_1.prisma.$executeRawUnsafe(`INSERT INTO "OTPVerification" ("id", "email", "otp", "purpose", "expiresAt", "createdAt") 
+       VALUES ($1, $2, $3, $4, $5, $6)`, 'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000), user.email, otp, String(purpose), expiresAt, new Date());
+        yield (0, email_1.sendOtpEmail)(user.email, otp, String(purpose));
+        res.json({ success: true, message: 'New OTP sent to your email.' });
+    }
+    catch (err) {
+        console.error('Resend OTP Error:', err);
+        res.status(500).json({ success: false, error: 'Failed to resend OTP' });
+    }
+}));
+// DEV ONLY: Retrieve latest OTP for browser automation
+router.get('/dev-otp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.query;
+        const otps = yield prisma_1.prisma.$queryRawUnsafe(`SELECT * FROM "OTPVerification" WHERE "email" = $1 ORDER BY "createdAt" DESC LIMIT 1`, String(email));
+        if (otps.length > 0) {
+            res.json({ success: true, otp: otps[0].otp, expiresAt: otps[0].expiresAt, purpose: otps[0].purpose });
+        }
+        else {
+            res.json({ success: false, otp: null });
+        }
+    }
+    catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to retrieve OTP' });
     }
 }));
 // 3. Request Password Recovery OTP
@@ -290,16 +351,24 @@ router.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 return;
             }
         }
+        let authenticatedUser = user;
+        if (req.body.pushToken && typeof req.body.pushToken === 'string') {
+            authenticatedUser = yield prisma_1.prisma.user.update({
+                where: { id: user.id },
+                data: { pushToken: req.body.pushToken }
+            });
+        }
         res.json({
             success: true,
             user: {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                phone: user.phone
+                id: authenticatedUser.id,
+                email: authenticatedUser.email,
+                name: authenticatedUser.name,
+                role: authenticatedUser.role,
+                phone: authenticatedUser.phone,
+                preferredLanguage: authenticatedUser.preferredLanguage
             },
-            token: 'demo-token-' + user.id
+            token: 'demo-token-' + authenticatedUser.id
         });
     }
     catch (error) {
@@ -318,6 +387,24 @@ router.get('/me', authMiddleware_1.requireAuth, (req, res) => __awaiter(void 0, 
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+}));
+// Update preferred language
+router.put('/language', authMiddleware_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { language } = req.body;
+        if (!language) {
+            res.status(400).json({ error: 'Language is required' });
+            return;
+        }
+        const updatedUser = yield prisma_1.prisma.user.update({
+            where: { id: req.prismaUser.id },
+            data: { preferredLanguage: language }
+        });
+        res.json({ success: true, preferredLanguage: updatedUser.preferredLanguage });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to update preferred language' });
     }
 }));
 exports.default = router;

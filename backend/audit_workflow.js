@@ -148,8 +148,8 @@ async function runAudit() {
     let ownerAnalyticsRes = await res.json();
     let oData = ownerAnalyticsRes.data || ownerAnalyticsRes;
     console.log("OWNER ANALYTICS DATA:", oData);
-    let analyticsPass = oData.revenueGraph && oData.revenueGraph.length > 0 && oData.totalRevenue >= 5000;
-    logResult('14. Verify Analytics', analyticsPass ? 'Graph updated with 5000' : 'No revenue', oData.revenueGraph ? 'Returned API data' : 'Failed', analyticsPass ? 'PASS' : 'FAIL');
+    let analyticsPass = oData.monthlyRevenue && oData.monthlyRevenue.length > 0 && oData.totalRevenue >= 5000;
+    logResult('14. Verify Analytics', analyticsPass ? 'Graph updated with 5000' : 'No revenue', oData.monthlyRevenue ? 'Returned API data' : 'Failed', analyticsPass ? 'PASS' : 'FAIL');
 
     // 15 & 16. Admin Verify User Registry
     // Let's create an Admin dynamically
@@ -174,7 +174,7 @@ async function runAudit() {
     res = await fetch(`${API_BASE}/analytics/admin/users/${farmerId}/suspend`, { method: 'PUT', headers: { 'Authorization': `Bearer ${adminToken}` } });
     data = await res.json();
     dbFarmer = await prisma.user.findUnique({ where: { id: farmerId } });
-    logResult('17. Suspend Farmer', !dbFarmer?.isVerified ? 'Suspended' : 'Failed', data ? 'Success' : 'Failed', !dbFarmer?.isVerified ? 'PASS' : 'FAIL');
+    logResult('17. Suspend Farmer', dbFarmer?.isSuspended ? 'Suspended' : 'Failed', data ? 'Success' : 'Failed', dbFarmer?.isSuspended ? 'PASS' : 'FAIL');
 
     // 18. Verify Login Blocked
     res = await fetch(`${API_BASE}/auth/login`, {
@@ -189,7 +189,7 @@ async function runAudit() {
     res = await fetch(`${API_BASE}/analytics/admin/users/${farmerId}/suspend`, { method: 'PUT', headers: { 'Authorization': `Bearer ${adminToken}` } });
     data = await res.json();
     dbFarmer = await prisma.user.findUnique({ where: { id: farmerId } });
-    logResult('19. Reactivate Farmer', dbFarmer?.isVerified ? 'Reactivated' : 'Failed', data ? 'Success' : 'Failed', dbFarmer?.isVerified ? 'PASS' : 'FAIL');
+    logResult('19. Reactivate Farmer', !dbFarmer?.isSuspended ? 'Reactivated' : 'Failed', data ? 'Success' : 'Failed', !dbFarmer?.isSuspended ? 'PASS' : 'FAIL');
 
     // 20. Verify Login Restored
     res = await fetch(`${API_BASE}/auth/login`, {

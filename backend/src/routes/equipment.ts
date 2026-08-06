@@ -287,8 +287,7 @@ router.put('/:id', requireAuth, requireRole('OWNER'), validate(updateEquipmentSc
           message: `Owner ${req.prismaUser.name} flagged ${equipment.title} as unavailable. Review the listing.`,
           type: 'EQUIPMENT_FLAGGED',
           relatedId: equipment.id
-        })),
-        skipDuplicates: true
+        }))
       });
 
       const pushTokens = adminUsers

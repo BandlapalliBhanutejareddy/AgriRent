@@ -1,11 +1,11 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export class AuthService {
-  static async login(email, password) {
+  static async login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error('User not found');
     
@@ -22,7 +22,7 @@ export class AuthService {
     return { token, user };
   }
 
-  static async register(data) {
+  static async register(data: Prisma.UserCreateInput) {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const user = await prisma.user.create({
       data: {

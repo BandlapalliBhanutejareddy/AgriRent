@@ -53,15 +53,17 @@ async function main() {
     }, {
       headers: { Authorization: `Bearer ${farmerToken}` }
     });
-    bookingId = bookingRes.data.id;
-    console.log(`[PASS] Booking requested successfully. Booking ID: ${bookingId}, Status: ${bookingRes.data.status}`);
+    bookingId = bookingRes.data.data ? bookingRes.data.data.id : bookingRes.data.id;
+    const bStatus = bookingRes.data.data ? bookingRes.data.data.status : bookingRes.data.status;
+    console.log(`[PASS] Booking requested successfully. Booking ID: ${bookingId}, Status: ${bStatus}`);
+    console.log('Booking Res Data:', bookingRes.data);
 
     // 5. Owner receives booking request
     console.log('[STEP] OWNER retrieving active bookings queue...');
     const ownerBookingsRes = await axios.get(`${API_URL}/bookings`, {
       headers: { Authorization: `Bearer ${ownerToken}` }
     });
-    const ownerBookings = ownerBookingsRes.data;
+    const ownerBookings = Array.isArray(ownerBookingsRes.data) ? ownerBookingsRes.data : ownerBookingsRes.data.data;
     const receivedBooking = ownerBookings.find(b => b.id === bookingId);
     if (!receivedBooking) {
       throw new Error('Owner failed to receive the booking request in their queue!');
@@ -75,7 +77,8 @@ async function main() {
     }, {
       headers: { Authorization: `Bearer ${ownerToken}` }
     });
-    console.log(`[PASS] Booking status updated by OWNER. New Status: ${acceptRes.data.status}`);
+    const newStatus = acceptRes.data.data ? acceptRes.data.data.status : acceptRes.data.status;
+    console.log(`[PASS] Booking status updated by OWNER. New Status: ${newStatus}`);
 
     // 7. Verify in PostgreSQL
     console.log('[STEP] Verifying row values in PostgreSQL directly...');
