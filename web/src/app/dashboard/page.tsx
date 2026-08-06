@@ -272,6 +272,7 @@ export default function OwnerDashboard() {
                 <th className="p-6 font-black">{t('renting_farmer', { defaultValue: 'Renting Farmer' })}</th>
                 <th className="p-6 font-black">{t('dates', { defaultValue: 'Dates' })}</th>
                 <th className="p-6 font-black">{t('yield', { defaultValue: 'Yield' })}</th>
+                <th className="p-6 font-black">{t('payment', { defaultValue: 'Payment' })}</th>
                 <th className="p-6 font-black">{t('status', { defaultValue: 'Status' })}</th>
                 <th className="p-6 font-black text-right">{t('actions', { defaultValue: 'Actions' })}</th>
               </tr>
@@ -279,7 +280,7 @@ export default function OwnerDashboard() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30">
               {bookings.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-16 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan={7} className="p-16 text-center text-slate-400 dark:text-slate-500">
                     <Clock className="mx-auto text-slate-300 dark:text-slate-700 mb-3" size={32} />
                     <span className="font-bold">{t('no_active_proposals', { defaultValue: 'No active booking proposals yet.' })}</span>
                     <p className="text-xs mt-1">{t('complete_registry_prompt', { defaultValue: 'Complete your fleet registry to attract rentals!' })}</p>
@@ -309,7 +310,27 @@ export default function OwnerDashboard() {
                       </span>
                     </td>
                     <td className="p-6">
-                      <div className="font-black text-slate-900 dark:text-white">₹{booking.totalPrice.toLocaleString()}</div>
+                      <div className="font-black text-slate-900 dark:text-white">₹{booking.totalPrice?.toLocaleString()}</div>
+                    </td>
+                    <td className="p-6">
+                      {booking.paymentStatus === 'PAID' ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 w-fit">
+                            PAID
+                          </span>
+                          <a href={`http://localhost:4000/api/payments/${booking.id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1 font-bold">
+                            Download Invoice
+                          </a>
+                        </div>
+                      ) : booking.paymentStatus === 'REFUNDED' ? (
+                        <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 w-fit">
+                          REFUNDED
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 w-fit">
+                          {booking.paymentStatus || 'PENDING'}
+                        </span>
+                      )}
                     </td>
                     <td className="p-6">
                       <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm

@@ -37,6 +37,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<any[]>([]);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
 
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
 
@@ -82,6 +83,11 @@ export default function AdminDashboard() {
           status: eq.available ? 'APPROVED' : 'PENDING',
           location: eq.location || 'Punjab, India'
         })));
+      }
+
+      const txRes = await api.get('/payments/admin/payments');
+      if (txRes.data) {
+        setTransactions(txRes.data);
       }
     } catch (error) {
       console.error('Failed to load admin dataset:', error);
@@ -497,6 +503,74 @@ export default function AdminDashboard() {
              <div className="col-span-full text-center py-12 text-slate-400 font-bold uppercase tracking-widest text-xs">
                 {t('no_equipment_awaiting_moderation')}</div>
           )}
+        </div>
+      </div>
+
+      {/* Financial Transactions */}
+      <div id="transactions" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[32px] shadow-sm border border-slate-200/50 dark:border-slate-800/50 overflow-hidden mt-8">
+        <div className="p-6 md:p-8 border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center bg-slate-50/30 dark:bg-slate-800/10">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Financial Transactions</h3>
+            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-1">Platform payment and refund ledger</p>
+          </div>
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl">
+            <IndianRupee size={20} className="text-emerald-600 dark:text-emerald-400" />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30">
+                <th className="p-6 font-black">Transaction ID</th>
+                <th className="p-6 font-black">Booking / Parties</th>
+                <th className="p-6 font-black">Date</th>
+                <th className="p-6 font-black">Amount</th>
+                <th className="p-6 font-black">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30">
+              {transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-16 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
+                    No transactions found
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
+                    <td className="p-6">
+                      <div className="font-bold text-slate-900 dark:text-slate-100 text-xs tracking-tight break-all">{tx.razorpayOrderId}</div>
+                      <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">{tx.id}</div>
+                    </td>
+                    <td className="p-6">
+                      <div className="font-bold text-slate-700 dark:text-slate-300 text-xs">{tx.booking?.equipment?.title || 'Unknown Equipment'}</div>
+                      <div className="text-[10px] text-slate-500 font-bold mt-1">
+                        Farmer: {tx.booking?.farmer?.name} | Owner: {tx.booking?.equipment?.owner?.name}
+                      </div>
+                    </td>
+                    <td className="p-6">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                        {new Date(tx.createdAt).toLocaleString()}
+                      </span>
+                    </td>
+                    <td className="p-6">
+                      <div className="font-black text-emerald-600 dark:text-emerald-400">₹{tx.amount?.toLocaleString()}</div>
+                    </td>
+                    <td className="p-6">
+                      <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm
+                        ${tx.status === 'PAYMENT_CAPTURED' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 border-emerald-200' : 
+                          tx.status === 'ORDER_CREATED' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 border-amber-200' : 
+                          tx.status === 'FAILED' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 border-red-200' : 
+                          'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 border-indigo-200'}`}
+                      >
+                        {tx.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

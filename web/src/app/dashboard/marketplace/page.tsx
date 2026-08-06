@@ -289,16 +289,72 @@ function MarketplaceContent() {
     }));
 
     try {
-      await api.post('/bookings', {
+      // 1. Create Booking
+      const bookingRes = await api.post('/bookings', {
         equipmentId: item.id,
         startDate: start.toISOString(),
         endDate: end.toISOString(),
       });
-      showToast(`Rental booking request submitted for ${item.title}!`, 'success');
-      setSelectedSpecsItem(null); // Close modal if open
+      const bookingId = bookingRes.data.id;
+
+      // 2. Load Razorpay script dynamically
+      const res = await new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+      });
+
+      if (!res) {
+        showToast('Razorpay SDK failed to load. Are you online?', 'warning');
+        return;
+      }
+
+      // 3. Create Razorpay Order
+      const orderRes = await api.post('/payments/create-order', { bookingId });
+      const { orderId, amount, currency } = orderRes.data;
+
+      // 4. Open Razorpay Checkout
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_xxxxx',
+        amount: amount,
+        currency: currency,
+        name: 'AgroRent AI',
+        description: `Rental Payment for ${item.title}`,
+        order_id: orderId,
+        handler: async function (response: any) {
+          try {
+            showToast('Processing payment verification...', 'success');
+            // 5. Verify Signature
+            await api.post('/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              bookingId: bookingId
+            });
+            showToast(`Rental booking confirmed for ${item.title}!`, 'success');
+            setSelectedSpecsItem(null);
+            fetchEquipment(); // refresh data
+          } catch (err) {
+            showToast('Payment verification failed. Contact support.', 'warning');
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+          contact: user?.phone
+        },
+        theme: {
+          color: '#059669' // emerald-600
+        }
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+
     } catch (error: any) {
-      showToast(`Booking submitted: Owner notified.`, 'success');
-      setSelectedSpecsItem(null);
+      showToast(error.response?.data?.error || 'Failed to initiate booking payment.', 'warning');
     } finally {
       setBookingDrafts((prev) => ({
         ...prev,
@@ -357,7 +413,7 @@ function MarketplaceContent() {
             disabled={!item.available || draft.loading}
             className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-500/10"
           >
-            {draft.loading ? t('submitting', { defaultValue: 'Submitting...' }) : t('request_rental_booking', { defaultValue: 'Request Rental Booking' })}
+            {draft.loading ? t('submitting', { defaultValue: 'Processing...' }) : t('pay_and_book', { defaultValue: 'Pay & Confirm Booking' })}
           </button>
         ) : (
           <div className="text-[10px] text-center p-2.5 bg-amber-50 dark:bg-slate-800 text-amber-600 dark:text-slate-350 border border-amber-100 dark:border-slate-750 rounded-xl font-bold">

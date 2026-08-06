@@ -73,10 +73,11 @@ model Booking {
   totalPrice    Float?
   amountPaid    Float?
   paymentId     String?
-  paymentStatus String    @default("PENDING")
-  farmer        User      @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  equipment     Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  paymentStatus String               @default("PENDING")
+  farmer        User                 @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  equipment     Equipment            @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
   messages      Message[]
+  payments      PaymentTransaction[]
 
   @@index([farmerId])
   @@index([equipmentId])
@@ -151,4 +152,22 @@ model OTPVerification {
   purpose   String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model PaymentTransaction {
+  id                String   @id @default(cuid())
+  bookingId         String
+  booking           Booking  @relation(fields:[bookingId], references:[id])
+  razorpayOrderId   String   @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  amount            Float
+  currency          String
+  status            String
+  paymentMethod     String?
+  invoiceUrl        String?
+  refundedAmount    Float?
+  failureReason     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

@@ -210,7 +210,8 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
       where: { equipment: { ownerId: req.prismaUser.id } },
       include: {
         equipment: { select: { id: true, title: true, category: true, imageUrl: true } },
-        farmer: { select: { id: true, name: true, email: true, phone: true } }
+        farmer: { select: { id: true, name: true, email: true, phone: true } },
+        payments: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -227,7 +228,8 @@ router.get('/admin/all', requireAuth, requireRole('ADMIN'), async (req: AuthRequ
     const bookings = await prisma.booking.findMany({
       include: {
         equipment: { select: { id: true, title: true } },
-        farmer: { select: { id: true, name: true, email: true } }
+        farmer: { select: { id: true, name: true, email: true } },
+        payments: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -262,7 +264,8 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response, next: any):
         },
         farmer: {
           select: { id: true, name: true, phone: true }
-        }
+        },
+        payments: true
       },
       orderBy: { createdAt: 'desc' }
     });

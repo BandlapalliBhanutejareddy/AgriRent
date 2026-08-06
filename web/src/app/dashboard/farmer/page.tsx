@@ -70,6 +70,18 @@ export default function FarmerDashboard() {
     }
   };
 
+  async function handleRefundBooking(id: string) {
+    try {
+      if (!confirm('Are you sure you want to cancel and request a refund?')) return;
+      await api.post(`/payments/${id}/refund`);
+      showToast('Refund initiated successfully', 'success');
+      fetchData(); // Refresh to get updated status
+    } catch (error) {
+      console.error('Failed to initiate refund', error);
+      showToast('Failed to initiate refund', 'warning');
+    }
+  };
+
   const activeBookings = bookings.filter(b => b.status === 'ACTIVE' || b.status === 'ACCEPTED');
   const pendingBookings = bookings.filter(b => b.status === 'PENDING');
 
@@ -249,6 +261,7 @@ export default function FarmerDashboard() {
                 <th className="p-6 font-black">{t('owner_detail', { defaultValue: 'Owner Detail' })}</th>
                 <th className="p-6 font-black">{t('active_dates', { defaultValue: 'Active Dates' })}</th>
                 <th className="p-6 font-black">{t('pricing', { defaultValue: 'Pricing' })}</th>
+                <th className="p-6 font-black">{t('payment', { defaultValue: 'Payment' })}</th>
                 <th className="p-6 font-black">{t('status', { defaultValue: 'Status' })}</th>
                 <th className="p-6 font-black text-right">{t('actions', { defaultValue: 'Actions' })}</th>
               </tr>
@@ -256,7 +269,7 @@ export default function FarmerDashboard() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30">
               {bookings.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-16 text-center">
+                  <td colSpan={7} className="p-16 text-center">
                     <div className="flex flex-col items-center justify-center space-y-4 max-w-sm mx-auto">
                       <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 rounded-full shadow-sm">
                         <Tractor size={32} />
@@ -289,7 +302,27 @@ export default function FarmerDashboard() {
                     <td className="p-6 text-slate-600 dark:text-slate-400 font-medium text-xs">
                        {new Date(booking.startDate).toLocaleDateString()} - {new Date(booking.endDate).toLocaleDateString()}
                     </td>
-                    <td className="p-6 font-black text-slate-900 dark:text-white">₹{booking.totalPrice.toLocaleString()}</td>
+                    <td className="p-6 font-black text-slate-900 dark:text-white">₹{booking.totalPrice?.toLocaleString()}</td>
+                    <td className="p-6">
+                      {booking.paymentStatus === 'PAID' ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 w-fit">
+                            PAID
+                          </span>
+                          <a href={`http://localhost:4000/api/payments/${booking.id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1 font-bold">
+                            Download Invoice
+                          </a>
+                        </div>
+                      ) : booking.paymentStatus === 'REFUNDED' ? (
+                        <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 w-fit">
+                          REFUNDED
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 w-fit">
+                          {booking.paymentStatus || 'PENDING'}
+                        </span>
+                      )}
+                    </td>
                     <td className="p-6">
                       <span className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm
                         ${booking.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50' : 
@@ -301,13 +334,21 @@ export default function FarmerDashboard() {
                       </span>
                     </td>
                     <td className="p-6 text-right">
-                      {booking.status === 'PENDING' && (
+                      {booking.status === 'PENDING' ? (
                         <button 
                           onClick={() => handleCancelBooking(booking.id)}
                           className="px-4 py-2 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
                         >
-                          {t('cancel')}</button>
-                      )}
+                          {t('cancel')}
+                        </button>
+                      ) : booking.paymentStatus === 'PAID' && (booking.status === 'CONFIRMED' || booking.status === 'ACCEPTED') ? (
+                        <button 
+                          onClick={() => handleRefundBooking(booking.id)}
+                          className="px-4 py-2 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                        >
+                          Request Refund
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))
