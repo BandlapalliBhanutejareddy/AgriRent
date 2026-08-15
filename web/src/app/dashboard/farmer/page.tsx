@@ -17,12 +17,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useStore } from '@/store/useStore';
+import { useToast } from '@/components/ToastProvider';
 import { useTranslation } from 'react-i18next';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function FarmerDashboard() {
   const { t } = useTranslation();
   const { user } = useStore();
+  const { showToast } = useToast();
   const [bookings, setBookings] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
