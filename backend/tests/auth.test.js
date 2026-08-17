@@ -53,8 +53,11 @@ test('Auth Verification Suite', async (t) => {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
-    assert.strictEqual(res.status, 200, 'Access token failed: ' + JSON.stringify(res.data));
-    assert.strictEqual(res.data.email, testUser.email, 'Wrong user returned');
+    if (res.status !== 200) {
+      throw new Error(`Failed to access protected endpoint: ${res.status} ${JSON.stringify(res.data)}`);
+    }
+    const userEmail = res.data.data ? res.data.data.email : res.data.email;
+    assert.strictEqual(userEmail, testUser.email, 'Wrong user returned');
   });
 
   await t.test('Refresh Token rotates session', async () => {

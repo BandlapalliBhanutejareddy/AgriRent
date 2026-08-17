@@ -560,3 +560,99 @@ Server has closed the connection.
     at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
     at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
 ---
+[2026-08-17T13:21:33.498Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\src\index.ts:35:23)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---
+[2026-08-17T13:23:59.339Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\dist\index.js:44:29)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---
+[2026-08-17T13:25:10.199Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\dist\index.js:44:29)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---
+[2026-08-17T13:26:35.941Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\dist\index.js:44:29)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---
+[2026-08-17T13:29:19.507Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\dist\index.js:44:29)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---
+[2026-08-17T13:35:44.205Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\dist\index.js:44:29)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---
+[2026-08-17T13:38:34.047Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\dist\index.js:44:29)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---
+[2026-08-17T13:43:06.967Z] [unknown] Error: The CORS policy for this site does not allow access from the specified Origin.
+    at origin (D:\AgriRent_AI\backend\dist\index.js:44:29)
+    at D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (D:\AgriRent_AI\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handleRequest (D:\AgriRent_AI\backend\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (D:\AgriRent_AI\backend\node_modules\router\index.js:342:13)
+    at D:\AgriRent_AI\backend\node_modules\router\index.js:297:9
+    at processParams (D:\AgriRent_AI\backend\node_modules\router\index.js:582:12)
+    at next (D:\AgriRent_AI\backend\node_modules\router\index.js:291:5)
+    at router.handle (D:\AgriRent_AI\backend\node_modules\router\index.js:186:3)
+---

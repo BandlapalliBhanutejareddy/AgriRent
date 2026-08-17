@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 import { useStore } from '@/store/useStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import { 
@@ -31,124 +32,57 @@ export default function NotificationsPage() {
   const role = user?.role || 'OWNER';
 
   useEffect(() => {
-    // Generate role-specific initial alerts if none exist
-    if (notifications.length === 0) {
-      const generated = getInitialNotificationsByRole(role);
-      setNotifications(generated);
-      setLocalNotifications(generated);
-    } else {
-      setLocalNotifications(notifications);
-    }
-  }, [notifications, role]);
+    fetchNotifications();
+  }, []);
 
-  function getInitialNotificationsByRole(userRole: string) {
-    const timestamp = '10 mins ago';
-    switch (userRole) {
-      case 'ADMIN':
-        return [
-          {
-            id: 'n-admin-1',
-            title: 'Machinery Moderation Request',
-            description: 'Owner Bhanu Pratap submitted "John Deere 5050 D" tractor for review in Nellore.',
-            type: 'MODERATION',
-            time: '5 mins ago',
-            read: false
-          },
-          {
-            id: 'n-admin-2',
-            title: 'Audit Warning',
-            description: 'API Request Latency exceeded 1.5s in AI Advisor cluster during crop recommendation stream.',
-            type: 'WARNING',
-            time: '2 hrs ago',
-            read: false
-          },
-          {
-            id: 'n-admin-3',
-            title: 'New Account Listed',
-            description: 'A new farmer profile "Ramesh Kumar" registered from Kurnool.',
-            type: 'INFO',
-            time: '1 day ago',
-            read: true
-          }
-        ];
-      case 'FARMER':
-        return [
-          {
-            id: 'n-farmer-1',
-            title: 'Booking Request Approved! 🚜',
-            description: 'Your rental request for "Swaraj 744 FE" has been accepted by owner Harish Reddy. Scheduled from Jun 10 to Jun 14.',
-            type: 'SUCCESS',
-            time: '3 mins ago',
-            read: false
-          },
-          {
-            id: 'n-farmer-2',
-            title: 'AI Crop Advisory Alert',
-            description: 'Gemini AI Advisor generated new seasonal cropping suggestions for Basmati Rice sowing in soil conditions.',
-            type: 'AI',
-            time: '1 hr ago',
-            read: false
-          },
-          {
-            id: 'n-farmer-3',
-            title: 'Invoice Payment Received',
-            description: 'Security deposit payment of ₹2,500 has been verified for booking draft.',
-            type: 'INFO',
-            time: '2 days ago',
-            read: true
-          }
-        ];
-      case 'OWNER':
-      default:
-        return [
-          {
-            id: 'n-owner-1',
-            title: 'Pending Rental Booking Request 🌾',
-            description: 'Farmer Suresh Patil requested booking for "Paddy Transplanter" implement from Jun 18 to Jun 20.',
-            type: 'BOOKING',
-            time: '8 mins ago',
-            read: false
-          },
-          {
-            id: 'n-owner-2',
-            title: 'Fleet Pricing Suggestion',
-            description: 'Our analytics platform suggests increasing Swaraj tractor pricing by 5% due to high localized crop sowing season demand.',
-            type: 'INFO',
-            time: '5 hrs ago',
-            read: false
-          },
-          {
-            id: 'n-owner-3',
-            title: 'Equipment Live Status',
-            description: 'Your John Deere 5050 tractor listing is now live on the global marketplace portal.',
-            type: 'SUCCESS',
-            time: '3 days ago',
-            read: true
-          }
-        ];
+  async function fetchNotifications() {
+    try {
+      const response = await api.get('/notifications');
+      setNotifications(response.data || []);
+      setLocalNotifications(response.data || []);
+    } catch (error) {
+      console.error('Failed to load notifications', error);
+      showToast('Unable to load notifications. Please try again.', 'error');
+      setLocalNotifications([]);
+      setNotifications([]);
+    }
+  }
+
+  async function handleMarkAsRead(id: string) {
+    try {
+      await api.put(`/notifications/${id}/read`);
+      markAsRead(id);
+      const updated = localNotifications.map(n => n.id === id ? { ...n, read: true } : n);
+      setLocalNotifications(updated);
+      setNotifications(updated);
+      showToast('Notification marked as read.', 'success');
+    } catch (error) {
+      showToast('Failed to mark as read.', 'error');
     }
   };
 
-  function handleMarkAsRead(id: string) {
-    markAsRead(id);
-    const updated = localNotifications.map(n => n.id === id ? { ...n, read: true } : n);
-    setLocalNotifications(updated);
-    setNotifications(updated);
-    showToast('Notification marked as read.', 'success');
+  async function handleMarkAllAsRead() {
+    try {
+      await api.put('/notifications/read-all');
+      const updated = localNotifications.map(n => ({ ...n, read: true }));
+      setLocalNotifications(updated);
+      setNotifications(updated);
+      showToast('All notifications marked as read.', 'success');
+    } catch (error) {
+      showToast('Failed to mark all as read.', 'error');
+    }
   };
 
-  function handleMarkAllAsRead() {
-    const updated = localNotifications.map(n => ({ ...n, read: true }));
-    setLocalNotifications(updated);
-    setNotifications(updated);
-    showToast('All notifications marked as read.', 'success');
-  };
-
-  function handleDelete(id: string) {
-    const updated = localNotifications.filter(n => n.id !== id);
-    setLocalNotifications(updated);
-    setNotifications(updated);
-    showToast('Notification deleted.', 'success');
+  async function handleDelete(id: string) {
+    try {
+      await api.delete(`/notifications/${id}`);
+      const updated = localNotifications.filter(n => n.id !== id);
+      setLocalNotifications(updated);
+      setNotifications(updated);
+      showToast('Notification deleted.', 'success');
+    } catch (error) {
+      showToast('Failed to delete notification.', 'error');
+    }
   };
 
   function getAlertIcon(type: string) {
@@ -215,15 +149,11 @@ export default function NotificationsPage() {
                     {t('you_have_zero_pending_notifications_we_w')}</p>
                 </div>
                 <button 
-                  onClick={() => {
-                    const fresh = getInitialNotificationsByRole(role);
-                    setNotifications(fresh);
-                    setLocalNotifications(fresh);
-                    showToast('Mock notifications re-seeded for testing!', 'success');
-                  }}
+                  onClick={fetchNotifications}
                   className="px-6 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-colors"
                 >
-                  {t('reload_mock_data')}</button>
+                  Refresh Notifications
+                </button>
               </motion.div>
             ) : (
               localNotifications.map((notif) => (

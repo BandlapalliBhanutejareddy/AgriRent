@@ -81,48 +81,10 @@ export default function EquipmentManagement() {
       setEquipment(data);
       setFilteredEquipment(data);
     } catch (error) {
-      console.warn('Backend offline, loading enhanced demo fleet inventory.');
-      // Enforce robust demo dataset with zero null options
-      const fallbackData = [
-        {
-          id: 'eq-demo-1',
-          title: 'Swaraj 744 FE',
-          category: 'TRACTOR',
-          pricePerDay: 2800,
-          description: 'High-yield tractor with advanced fuel-saving capabilities, perfect for dry-land sowing and crop transplantation.',
-          available: true,
-          imageUrl: 'https://images.unsplash.com/photo-1595273670150-db0a3e39223e?auto=format&fit=crop&q=80&w=400',
-          utilization: '88.5%',
-          ratings: '4.8 ★',
-          revenueGenerated: 28400
-        },
-        {
-          id: 'eq-demo-2',
-          title: 'Paddy Transplanter',
-          category: 'IMPLEMENT',
-          pricePerDay: 1800,
-          description: 'Saves water usage and manual labor up to 40% with precision crop alignment and high transplanting efficiency.',
-          available: true,
-          imageUrl: 'https://images.unsplash.com/photo-1599939575321-4f1155cc9a33?auto=format&fit=crop&q=80&w=400',
-          utilization: '74.2%',
-          ratings: '4.9 ★',
-          revenueGenerated: 11200
-        },
-        {
-          id: 'eq-demo-3',
-          title: 'Kartar 4000 Harvester',
-          category: 'HARVESTER',
-          pricePerDay: 8500,
-          description: 'Heavy duty crawler harvester for wheat and rice harvesting with multi-crop threshing capabilities.',
-          available: false,
-          imageUrl: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=400',
-          utilization: '92.1%',
-          ratings: '4.7 ★',
-          revenueGenerated: 68000
-        }
-      ];
-      setEquipment(fallbackData);
-      setFilteredEquipment(fallbackData);
+      console.error('Failed to load equipment', error);
+      showToast('Unable to load equipment. Please try again.', 'error');
+      setEquipment([]);
+      setFilteredEquipment([]);
     } finally {
       setLoading(false);
     }
@@ -156,11 +118,8 @@ export default function EquipmentManagement() {
       );
       showToast('Machinery specifications updated successfully!', 'success');
     } catch (error) {
-      // Offline fallback state update
-      setEquipment(prev => 
-        prev.map(e => e.id === editingItem.id ? { ...e, ...payload } : e)
-      );
-      showToast('Fleet catalog updated!', 'success');
+      console.error('Failed to update equipment', error);
+      showToast('Unable to update equipment. Please try again.', 'error');
     } finally {
       setEditingItem(null);
     }
@@ -173,8 +132,8 @@ export default function EquipmentManagement() {
       setEquipment(prev => prev.filter(e => e.id !== deletingItemId));
       showToast('Equipment permanently removed from fleet list.', 'success');
     } catch (error) {
-      setEquipment(prev => prev.filter(e => e.id !== deletingItemId));
-      showToast('Equipment removed!', 'success');
+      console.error('Failed to delete equipment', error);
+      showToast('Unable to delete equipment. Please try again.', 'error');
     } finally {
       setDeletingItemId(null);
     }
@@ -188,10 +147,8 @@ export default function EquipmentManagement() {
       );
       showToast(`Equipment availability toggled. Now ${!currentStatus ? 'Online' : 'Offline'}.`, 'success');
     } catch (error) {
-      setEquipment(prev => 
-        prev.map(e => e.id === id ? { ...e, available: !currentStatus } : e)
-      );
-      showToast(`Availability updated!`, 'success');
+      console.error('Failed to toggle availability', error);
+      showToast('Unable to toggle availability. Please try again.', 'error');
     }
   };
 

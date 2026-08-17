@@ -4,10 +4,10 @@ const fs = require('fs');
 const http = require('http');
 
 const PORT = 4010;
-const env = { ...process.env, PORT: PORT.toString() };
+const env = { ...process.env, PORT: PORT.toString(), NODE_ENV: 'test' };
 
 console.log('Starting Test Server...');
-const serverProcess = spawn('npx', ['ts-node', 'src/index.ts'], { env, cwd: path.join(__dirname, '..'), shell: true });
+const serverProcess = spawn('node', ['dist/index.js'], { env, cwd: path.join(__dirname, '..'), shell: true });
 
 let isReady = false;
 
@@ -28,7 +28,7 @@ function runTests() {
   // We will run the node tests without them trying to spawn the server again
   // Actually, we need to modify utils.js to NOT spawn the server if we do it here.
   
-  const testProcess = spawn('node', ['--test', 'tests/security.test.js', 'tests/auth.test.js', 'tests/auditlog.test.js'], { env: { ...process.env, TEST_SERVER_EXTERNAL: 'true' }, cwd: path.join(__dirname, '..'), stdio: 'inherit', shell: true });
+  const testProcess = spawn('node', ['--test', 'tests/auth.test.js', 'tests/auditlog.test.js', 'tests/security.test.js'], { env: { ...process.env, TEST_SERVER_EXTERNAL: 'true' }, cwd: path.join(__dirname, '..'), stdio: 'inherit', shell: true });
   
   testProcess.on('exit', (code) => {
     console.log(`Tests finished with code ${code}. Shutting down server...`);

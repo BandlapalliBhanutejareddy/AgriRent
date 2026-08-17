@@ -31,17 +31,22 @@ test('AuditLog Verification Suite', async (t) => {
   });
 
   await t.test('AuditLog records Failed Login', async () => {
-    await request('/api/auth/login', {
+    const res = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: testUser.email, password: 'WrongPassword' })
     });
+    
+    assert.strictEqual(res.status, 401, 'Expected 401 Unauthorized: ' + JSON.stringify(res.data));
+
+    // Wait for async log creation
+    await new Promise(r => setTimeout(r, 1000));
 
     const logs = await prisma.auditLog.findMany({
       where: {
         action: 'FAILED_LOGIN',
         actorId: testUser.id
       },
-      orderBy: { timestamp: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: 1
     });
     
@@ -49,17 +54,22 @@ test('AuditLog Verification Suite', async (t) => {
   });
 
   await t.test('AuditLog records Successful Login', async () => {
-    await request('/api/auth/login', {
+    const res = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: testUser.email, password: 'Password123' })
     });
+    
+    assert.strictEqual(res.status, 200, 'Expected 200 OK: ' + JSON.stringify(res.data));
+
+    // Wait for async log creation
+    await new Promise(r => setTimeout(r, 1000));
 
     const logs = await prisma.auditLog.findMany({
       where: {
         action: 'LOGIN',
         actorId: testUser.id
       },
-      orderBy: { timestamp: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: 1
     });
     

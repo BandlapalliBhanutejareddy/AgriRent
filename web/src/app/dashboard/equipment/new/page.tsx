@@ -53,8 +53,6 @@ export default function AddEquipment() {
     e.preventDefault();
     setLoading(true);
 
-    const mockImage = 'https://images.unsplash.com/photo-1592919016382-70678625902b?auto=format&fit=crop&q=80&w=800';
-
     if (!formData.title || formData.title.trim().length < 3) {
       showToast('Machinery title must be at least 3 characters long', 'warning');
       setLoading(false);
@@ -74,7 +72,7 @@ export default function AddEquipment() {
     }
 
     try {
-      let imageUrl = mockImage;
+      let imageUrl = '';
       
       // 1. Upload Image if present
       if (image) {

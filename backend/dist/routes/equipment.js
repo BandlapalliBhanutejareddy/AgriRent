@@ -332,6 +332,18 @@ router.delete('/:id', authMiddleware_1.requireAuth, (0, authMiddleware_1.require
         yield prisma_1.prisma.equipment.delete({
             where: { id: equipmentId }
         });
+        yield prisma_1.prisma.auditLog.create({
+            data: {
+                actorId: req.prismaUser.id,
+                actorRole: req.prismaUser.role,
+                action: 'DELETE_EQUIPMENT',
+                resource: 'Equipment',
+                resourceId: equipmentId,
+                metadata: JSON.stringify({ title: existingEquipment.title }),
+                ip: req.ip || req.connection.remoteAddress,
+                userAgent: req.headers['user-agent']
+            }
+        });
         res.json({ message: 'Equipment deleted successfully' });
     }
     catch (error) {

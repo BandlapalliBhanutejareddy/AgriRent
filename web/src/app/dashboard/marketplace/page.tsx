@@ -69,127 +69,14 @@ function MarketplaceContent() {
         ]
       }));
 
-      // In case backend returns nothing, seed a robust demo dataset
-      if (enriched.length === 0) {
-        const fallbacks = [
-          {
-            id: 'eq-marketplace-1',
-            title: 'Swaraj 744 FE',
-            category: 'TRACTOR',
-            pricePerDay: 2800,
-            description: 'Powerful tractor optimized for cultivation, land preparation, and heavy agricultural haulage operations.',
-            available: true,
-            location: 'Nellore district, AP',
-            owner: { name: 'Bhanu Pratap', phone: '+91 87654 32109' },
-            rating: '4.8',
-            reviewCount: 12,
-            distance: '6.4',
-            securityDeposit: 3000,
-            reviews: [
-              { author: 'Ramesh Kumar', rating: 5, text: 'Superb fuel efficiency. Finished sowing in one day flat!' },
-              { author: 'Anil Mehta', rating: 4, text: 'Owner responded instantly. Highly recommend this partner!' }
-            ]
-          },
-          {
-            id: 'eq-marketplace-2',
-            title: 'Paddy Transplanter',
-            category: 'IMPLEMENT',
-            pricePerDay: 1800,
-            description: 'Precision paddy rice transplanter to save up to 40% seed water and secure uniform sowing yields.',
-            available: true,
-            location: 'Kurnool District, AP',
-            owner: { name: 'Harish Reddy', phone: '+91 99887 76655' },
-            rating: '4.9',
-            reviewCount: 9,
-            distance: '14.2',
-            securityDeposit: 2000,
-            reviews: [
-              { author: 'Suresh Patil', rating: 5, text: 'Amazing machine, very easy to operate and saved me 4 days of labor!' }
-            ]
-          },
-          {
-            id: 'eq-marketplace-3',
-            title: 'Kartar 4000 Harvester',
-            category: 'HARVESTER',
-            pricePerDay: 8500,
-            description: 'High-performance multi-crop combine harvester for rapid grain sorting during peak kharif crop harvests.',
-            available: false,
-            location: 'Sangrur, Punjab',
-            owner: { name: 'Anil Mehta', phone: '+91 88776 65544' },
-            rating: '4.7',
-            reviewCount: 18,
-            distance: '34.8',
-            securityDeposit: 10000,
-            reviews: [
-              { author: 'Jagpreet Singh', rating: 5, text: 'Excellent machine for paddy harvesting. No clogging.' }
-            ]
-          }
-        ];
-        setEquipment(fallbacks);
-        setupDrafts(fallbacks);
-      } else {
-        setEquipment(enriched);
-        setupDrafts(enriched);
-      }
+      // In case backend returns nothing, we should show empty state
+      setEquipment(enriched);
+      setupDrafts(enriched);
     } catch (error) {
-      console.warn('Backend offline, loading custom marketplace datasets.');
-      // Enforce default demo dataset
-      const fallbacks = [
-        {
-          id: 'eq-marketplace-1',
-          title: 'Swaraj 744 FE',
-          category: 'TRACTOR',
-          pricePerDay: 2800,
-          description: 'Powerful tractor optimized for cultivation, land preparation, and heavy agricultural haulage operations.',
-          available: true,
-          location: 'Nellore district, AP',
-          owner: { name: 'Bhanu Pratap', phone: '+91 87654 32109' },
-          rating: '4.8',
-          reviewCount: 12,
-          distance: '6.4',
-          securityDeposit: 3000,
-          reviews: [
-            { author: 'Ramesh Kumar', rating: 5, text: 'Superb fuel efficiency. Finished sowing in one day flat!' },
-            { author: 'Anil Mehta', rating: 4, text: 'Owner responded instantly. Highly recommend this partner!' }
-          ]
-        },
-        {
-          id: 'eq-marketplace-2',
-          title: 'Paddy Transplanter',
-          category: 'IMPLEMENT',
-          pricePerDay: 1800,
-          description: 'Precision paddy rice transplanter to save up to 40% seed water and secure uniform sowing yields.',
-          available: true,
-          location: 'Kurnool District, AP',
-          owner: { name: 'Harish Reddy', phone: '+91 99887 76655' },
-          rating: '4.9',
-          reviewCount: 9,
-          distance: '14.2',
-          securityDeposit: 2000,
-          reviews: [
-            { author: 'Suresh Patil', rating: 5, text: 'Amazing machine, very easy to operate and saved me 4 days of labor!' }
-          ]
-        },
-        {
-          id: 'eq-marketplace-3',
-          title: 'Kartar 4000 Harvester',
-          category: 'HARVESTER',
-          pricePerDay: 8500,
-          description: 'High-performance multi-crop combine harvester for rapid grain sorting during peak kharif crop harvests.',
-          available: false,
-          location: 'Sangrur, Punjab',
-          owner: { name: 'Anil Mehta', phone: '+91 88776 65544' },
-          rating: '4.7',
-          reviewCount: 18,
-          distance: '34.8',
-          securityDeposit: 10000,
-          reviews: [
-            { author: 'Jagpreet Singh', rating: 5, text: 'Excellent machine for paddy harvesting. No clogging.' }
-          ]
-        }
-      ];
-      setEquipment(fallbacks);
-      setupDrafts(fallbacks);
+      console.error('Failed to load equipment', error);
+      showToast('Unable to load equipment. Please try again.', 'error');
+      setEquipment([]);
+      setupDrafts([]);
     } finally {
       setLoading(false);
     }

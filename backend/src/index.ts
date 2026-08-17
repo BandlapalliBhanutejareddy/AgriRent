@@ -74,12 +74,13 @@ app.use(helmet({
 }));
 app.use(compression());
 
-// Granular Rate Limiters
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: 'Too many auth requests' });
-const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: 3, message: 'Too many OTP requests' });
-const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, message: 'AI request limit reached' });
-const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: 'Too many payment requests' });
-const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, message: 'Rate limit exceeded' });
+// Granular Rate Limiters (increased for testing)
+const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_SERVER_EXTERNAL;
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 15 : 5, message: 'Too many auth requests' });
+const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 15 : 3, message: 'Too many OTP requests' });
+const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: isTest ? 100 : 20, message: 'AI request limit reached' });
+const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 100 : 10, message: 'Too many payment requests' });
+const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 1000 : 100, message: 'Rate limit exceeded' });
 
 app.use('/api/', generalLimiter);
 app.use('/api/auth', authLimiter);

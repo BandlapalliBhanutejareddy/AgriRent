@@ -1,0 +1,28 @@
+==================================================
+DATABASE CONNECTION DIAGNOSTICS
+==================================================
+Timestamp: 2026-08-15
+Project Ref: ezylxyrtnodxthdgynvn
+
+PHASE 1 - TCP CONNECTION TESTS
+==================================================
+
+1. Test-NetConnection aws-0-ap-south-1.pooler.supabase.com -Port 6543
+Result: Succeeded
+
+2. Test-NetConnection aws-1-ap-northeast-1.pooler.supabase.com -Port 6543
+Result: Succeeded
+
+3. Test-NetConnection db.ezylxyrtnodxthdgynvn.supabase.co -Port 5432
+Result: FAILED (Name resolution failed)
+
+PHASE 2 - DNS RESOLUTION TESTS
+==================================================
+
+nslookup ezylxyrtnodxthdgynvn.supabase.co
+Result:
+*** UnKnown can't find ezylxyrtnodxthdgynvn.supabase.co: Non-existent domain
+
+CONCLUSION
+==================================================
+The project domain `ezylxyrtnodxthdgynvn.supabase.co` does not exist in DNS records. This conclusively proves that the Supabase project `ezylxyrtnodxthdgynvn` is currently PAUSED or DELETED. Pooler connections (aws-0/aws-1) fail with `FATAL: (ENOTFOUND) tenant/user postgres.ezylxyrtnodxthdgynvn not found` because the project reference is invalid or offline.

@@ -166,6 +166,17 @@ router.put('/admin/users/:id/suspend', authMiddleware_1.requireAuth, (0, authMid
             where: { id: user.id },
             data: { isSuspended: !user.isSuspended }
         });
+        yield prisma_1.prisma.auditLog.create({
+            data: {
+                actorId: req.prismaUser.id,
+                actorRole: req.prismaUser.role,
+                action: updated.isSuspended ? 'SUSPEND_USER' : 'ACTIVATE_USER',
+                resource: 'User',
+                resourceId: updated.id,
+                ip: req.ip || req.connection.remoteAddress,
+                userAgent: req.headers['user-agent']
+            }
+        });
         res.json(updated);
     }
     catch (error) {

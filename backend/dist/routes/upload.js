@@ -18,16 +18,27 @@ const supabase_js_1 = require("@supabase/supabase-js");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 const imageProcessor_1 = require("../lib/imageProcessor");
 const router = (0, express_1.Router)();
+const path_1 = __importDefault(require("path"));
+const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic'];
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
+        // Check MIME type
+        if (!allowedMimeTypes.includes(file.mimetype)) {
+            return cb(new Error('Invalid file type. Only JPEG, PNG, WEBP, and HEIC are allowed.'));
         }
-        else {
-            cb(new Error('Only images are allowed'));
+        // Check extension
+        const ext = path_1.default.extname(file.originalname).toLowerCase();
+        if (!allowedExtensions.includes(ext)) {
+            return cb(new Error('Invalid file extension.'));
         }
+        // Reject executable content explicitly
+        if (ext === '.exe' || ext === '.sh' || ext === '.bat' || ext === '.js') {
+            return cb(new Error('Executable files are not allowed.'));
+        }
+        cb(null, true);
     }
 });
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -93,6 +93,18 @@ router.post('/', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)
                 data: { bookingId: booking.id, screen: 'owner/requests' }
             });
         }
+        yield prisma_1.prisma.auditLog.create({
+            data: {
+                actorId: req.prismaUser.id,
+                actorRole: req.prismaUser.role,
+                action: 'CREATE_BOOKING',
+                resource: 'Booking',
+                resourceId: booking.id,
+                metadata: JSON.stringify({ equipmentId, startDate: start, endDate: end, price: totalPrice }),
+                ip: req.ip || req.connection.remoteAddress,
+                userAgent: req.headers['user-agent']
+            }
+        });
         res.status(201).json(booking);
     }
     catch (error) {
@@ -201,7 +213,8 @@ router.get('/owner', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireR
             where: { equipment: { ownerId: req.prismaUser.id } },
             include: {
                 equipment: { select: { id: true, title: true, category: true, imageUrl: true } },
-                farmer: { select: { id: true, name: true, email: true, phone: true } }
+                farmer: { select: { id: true, name: true, email: true, phone: true } },
+                payments: true
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -218,7 +231,8 @@ router.get('/admin/all', authMiddleware_1.requireAuth, (0, authMiddleware_1.requ
         const bookings = yield prisma_1.prisma.booking.findMany({
             include: {
                 equipment: { select: { id: true, title: true } },
-                farmer: { select: { id: true, name: true, email: true } }
+                farmer: { select: { id: true, name: true, email: true } },
+                payments: true
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -252,7 +266,8 @@ router.get('/', authMiddleware_1.requireAuth, (req, res, next) => __awaiter(void
                 },
                 farmer: {
                     select: { id: true, name: true, phone: true }
-                }
+                },
+                payments: true
             },
             orderBy: { createdAt: 'desc' }
         });

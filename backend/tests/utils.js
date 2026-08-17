@@ -15,8 +15,8 @@ async function startTestServer() {
     // Overwrite port for test
     const env = { ...process.env, PORT: PORT.toString() };
     
-    // We use ts-node to run the server directly
-    serverProcess = spawn('npx', ['ts-node', 'src/index.ts'], { env, cwd: process.cwd(), shell: true });
+    // We use node to run the compiled server directly
+    serverProcess = spawn('node', ['dist/index.js'], { env, cwd: process.cwd(), shell: true });
     
     let isReady = false;
     
