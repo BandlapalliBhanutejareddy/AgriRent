@@ -4,19 +4,17 @@ test.describe('Authentication Flows', () => {
   
   test('should login successfully as farmer', async ({ page }) => {
     await page.goto('/login');
-    
-    // Fill credentials
     await page.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
     await page.locator('input[type="password"]').fill('password123');
-    
-    // Click login
     await page.getByTestId('login-button').click();
-    
-    // Verify dashboard redirect
     await expect(page).toHaveURL(/\/dashboard/);
     
-    // Verify logout button appears (indicates successful auth state)
-    await expect(page.getByTestId('logout-button')).toBeVisible({ timeout: 10000 });
+    const hamburger = page.locator('button:has(svg.lucide-menu)');
+    if (await hamburger.isVisible()) {
+      await expect(page.getByTestId('logout-button-mobile')).toBeAttached({ timeout: 10000 });
+    } else {
+      await expect(page.getByTestId('logout-button')).toBeVisible({ timeout: 10000 });
+    }
   });
 
   test('should logout successfully', async ({ page }) => {
@@ -24,16 +22,16 @@ test.describe('Authentication Flows', () => {
     await page.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
     await page.locator('input[type="password"]').fill('password123');
     await page.getByTestId('login-button').click();
-    
-    // Wait for dashboard and logout button
     await expect(page).toHaveURL(/\/dashboard/);
-    const logoutBtn = page.getByTestId('logout-button');
-    await expect(logoutBtn).toBeVisible({ timeout: 10000 });
     
-    // Perform logout
-    await logoutBtn.click();
+    const hamburger = page.locator('button:has(svg.lucide-menu)');
+    if (await hamburger.isVisible()) {
+      await hamburger.click();
+      await page.getByTestId('logout-button-mobile').click();
+    } else {
+      await page.getByTestId('logout-button').click();
+    }
     
-    // Verify redirected back to login page
     await expect(page).toHaveURL(/\/login/);
   });
 

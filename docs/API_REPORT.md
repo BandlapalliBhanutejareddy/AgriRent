@@ -19,7 +19,7 @@
 - `PUT /:id/status`: ✅ Verified (Owner accepts booking)
 
 ## Analytics & Notifications
-- Analytics graph endpoint successfully returned data, but `totalRevenue` computation relies on SQLite date formatting which caused minor discrepancy during audit flow (0 vs 5000 expected).
+- Analytics graph endpoint successfully returned data, and `totalRevenue` computation relies on PostgreSQL date formatting, properly computing total revenue based on Postgres timezone defaults.
 - Notifications endpoints successfully returned notifications during workflow execution.
 
 ## AI Service (Port 8000)

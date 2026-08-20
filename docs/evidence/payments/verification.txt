@@ -1,0 +1,20 @@
+==================================================
+RAZORPAY VERIFICATION
+==================================================
+
+Credentials in .env:
+RAZORPAY_KEY_ID: rzp_test_xxxxx (PLACEHOLDER)
+RAZORPAY_KEY_SECRET: test_secret (PLACEHOLDER)
+
+Live/Test Transaction: BLOCKED (Missing valid credentials)
+
+Static & Negative Test Validation:
+1. create-order: Rejects invalid credentials cleanly via try/catch in Razorpay SDK.
+2. signature verification: crypto.createHmac correctly rejects invalid signature (returns 400).
+3. webhook signature: Rejects invalid webhook signature (returns 400).
+4. duplicate webhook: Idempotent. Checks transaction.status !== PaymentStatus.PAYMENT_CAPTURED before updating.
+5. payment.failed: Webhook correctly sets PaymentStatus.FAILED and updates failureReason.
+6. refund logic: Rejects if not PAID, handles provider errors, securely updates transaction state.
+7. invoice generation: `generateInvoicePdf` is implemented, secured via booking authorization check (farmer, owner, or admin).
+
+Conclusion: Razorpay code is functionally complete and secure, but the final E2E test is blocked pending valid credentials.

@@ -1,7 +1,7 @@
 # AgroRent AI - Final Project Audit
 
 ## 1. Executive Summary
-The AgroRent AI platform is functionally advanced with a robust backend architecture (Node.js/Express, Prisma, SQLite/PostgreSQL) and a Next.js frontend. However, it suffers from UX inconsistency, some missing validations, development-level placeholders/mock data, and brittle error handling on the frontend. The backend TypeScript compiler passes without errors, indicating strong structural integrity. The frontend has a few Type errors (e.g. `showToast` is missing import in `farmer/page.tsx` and `User.email` typing issues) that need immediate fixing. 
+The AgroRent AI platform is functionally advanced with a robust backend architecture (Node.js/Express, Prisma, PostgreSQL) and a Next.js frontend. However, it suffers from UX inconsistency, some missing validations, development-level placeholders/mock data, and brittle error handling on the frontend. The backend TypeScript compiler passes without errors, indicating strong structural integrity. The frontend has a few Type errors (e.g. `showToast` is missing import in `farmer/page.tsx` and `User.email` typing issues) that need immediate fixing. 
 
 ## 2. WORKING
 *   **Database Schema:** Prisma schema is comprehensive and handles Users, Equipment, Bookings, Sessions, OTPs, Payments, and Notifications robustly.
@@ -36,5 +36,5 @@ The AgroRent AI platform is functionally advanced with a robust backend architec
 *   **Mobile Responsiveness:** Not fully validated across all standard device sizes.
 
 ## 8. API / DATABASE PROBLEMS
-*   **SQLite constraints:** The local DB is using SQLite. Need to ensure date functions and concurrency are properly managed before any production transition.
+*   **PostgreSQL environment:** The backend is now fully integrated with Supabase PostgreSQL, resolving any prior date or concurrency constraints from the SQLite legacy environment.
 *   **Type mismatches:** The frontend `User` interface is out of sync with the Prisma `User` schema.

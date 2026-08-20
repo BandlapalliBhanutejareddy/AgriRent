@@ -49,17 +49,7 @@ router.post('/create-order', authMiddleware_1.requireAuth, (req, res) => __await
             currency: 'INR',
             receipt: `receipt_booking_${booking.id}`,
         };
-        let order;
-        if (process.env.RAZORPAY_KEY_SECRET === 'test_secret' || !process.env.RAZORPAY_KEY_SECRET) {
-            order = {
-                id: 'order_MOCK' + Math.floor(Math.random() * 100000),
-                amount: options.amount,
-                currency: options.currency
-            };
-        }
-        else {
-            order = yield razorpay.orders.create(options);
-        }
+        const order = yield razorpay.orders.create(options);
         if (!order) {
             res.status(500).json({ error: 'Failed to create Razorpay order' });
             return;
@@ -191,16 +181,10 @@ router.post('/:bookingId/refund', authMiddleware_1.requireAuth, (req, res) => __
             data: { status: paymentStates_1.PaymentStatus.REFUND_REQUESTED }
         });
         // Initiate Razorpay Refund
-        let refund;
-        if (payment.razorpayPaymentId.startsWith('pay_MOCK')) {
-            refund = { id: 'rfnd_MOCK' + Math.floor(Math.random() * 100000) };
-        }
-        else {
-            refund = yield razorpay.payments.refund(payment.razorpayPaymentId, {
-                amount: Math.round(payment.amount * 100),
-                speed: 'normal'
-            });
-        }
+        const refund = yield razorpay.payments.refund(payment.razorpayPaymentId, {
+            amount: Math.round(payment.amount * 100),
+            speed: 'normal'
+        });
         if (!refund) {
             res.status(500).json({ error: 'Failed to initiate refund with Razorpay' });
             return;

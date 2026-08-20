@@ -67,7 +67,7 @@ export default function AdminDashboard() {
           name: u.name,
           email: u.email,
           role: u.role,
-          status: u.isVerified ? 'ACTIVE' : 'SUSPENDED',
+          status: u.isSuspended ? 'SUSPENDED' : 'ACTIVE',
           phone: u.phone || 'AgroRent User'
         })));
       }
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
     try {
       const response = await api.put(`/analytics/admin/users/${id}/suspend`);
       if (response.data) {
-        const nextStatus = response.data.isVerified ? 'ACTIVE' : 'SUSPENDED';
+        const nextStatus = response.data.isSuspended ? 'SUSPENDED' : 'ACTIVE';
         setUsers(prev => prev.map(u => u.id === id ? { ...u, status: nextStatus } : u));
         
         if (nextStatus === 'SUSPENDED') {

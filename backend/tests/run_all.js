@@ -28,7 +28,7 @@ function runTests() {
   // We will run the node tests without them trying to spawn the server again
   // Actually, we need to modify utils.js to NOT spawn the server if we do it here.
   
-  const testProcess = spawn('node', ['--test', 'tests/auth.test.js', 'tests/auditlog.test.js', 'tests/security.test.js'], { env: { ...process.env, TEST_SERVER_EXTERNAL: 'true' }, cwd: path.join(__dirname, '..'), stdio: 'inherit', shell: true });
+  const testProcess = spawn('node', ['--test', '--test-concurrency=1', 'tests/auth.test.js', 'tests/auditlog.test.js', 'tests/security.test.js'], { env: { ...process.env, TEST_SERVER_EXTERNAL: 'true' }, cwd: path.join(__dirname, '..'), stdio: 'inherit', shell: true });
   
   testProcess.on('exit', (code) => {
     console.log(`Tests finished with code ${code}. Shutting down server...`);

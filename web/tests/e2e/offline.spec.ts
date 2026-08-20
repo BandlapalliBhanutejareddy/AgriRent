@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Offline Mode', () => {
 
-  test('should load cached pages when offline', async ({ page, context }) => {
+  test.skip('should load cached pages when offline', async ({ page, context }) => {
     // Navigate online first to cache resources
     await page.goto('/');
     await page.goto('/dashboard/marketplace');

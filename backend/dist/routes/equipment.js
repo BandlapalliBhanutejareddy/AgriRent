@@ -25,8 +25,16 @@ const router = (0, express_1.Router)();
 // Get Equipment List (With Filters)
 router.get('/', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { category, search, minPrice, maxPrice, sort, available } = req.query;
-        const where = {};
+        const { category, search, minPrice, maxPrice, sort, available, page, limit } = req.query;
+        const pageNum = parseInt(String(page)) || 1;
+        const limitNum = parseInt(String(limit)) || 20;
+        const skip = (pageNum - 1) * limitNum;
+        const where = {
+            owner: {
+                isSuspended: false,
+                isVerified: true
+            }
+        };
         if (available === 'true') {
             where.available = true;
         }
@@ -83,20 +91,36 @@ router.get('/', (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
                 where.pricePerDay.lte = parseFloat(String(maxPrice));
         }
         let orderBy = { createdAt: 'desc' };
-        if (sort === 'price_asc')
+        if (sort === 'lowest_price')
             orderBy = { pricePerDay: 'asc' };
-        if (sort === 'price_desc')
+        if (sort === 'highest_price')
             orderBy = { pricePerDay: 'desc' };
-        const equipment = yield prisma_1.prisma.equipment.findMany({
-            where,
-            orderBy,
-            include: {
-                owner: {
-                    select: { id: true, name: true }
+        if (sort === 'newest')
+            orderBy = { createdAt: 'desc' };
+        // "recommended", "nearest", "highest_rated" can be future extensions, default to createdAt
+        const [total, equipment] = yield prisma_1.prisma.$transaction([
+            prisma_1.prisma.equipment.count({ where }),
+            prisma_1.prisma.equipment.findMany({
+                where,
+                orderBy,
+                skip,
+                take: limitNum,
+                include: {
+                    owner: {
+                        select: { id: true, name: true }
+                    }
                 }
+            })
+        ]);
+        res.json({
+            data: equipment,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total,
+                totalPages: Math.ceil(total / limitNum)
             }
         });
-        res.json(equipment);
     }
     catch (error) {
         console.error('Equipment Fetch Error:', error);

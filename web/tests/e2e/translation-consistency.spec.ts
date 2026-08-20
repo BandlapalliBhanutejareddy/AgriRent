@@ -23,7 +23,7 @@ test.describe('Translation Consistency', () => {
         await page.reload();
         await page.waitForTimeout(1000); // Wait for i18n hydration
 
-        const heading = await page.locator('h1').first().innerText();
+        const heading = await page.locator('h2').first().innerText();
         console.log(`Heading in ${lang}: ${heading}`);
         
         // Assert heading is not empty

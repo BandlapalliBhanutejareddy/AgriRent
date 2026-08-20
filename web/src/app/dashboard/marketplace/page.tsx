@@ -39,6 +39,9 @@ function MarketplaceContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All Categories');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [bookingDrafts, setBookingDrafts] = useState<Record<string, { startDate: string; endDate: string; loading: boolean }>>({});
   const [isListening, setIsListening] = useState(false);
   
@@ -47,29 +50,49 @@ function MarketplaceContent() {
 
   // Read URL search params on mount
   useEffect(() => {
-    fetchEquipment();
-  }, []);
+    const query = searchParams.get('search');
+    if (query) {
+      setSearch(query);
+    }
+  }, [searchParams]);
+
+  // Fetch when filters change
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchEquipment();
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [search, category, page]);
 
   async function fetchEquipment() {
     try {
-      const response = await api.get('/equipment');
-      const data = response.data || [];
+      setLoading(true);
+      const response = await api.get('/equipment', {
+        params: {
+          page,
+          limit: 20,
+          search: search || undefined,
+          category: category === 'All Categories' || category === (t('categories.all') || 'All Categories') ? undefined : category
+        }
+      });
+      const data = response.data?.data || [];
+      const pagination = response.data?.pagination || { page: 1, totalPages: 1, total: 0 };
       
-      // Seed with comprehensive initial reviews, contacts, distances, and deposits if missing
+      setTotalPages(pagination.totalPages);
+      setTotalItems(pagination.total);
+      
+      // Use actual data from backend
       const enriched = data.map((item: any, idx: number) => ({
         ...item,
-        owner: item.owner || { name: 'Teja Bhanu', phone: '+91 87654 32109' },
-        rating: item.rating || (4.7 + (idx % 3) * 0.1).toFixed(1),
-        reviewCount: item.reviewCount || (8 + idx * 3),
-        distance: item.distance || (5.4 + idx * 3.2).toFixed(1),
-        securityDeposit: item.securityDeposit || (1500 + idx * 1000),
-        reviews: [
-          { author: 'Ramesh K.', rating: 5, text: 'Fantastic tractor. Harvested my 4-acre plot in Nellore without any issue!' },
-          { author: 'Harish R.', rating: 4, text: 'Clean and well-maintained implement. Owner was very prompt in answering calls.' }
-        ]
+        owner: item.owner || { name: 'Unknown Owner', phone: 'N/A' },
+        rating: item.rating || 0,
+        reviewCount: item.reviewCount || 0,
+        distance: item.distance || '0',
+        securityDeposit: item.securityDeposit || 0,
+        reviews: item.reviews || []
       }));
 
-      // In case backend returns nothing, we should show empty state
       setEquipment(enriched);
       setupDrafts(enriched);
     } catch (error) {
@@ -81,14 +104,6 @@ function MarketplaceContent() {
       setLoading(false);
     }
   };
-
-  // Extract query parameter if passed e.g., ?search=Tractor
-  useEffect(() => {
-    const query = searchParams.get('search');
-    if (query) {
-      setSearch(query);
-    }
-  }, [searchParams]);
 
   function setupDrafts(items: any[]) {
     const draftState = items.reduce((acc: Record<string, any>, item: any) => {
@@ -103,21 +118,13 @@ function MarketplaceContent() {
   };
 
   const categories = useMemo(() => {
-    const values = Array.from(new Set(equipment.map((item) => item.category || 'Other')));
-    return [t('categories.all') || 'All Categories', ...values];
-  }, [equipment, t]);
+    return [
+      t('categories.all') || 'All Categories',
+      'TRACTOR', 'HARVESTER', 'IMPLEMENT', 'ROTAVATOR', 'CULTIVATOR', 'SEED DRILL', 'SPRAYER', 'POWER TILLER', 'RICE TRANSPLANTER'
+    ];
+  }, [t]);
 
-  const filteredEquipment = useMemo(() => {
-    return equipment.filter((item) => {
-      const matchesSearch = search ? (
-        item.title?.toLowerCase().includes(search.toLowerCase()) ||
-        item.description?.toLowerCase().includes(search.toLowerCase()) ||
-        item.owner?.name?.toLowerCase().includes(search.toLowerCase())
-      ) : true;
-      const matchesCategory = category === 'All Categories' || item.category === category;
-      return matchesSearch && matchesCategory;
-    });
-  }, [equipment, search, category]);
+  const filteredEquipment = equipment; // Filters are applied on backend
 
   function updateDraft(id: string, field: 'startDate' | 'endDate', value: string) {
     setBookingDrafts((prev) => ({
@@ -386,7 +393,7 @@ function MarketplaceContent() {
                 </p>
               </div>
               <button 
-                onClick={() => { setSearch(''); setCategory('All Categories'); }}
+                onClick={() => { setSearch(''); setCategory('All Categories'); setPage(1); }}
                 className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
               >
                 {t('reset_filters', { defaultValue: 'Reset Filters' })}
@@ -477,6 +484,29 @@ function MarketplaceContent() {
             </div>
             );
           })}
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="col-span-full flex items-center justify-between mt-8 p-4 bg-white dark:bg-slate-900 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm">
+              <button 
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 text-xs font-bold uppercase rounded-xl transition-colors"
+              >
+                {t('previous')}
+              </button>
+              <div className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                {t('page')} {page} {t('of')} {totalPages} <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg">{totalItems} {t('items')}</span>
+              </div>
+              <button 
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 text-xs font-bold uppercase rounded-xl transition-colors"
+              >
+                {t('next')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

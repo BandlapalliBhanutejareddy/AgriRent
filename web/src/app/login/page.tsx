@@ -62,6 +62,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const { setUser, setSession } = useStore();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Forgot Password Flow States
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -536,7 +538,7 @@ export default function LoginPage() {
             <button
               type="submit"
               data-testid={isLoginMode ? "login-button" : "register-button"}
-              disabled={loading}
+              disabled={loading || !mounted}
               className={`w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-black rounded-xl text-white shadow-lg transition-all duration-300 disabled:opacity-50 ${activeConf.accentClass}`}
             >
               {loading ? t('authenticating', { defaultValue: 'Authenticating...' }) : (isLoginMode ? t('sign_in', { defaultValue: 'Sign In' }) : t('create_account', { defaultValue: 'Create Account' }))}

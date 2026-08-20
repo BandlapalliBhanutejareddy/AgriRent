@@ -37,6 +37,11 @@ router.post('/create-order', requireAuth, async (req: AuthRequest, res: Response
       return;
     }
 
+    if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('xxxxx')) {
+      res.status(503).json({ error: 'Payment gateway is currently unavailable pending production credentials.' });
+      return;
+    }
+
     const amountInPaise = Math.round(booking.totalPrice * 100); // Razorpay requires amount in smallest currency unit
 
     const options = {
@@ -45,16 +50,7 @@ router.post('/create-order', requireAuth, async (req: AuthRequest, res: Response
       receipt: `receipt_booking_${booking.id}`,
     };
 
-    let order;
-    if (process.env.RAZORPAY_KEY_SECRET === 'test_secret' || !process.env.RAZORPAY_KEY_SECRET) {
-      order = {
-        id: 'order_MOCK' + Math.floor(Math.random() * 100000),
-        amount: options.amount,
-        currency: options.currency
-      };
-    } else {
-      order = await razorpay.orders.create(options);
-    }
+    const order = await razorpay.orders.create(options);
 
     if (!order) {
       res.status(500).json({ error: 'Failed to create Razorpay order' });
@@ -209,15 +205,10 @@ router.post('/:bookingId/refund', requireAuth, async (req: AuthRequest, res: Res
     });
 
     // Initiate Razorpay Refund
-    let refund;
-    if (payment.razorpayPaymentId.startsWith('pay_MOCK')) {
-      refund = { id: 'rfnd_MOCK' + Math.floor(Math.random() * 100000) };
-    } else {
-      refund = await razorpay.payments.refund(payment.razorpayPaymentId, {
-        amount: Math.round(payment.amount * 100),
-        speed: 'normal'
-      });
-    }
+    const refund = await razorpay.payments.refund(payment.razorpayPaymentId, {
+      amount: Math.round(payment.amount * 100),
+      speed: 'normal'
+    });
 
     if (!refund) {
       res.status(500).json({ error: 'Failed to initiate refund with Razorpay' });

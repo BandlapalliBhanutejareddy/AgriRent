@@ -80,7 +80,7 @@ app.use((0, helmet_1.default)({
 app.use((0, compression_1.default)());
 // Granular Rate Limiters (increased for testing)
 const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_SERVER_EXTERNAL;
-const authLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 15 : 5, message: 'Too many auth requests' });
+const authLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 10 : 5, message: 'Too many auth requests' });
 const otpLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 15 : 3, message: 'Too many OTP requests' });
 const aiLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 60 * 1000, max: isTest ? 100 : 20, message: 'AI request limit reached' });
 const paymentsLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 100 : 10, message: 'Too many payment requests' });

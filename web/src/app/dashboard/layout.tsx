@@ -193,8 +193,16 @@ export default function DashboardLayout({
           {renderSidebarLinks()}
         </div>
 
-        <div className="p-4 border-t border-slate-200/50 dark:border-slate-800/50">
+        <div className="p-4 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
           <NavLink href="/dashboard/profile" icon={Settings} label={t('profile_settings')} exact />
+          <button 
+            onClick={handleLogout}
+            data-testid="logout-button-mobile"
+            className="p-2.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 bg-slate-50 dark:bg-slate-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all md:hidden"
+            title={t('sign_out')}
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       </aside>
 

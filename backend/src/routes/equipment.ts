@@ -14,9 +14,18 @@ const router = Router();
 // Get Equipment List (With Filters)
 router.get('/', async (req: Request, res: Response, next: any): Promise<void> => {
   try {
-    const { category, search, minPrice, maxPrice, sort, available } = req.query;
+    const { category, search, minPrice, maxPrice, sort, available, page, limit } = req.query;
 
-    const where: any = {};
+    const pageNum = parseInt(String(page)) || 1;
+    const limitNum = parseInt(String(limit)) || 20;
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: any = {
+      owner: {
+        isSuspended: false,
+        isVerified: true
+      }
+    };
     
     if (available === 'true') {
       where.available = true;
@@ -75,20 +84,35 @@ router.get('/', async (req: Request, res: Response, next: any): Promise<void> =>
     }
 
     let orderBy: any = { createdAt: 'desc' };
-    if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' };
-    if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' };
+    if (sort === 'lowest_price') orderBy = { pricePerDay: 'asc' };
+    if (sort === 'highest_price') orderBy = { pricePerDay: 'desc' };
+    if (sort === 'newest') orderBy = { createdAt: 'desc' };
+    // "recommended", "nearest", "highest_rated" can be future extensions, default to createdAt
 
-    const equipment = await prisma.equipment.findMany({
-      where,
-      orderBy,
-      include: {
-        owner: {
-          select: { id: true, name: true }
+    const [total, equipment] = await prisma.$transaction([
+      prisma.equipment.count({ where }),
+      prisma.equipment.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limitNum,
+        include: {
+          owner: {
+            select: { id: true, name: true }
+          }
         }
+      })
+    ]);
+
+    res.json({
+      data: equipment,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
       }
     });
-
-    res.json(equipment);
   } catch (error) {
     console.error('Equipment Fetch Error:', error);
     next(error);

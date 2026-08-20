@@ -34,10 +34,9 @@ test.describe('Localization Checks', () => {
       }, lang.code);
       
       await page.reload();
-      
-      // Verify visual translation
-      const textContent = await page.content();
-      expect(textContent).toContain(lang.expected);
+      await page.waitForTimeout(2000);      
+      // Verify visual translation using locator to benefit from Playwright's auto-wait
+      await expect(page.locator('h1').first()).toContainText(lang.expected);
 
       // Visual snapshot
       await expect(page).toHaveScreenshot(`dashboard-${lang.code}.png`, { fullPage: true, maxDiffPixelRatio: 0.1 });

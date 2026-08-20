@@ -32,7 +32,7 @@ export const options = {
   },
 };
 
-const BASE_URL = 'http://localhost:4000/api';
+const BASE_URL = __ENV.PERFORMANCE_BASE_URL || 'http://localhost:4000/api';
 
 // Simple payload mocks for the performance test
 export function testLogin() {

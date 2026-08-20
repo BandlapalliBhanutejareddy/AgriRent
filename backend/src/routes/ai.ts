@@ -17,6 +17,11 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.includes('your_api_key_here')) {
+      res.status(503).json({ error: 'AI Advisor is currently unavailable pending production credentials.' });
+      return;
+    }
+
     // Fetch all available equipment to give context to Gemini
     const equipmentList = await prisma.equipment.findMany({
       where: { available: true },

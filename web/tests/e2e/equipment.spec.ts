@@ -21,7 +21,7 @@ test.describe('Equipment CRUD', () => {
     await expect(createBtn).toBeVisible();
     
     // Fill basic info to test the form interacts (skipping full submission to avoid polluting unless necessary)
-    await page.getByPlaceholder(/machinery name/i).fill('Test Tractor Playwright');
+    await page.locator('input[type="text"]').first().fill('Test Tractor Playwright');
     
     // Test the button exists
     expect(await createBtn.isEnabled()).toBeTruthy();

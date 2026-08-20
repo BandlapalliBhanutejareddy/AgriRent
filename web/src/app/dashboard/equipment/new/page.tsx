@@ -85,11 +85,15 @@ export default function AddEquipment() {
       }
 
       // 2. Create Equipment
-      await api.post('/equipment', {
+      const payload: any = {
         ...formData,
-        imageUrl,
         pricePerDay: Number(formData.pricePerDay),
-      });
+      };
+      if (imageUrl) {
+        payload.imageUrl = imageUrl;
+      }
+      
+      await api.post('/equipment', payload);
       
       showToast('Equipment listed successfully!', 'success');
       router.push('/dashboard/equipment');
