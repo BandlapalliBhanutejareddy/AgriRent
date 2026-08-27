@@ -26,6 +26,10 @@ const allowedOrigins = [
   'https://your-vercel-domain.vercel.app',
   'https://www.agrorent.ai'
 ];
+
+if (process.env.CORS_ORIGIN) {
+  allowedOrigins.push(process.env.CORS_ORIGIN);
+}
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
