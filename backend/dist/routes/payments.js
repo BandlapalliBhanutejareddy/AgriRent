@@ -24,6 +24,10 @@ const razorpay = new razorpay_1.default({
     key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxx',
     key_secret: process.env.RAZORPAY_KEY_SECRET || 'test_secret',
 });
+// Get Razorpay Key ID
+router.get('/key', authMiddleware_1.requireAuth, (req, res) => {
+    res.json({ keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxx' });
+});
 // Create Payment Order
 router.post('/create-order', authMiddleware_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {

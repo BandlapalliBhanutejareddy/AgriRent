@@ -4,7 +4,9 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { requireAuth } from '../middlewares/authMiddleware';
-import { sendOtpEmail } from '../lib/email';
+import { EmailService } from '../services/email/email.service';
+
+const emailService = new EmailService();
 
 const router = Router();
 
@@ -107,7 +109,14 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     });
 
     // Send real OTP email via Resend (with console log debug backup)
-    await sendOtpEmail(String(email), generatedOtp, 'REGISTER');
+    const emailSent = await emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
+    if (!emailSent) {
+      await prisma.oTPVerification.deleteMany({
+        where: { email: String(email), purpose: 'REGISTER' }
+      });
+      res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+      return;
+    }
 
     res.json({
       success: true,
@@ -275,7 +284,14 @@ router.post('/resend-otp', async (req: Request, res: Response): Promise<void> =>
       }
     });
 
-    await sendOtpEmail(user.email, otp, String(purpose));
+    const emailSent = await emailService.sendOtp(user.email, otp, String(purpose));
+    if (!emailSent) {
+      await prisma.oTPVerification.deleteMany({
+        where: { email: user.email, purpose: String(purpose) }
+      });
+      res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+      return;
+    }
 
     res.json({ success: true, message: 'If an account exists, a new OTP has been sent.' });
   } catch (err) {
@@ -341,7 +357,14 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
     });
 
     // Send real recovery OTP email via Resend
-    await sendOtpEmail(String(email), otp, 'FORGOT_PASSWORD');
+    const emailSent = await emailService.sendOtp(String(email), otp, 'FORGOT_PASSWORD');
+    if (!emailSent) {
+      await prisma.oTPVerification.deleteMany({
+        where: { email: String(email), purpose: 'FORGOT_PASSWORD' }
+      });
+      res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+      return;
+    }
 
     res.json({
       success: true,
@@ -502,14 +525,22 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         data: {
           id: 'otp-resend-' + Date.now(),
           email: String(email),
-          otp: generatedOtp,
+          otp: await bcrypt.hash(generatedOtp, 10),
           purpose: 'REGISTER',
           expiresAt: new Date(Date.now() + 5 * 60 * 1000)
         }
       });
 
       // Send real resend OTP email via Resend
-      await sendOtpEmail(String(email), generatedOtp, 'REGISTER');
+      const emailSent = await emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
+      
+      if (!emailSent) {
+        await prisma.oTPVerification.deleteMany({
+          where: { email: String(email), purpose: 'REGISTER' }
+        });
+        res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+        return;
+      }
 
       res.status(403).json({ 
         success: false, 

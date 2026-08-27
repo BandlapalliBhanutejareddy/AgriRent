@@ -18,7 +18,8 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const crypto_1 = __importDefault(require("crypto"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const authMiddleware_1 = require("../middlewares/authMiddleware");
-const email_1 = require("../lib/email");
+const email_service_1 = require("../services/email/email.service");
+const emailService = new email_service_1.EmailService();
 const router = (0, express_1.Router)();
 const generateTokens = (userId, req) => __awaiter(void 0, void 0, void 0, function* () {
     const secret = process.env.JWT_SECRET || 'fallback_secret';
@@ -90,20 +91,28 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
                 isVerified: false
             }
         });
-        // Generate 6-digit numeric OTP
-        const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
+        // Generate cryptographically secure 6-digit numeric OTP
+        const generatedOtp = crypto_1.default.randomInt(100000, 999999).toString();
+        const hashedOtp = yield bcrypt_1.default.hash(generatedOtp, 10);
         // Save OTP to database
         yield prisma_1.prisma.oTPVerification.create({
             data: {
-                id: 'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                id: 'otp-' + Date.now() + '-' + crypto_1.default.randomInt(1000, 9999).toString(),
                 email: String(email),
-                otp: generatedOtp,
+                otp: hashedOtp,
                 purpose: 'REGISTER',
                 expiresAt: new Date(Date.now() + 5 * 60 * 1000)
             }
         });
         // Send real OTP email via Resend (with console log debug backup)
-        yield (0, email_1.sendOtpEmail)(String(email), generatedOtp, 'REGISTER');
+        const emailSent = yield emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
+        if (!emailSent) {
+            yield prisma_1.prisma.oTPVerification.deleteMany({
+                where: { email: String(email), purpose: 'REGISTER' }
+            });
+            res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+            return;
+        }
         res.json({
             success: true,
             message: 'Account created successfully! A secure 6-digit OTP code has been dispatched to your email.',
@@ -144,7 +153,6 @@ router.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, funct
         const otps = yield prisma_1.prisma.oTPVerification.findMany({
             where: {
                 email: String(email),
-                otp: String(otp),
                 purpose: String(purpose)
             },
             orderBy: { createdAt: 'desc' },
@@ -154,15 +162,26 @@ router.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, funct
             res.status(400).json({ success: false, error: 'Invalid OTP verification code' });
             return;
         }
+        const isMatch = yield bcrypt_1.default.compare(String(otp), otps[0].otp);
+        if (!isMatch) {
+            res.status(400).json({ success: false, error: 'Invalid OTP verification code' });
+            return;
+        }
         if (new Date(otps[0].expiresAt).getTime() < Date.now()) {
             res.status(400).json({ success: false, error: 'Expired OTP verification code' });
             return;
         }
-        // For FORGOT_PASSWORD: don't delete the OTP or update user here — reset-password will do that
+        // For FORGOT_PASSWORD: issue a secure reset authorization token and invalidate the OTP
         if (String(purpose) === 'FORGOT_PASSWORD') {
+            yield prisma_1.prisma.oTPVerification.deleteMany({
+                where: { email: String(email), purpose: String(purpose) }
+            });
+            const secret = process.env.JWT_SECRET || 'fallback_secret';
+            const resetToken = jsonwebtoken_1.default.sign({ email: String(email), purpose: 'password_reset' }, secret, { expiresIn: '15m' });
             res.json({
                 success: true,
-                message: 'OTP verified. You may now reset your password.'
+                message: 'OTP verified. You may now reset your password.',
+                resetToken
             });
             return;
         }
@@ -209,7 +228,16 @@ router.post('/resend-otp', (req, res) => __awaiter(void 0, void 0, void 0, funct
         }
         const user = yield prisma_1.prisma.user.findUnique({ where: { email: String(email) } });
         if (!user) {
-            res.status(404).json({ success: false, error: 'User not found' });
+            res.json({ success: true, message: 'If an account exists, a new OTP has been sent.' });
+            return;
+        }
+        // Cooldown check (60 seconds)
+        const recentOtp = yield prisma_1.prisma.oTPVerification.findFirst({
+            where: { email: String(email), purpose: String(purpose) },
+            orderBy: { createdAt: 'desc' }
+        });
+        if (recentOtp && (Date.now() - new Date(recentOtp.createdAt).getTime() < 60000)) {
+            res.status(429).json({ success: false, error: 'Please wait 60 seconds before requesting a new OTP' });
             return;
         }
         // Invalidate previous OTPs for this purpose
@@ -219,43 +247,31 @@ router.post('/resend-otp', (req, res) => __awaiter(void 0, void 0, void 0, funct
                 purpose: String(purpose)
             }
         });
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = crypto_1.default.randomInt(100000, 999999).toString();
+        const hashedOtp = yield bcrypt_1.default.hash(otp, 10);
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
         yield prisma_1.prisma.oTPVerification.create({
             data: {
-                id: 'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                id: 'otp-' + Date.now() + '-' + crypto_1.default.randomInt(1000, 9999).toString(),
                 email: user.email,
-                otp: otp,
+                otp: hashedOtp,
                 purpose: String(purpose),
                 expiresAt: expiresAt
             }
         });
-        yield (0, email_1.sendOtpEmail)(user.email, otp, String(purpose));
-        res.json({ success: true, message: 'New OTP sent to your email.' });
+        const emailSent = yield emailService.sendOtp(user.email, otp, String(purpose));
+        if (!emailSent) {
+            yield prisma_1.prisma.oTPVerification.deleteMany({
+                where: { email: user.email, purpose: String(purpose) }
+            });
+            res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+            return;
+        }
+        res.json({ success: true, message: 'If an account exists, a new OTP has been sent.' });
     }
     catch (err) {
         console.error('Resend OTP Error:', err);
         res.status(500).json({ success: false, error: 'Failed to resend OTP' });
-    }
-}));
-// DEV ONLY: Retrieve latest OTP for browser automation
-router.get('/dev-otp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { email } = req.query;
-        const otps = yield prisma_1.prisma.oTPVerification.findMany({
-            where: { email: String(email) },
-            orderBy: { createdAt: 'desc' },
-            take: 1
-        });
-        if (otps.length > 0) {
-            res.json({ success: true, otp: otps[0].otp, expiresAt: otps[0].expiresAt, purpose: otps[0].purpose });
-        }
-        else {
-            res.json({ success: false, otp: null });
-        }
-    }
-    catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to retrieve OTP' });
     }
 }));
 // 3. Request Password Recovery OTP
@@ -270,7 +286,10 @@ router.post('/forgot-password', (req, res) => __awaiter(void 0, void 0, void 0, 
             where: { email: String(email) }
         });
         if (!user) {
-            res.status(404).json({ success: false, error: 'No account registered with this email address' });
+            res.json({
+                success: true,
+                message: 'If an account exists, a security recovery OTP has been dispatched to your email.'
+            });
             return;
         }
         // Invalidate old tokens
@@ -280,22 +299,39 @@ router.post('/forgot-password', (req, res) => __awaiter(void 0, void 0, void 0, 
                 purpose: 'FORGOT_PASSWORD'
             }
         });
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        // Cooldown check (60 seconds)
+        const recentOtp = yield prisma_1.prisma.oTPVerification.findFirst({
+            where: { email: String(email), purpose: 'FORGOT_PASSWORD' },
+            orderBy: { createdAt: 'desc' }
+        });
+        if (recentOtp && (Date.now() - new Date(recentOtp.createdAt).getTime() < 60000)) {
+            res.status(429).json({ success: false, error: 'Please wait 60 seconds before requesting a new OTP' });
+            return;
+        }
+        const otp = crypto_1.default.randomInt(100000, 999999).toString();
+        const hashedOtp = yield bcrypt_1.default.hash(otp, 10);
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins expiry for reset
         yield prisma_1.prisma.oTPVerification.create({
             data: {
-                id: 'pwd-reset-' + Date.now(),
+                id: 'pwd-reset-' + Date.now() + '-' + crypto_1.default.randomInt(1000, 9999).toString(),
                 email: String(email),
-                otp: otp,
+                otp: hashedOtp,
                 purpose: 'FORGOT_PASSWORD',
                 expiresAt: expiresAt
             }
         });
         // Send real recovery OTP email via Resend
-        yield (0, email_1.sendOtpEmail)(String(email), otp, 'FORGOT_PASSWORD');
+        const emailSent = yield emailService.sendOtp(String(email), otp, 'FORGOT_PASSWORD');
+        if (!emailSent) {
+            yield prisma_1.prisma.oTPVerification.deleteMany({
+                where: { email: String(email), purpose: 'FORGOT_PASSWORD' }
+            });
+            res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+            return;
+        }
         res.json({
             success: true,
-            message: 'Security recovery OTP has been dispatched to your email.'
+            message: 'If an account exists, a security recovery OTP has been dispatched to your email.'
         });
     }
     catch (error) {
@@ -303,12 +339,12 @@ router.post('/forgot-password', (req, res) => __awaiter(void 0, void 0, void 0, 
         res.status(500).json({ success: false, error: 'Failed to process forgot password' });
     }
 }));
-// 4. Complete Password Reset using OTP
+// 4. Complete Password Reset using Secure Token
 router.post('/reset-password', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, otp, newPassword } = req.body;
-        if (!email || !otp || !newPassword) {
-            res.status(400).json({ success: false, error: 'Email, OTP, and new password are required' });
+        const { email, resetToken, newPassword } = req.body;
+        if (!email || !resetToken || !newPassword) {
+            res.status(400).json({ success: false, error: 'Email, reset token, and new password are required' });
             return;
         }
         if (!validatePasswordStrength(String(newPassword))) {
@@ -318,15 +354,16 @@ router.post('/reset-password', (req, res) => __awaiter(void 0, void 0, void 0, f
             });
             return;
         }
-        // Verify OTP exists and matches
-        const otps = yield prisma_1.prisma.$queryRawUnsafe(`SELECT * FROM "OTPVerification" 
-       WHERE "email" = $1 AND "otp" = $2 AND "purpose" = $3`, String(email), String(otp), 'FORGOT_PASSWORD');
-        if (otps.length === 0) {
-            res.status(400).json({ success: false, error: 'Invalid OTP code' });
-            return;
+        // Verify JWT Reset Token
+        const secret = process.env.JWT_SECRET || 'fallback_secret';
+        try {
+            const decoded = jsonwebtoken_1.default.verify(String(resetToken), secret);
+            if (decoded.email !== email || decoded.purpose !== 'password_reset') {
+                throw new Error('Invalid token payload');
+            }
         }
-        if (new Date(otps[0].expiresAt).getTime() < Date.now()) {
-            res.status(400).json({ success: false, error: 'Expired OTP code' });
+        catch (err) {
+            res.status(400).json({ success: false, error: 'Invalid or expired reset authorization. Please request a new OTP.' });
             return;
         }
         // Update user password hashed
@@ -338,8 +375,6 @@ router.post('/reset-password', (req, res) => __awaiter(void 0, void 0, void 0, f
                 isVerified: true // Auto-verify if they recover their account
             }
         });
-        // Delete verification code
-        yield prisma_1.prisma.$executeRawUnsafe(`DELETE FROM "OTPVerification" WHERE "email" = $1 AND "purpose" = $2`, String(email), 'FORGOT_PASSWORD');
         res.json({
             success: true,
             message: 'Password reset and saved successfully!'
@@ -438,13 +473,20 @@ router.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 data: {
                     id: 'otp-resend-' + Date.now(),
                     email: String(email),
-                    otp: generatedOtp,
+                    otp: yield bcrypt_1.default.hash(generatedOtp, 10),
                     purpose: 'REGISTER',
                     expiresAt: new Date(Date.now() + 5 * 60 * 1000)
                 }
             });
             // Send real resend OTP email via Resend
-            yield (0, email_1.sendOtpEmail)(String(email), generatedOtp, 'REGISTER');
+            const emailSent = yield emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
+            if (!emailSent) {
+                yield prisma_1.prisma.oTPVerification.deleteMany({
+                    where: { email: String(email), purpose: 'REGISTER' }
+                });
+                res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+                return;
+            }
             res.status(403).json({
                 success: false,
                 error: 'Email address is not verified yet. A fresh verification OTP has been dispatched to your email!',
