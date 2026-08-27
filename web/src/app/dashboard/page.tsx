@@ -318,7 +318,7 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 w-fit">
                             PAID
                           </span>
-                          <a href={`http://localhost:4000/api/payments/${booking.id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1 font-bold">
+                          <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/payments/${booking.id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1 font-bold">
                             Download Invoice
                           </a>
                         </div>

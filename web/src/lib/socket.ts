@@ -3,7 +3,8 @@ import { useStore } from '../store/useStore';
 import { useChatStore } from '../store/chatStore';
 import { useNotificationStore } from '../store/notificationStore';
 
-const SOCKET_URL = 'http://localhost:4000'; // Change in prod
+import { config } from './config';
+const SOCKET_URL = config.NEXT_PUBLIC_API_URL.replace('/api', '');
 
 let socket: Socket | null = null;
 
