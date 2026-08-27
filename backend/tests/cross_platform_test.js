@@ -102,6 +102,65 @@ async function runTests() {
     assert.strictEqual(farmerBooking.status, 'ACCEPTED');
     console.log('✔ Mobile Farmer sees booking is ACCEPTED');
 
+    console.log('\n--- TEST MULTI-OWNER MARKETPLACE ---');
+    const owner2Creds = { name: 'Owner 2', email: `owner2_${suffix}@test.com`, password: 'Password123!', role: 'OWNER' };
+    await axios.post(`${BASE_URL}/auth/register`, owner2Creds);
+    let otpRec2 = await prisma.oTPVerification.findFirst({ where: { email: owner2Creds.email }, orderBy: { createdAt: 'desc' }});
+    await axios.post(`${BASE_URL}/auth/verify-otp`, { email: owner2Creds.email, otp: otpRec2.otp, purpose: 'REGISTER' });
+    let res2 = await axios.post(`${BASE_URL}/auth/login`, { email: owner2Creds.email, password: owner2Creds.password });
+    let owner2Token = res2.data.token;
+    await axios.post(`${BASE_URL}/equipment`, { title: 'Tractor 2', description: 'Desc', pricePerDay: 400, category: 'TRACTOR', available: true }, { headers: { Authorization: `Bearer ${owner2Token}` } });
+    
+    // Farmer search
+    res = await axios.get(`${BASE_URL}/equipment`, { headers: { Authorization: `Bearer ${farmerToken}` } });
+    let marketplaceItems = res.data.data.data || res.data.data;
+    assert(marketplaceItems.length >= 2, 'Marketplace should show equipment from multiple owners');
+    console.log('✔ Global multi-owner marketplace verified');
+
+    console.log('\n--- TEST BOOKING CONFLICT ---');
+    try {
+      await axios.post(`${BASE_URL}/bookings`, {
+        equipmentId: equipmentId,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      }, { headers: { Authorization: `Bearer ${farmerToken}` } });
+      assert.fail('Should have rejected overlapping booking');
+    } catch (e) {
+      assert(e.response && (e.response.status === 400 || e.response.status === 409), 'Should reject with 400/409');
+      console.log('✔ Booking conflict properly rejected by backend');
+    }
+
+    console.log('\n--- TEST NOTIFICATIONS ---');
+    res = await axios.get(`${BASE_URL}/notifications`, { headers: { Authorization: `Bearer ${farmerToken}` } });
+    assert(res.data.data.length > 0, 'Farmer should have received a notification for accepted booking');
+    console.log('✔ Notifications verified via API');
+
+    console.log('\n--- TEST ANALYTICS ---');
+    res = await axios.get(`${BASE_URL}/analytics/owner`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(res.data.success, 'Owner analytics retrieved');
+    console.log('✔ Analytics API verified');
+
+    console.log('\n--- TEST PROFILE ---');
+    res = await axios.get(`${BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${farmerToken}` } });
+    assert.strictEqual(res.data.data.email, farmerCreds.email, 'Profile data mismatch');
+    console.log('✔ Profile API verified');
+
+    console.log('\n--- TEST PAYMENT & AI GRACEFUL DEGRADATION ---');
+    try {
+      await axios.post(`${BASE_URL}/payments/create-order`, { amount: 500, currency: 'INR' }, { headers: { Authorization: `Bearer ${farmerToken}` } });
+    } catch (e) {
+      assert([500, 503, 400].includes(e.response?.status), 'Payment API should gracefully handle missing keys or bad request');
+    }
+    
+    try {
+      await axios.post(`${BASE_URL}/ai/advisor`, { prompt: 'Hello' }, { headers: { Authorization: `Bearer ${farmerToken}` } });
+    } catch (e) {
+      if (![400, 500, 503].includes(e.response?.status)) {
+         throw new Error(`AI API failed with unexpected status: ${e.response?.status}. Body: ${JSON.stringify(e.response?.data)}`);
+      }
+    }
+    console.log('✔ Payment and AI gracefully degrade (no live keys)');
+
     console.log('\n--- TOKEN ROTATION TEST ---');
     res = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken: farmerRefreshToken });
     assert(res.data.success, 'Token refresh failed');

@@ -1,0 +1,15 @@
+{
+  "name": "web-selenium",
+  "version": "1.0.0",
+  "description": "Selenium E2E framework",
+  "main": "index.js",
+  "dependencies": {
+    "selenium-webdriver": "^4.18.1",
+    "chromedriver": "^122.0.0",
+    "exceljs": "^4.4.0",
+    "node-fetch": "^2.7.0"
+  },
+  "scripts": {
+    "test": "node runner.js"
+  }
+}

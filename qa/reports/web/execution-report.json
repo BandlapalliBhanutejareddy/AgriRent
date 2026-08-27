@@ -1,0 +1,168 @@
+{
+  "stats": {
+    "suites": 1,
+    "tests": 2,
+    "passes": 0,
+    "pending": 0,
+    "failures": 2,
+    "start": "2026-08-25T12:22:02.020Z",
+    "end": "2026-08-25T12:22:21.739Z",
+    "duration": 19719,
+    "testsRegistered": 2,
+    "passPercent": 0,
+    "pendingPercent": 0,
+    "other": 0,
+    "hasOther": false,
+    "skipped": 0,
+    "hasSkipped": false
+  },
+  "results": [
+    {
+      "uuid": "6b13fe50-ee4a-4f2e-8172-4dac49163665",
+      "title": "",
+      "fullFile": "D:\\AgriRent_AI\\qa\\web-selenium\\tests\\auth\\login.spec.js",
+      "file": "\\web-selenium\\tests\\auth\\login.spec.js",
+      "beforeHooks": [],
+      "afterHooks": [],
+      "tests": [],
+      "suites": [
+        {
+          "uuid": "a5487244-a119-495c-848b-32e5e13706cb",
+          "title": "AgroRent Web E2E - Auth Flow",
+          "fullFile": "D:\\AgriRent_AI\\qa\\web-selenium\\tests\\auth\\login.spec.js",
+          "file": "\\web-selenium\\tests\\auth\\login.spec.js",
+          "beforeHooks": [
+            {
+              "title": "\"before all\" hook in \"AgroRent Web E2E - Auth Flow\"",
+              "fullTitle": "AgroRent Web E2E - Auth Flow \"before all\" hook in \"AgroRent Web E2E - Auth Flow\"",
+              "timedOut": false,
+              "duration": 14561,
+              "state": null,
+              "speed": null,
+              "pass": false,
+              "fail": false,
+              "pending": false,
+              "context": null,
+              "code": "driver = await DriverFactory.build();",
+              "err": {},
+              "uuid": "b5074396-7b81-4038-a356-a8e64ecc45a6",
+              "parentUUID": "a5487244-a119-495c-848b-32e5e13706cb",
+              "isHook": true,
+              "skipped": false
+            }
+          ],
+          "afterHooks": [
+            {
+              "title": "\"after all\" hook in \"AgroRent Web E2E - Auth Flow\"",
+              "fullTitle": "AgroRent Web E2E - Auth Flow \"after all\" hook in \"AgroRent Web E2E - Auth Flow\"",
+              "timedOut": false,
+              "duration": 101,
+              "state": null,
+              "speed": null,
+              "pass": false,
+              "fail": false,
+              "pending": false,
+              "context": null,
+              "code": "await driver.quit();",
+              "err": {},
+              "uuid": "2220c88b-013d-4c8e-9503-053855b66f86",
+              "parentUUID": "a5487244-a119-495c-848b-32e5e13706cb",
+              "isHook": true,
+              "skipped": false
+            }
+          ],
+          "tests": [
+            {
+              "title": "should render the login page",
+              "fullTitle": "AgroRent Web E2E - Auth Flow should render the login page",
+              "timedOut": false,
+              "duration": 2669,
+              "state": "failed",
+              "speed": null,
+              "pass": false,
+              "fail": true,
+              "pending": false,
+              "context": null,
+              "code": "await driver.get('http://localhost:3000/login');\nconst title = await driver.getTitle();\nif (!title.includes('AgroRent')) {\n  throw new Error('Title mismatch');\n}",
+              "err": {
+                "message": "WebDriverError: unknown error: net::ERR_CONNECTION_REFUSED\n  (Session info: chrome=151.0.7922.174)",
+                "estack": "WebDriverError: unknown error: net::ERR_CONNECTION_REFUSED\n  (Session info: chrome=151.0.7922.174)\n    at Object.throwDecodedError (node_modules\\selenium-webdriver\\lib\\error.js:523:15)\n    at parseHttpResponse (node_modules\\selenium-webdriver\\lib\\http.js:527:13)\n    at Executor.execute (node_modules\\selenium-webdriver\\lib\\http.js:459:28)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async Driver.execute (node_modules\\selenium-webdriver\\lib\\webdriver.js:745:17)\n    at async Context.<anonymous> (web-selenium\\tests\\auth\\login.spec.js:16:5)",
+                "diff": null
+              },
+              "uuid": "03fac181-b173-420c-a9a5-c0ff38654581",
+              "parentUUID": "a5487244-a119-495c-848b-32e5e13706cb",
+              "isHook": false,
+              "skipped": false
+            },
+            {
+              "title": "should display validation errors for empty fields",
+              "fullTitle": "AgroRent Web E2E - Auth Flow should display validation errors for empty fields",
+              "timedOut": false,
+              "duration": 2377,
+              "state": "failed",
+              "speed": null,
+              "pass": false,
+              "fail": true,
+              "pending": false,
+              "context": null,
+              "code": "await driver.get('http://localhost:3000/login');\nconst button = await driver.wait(until.elementLocated(By.css('button[type=\"submit\"]')), 5000);\nawait button.click();\n\n// Test logic follows",
+              "err": {
+                "message": "WebDriverError: unknown error: net::ERR_CONNECTION_REFUSED\n  (Session info: chrome=151.0.7922.174)",
+                "estack": "WebDriverError: unknown error: net::ERR_CONNECTION_REFUSED\n  (Session info: chrome=151.0.7922.174)\n    at Object.throwDecodedError (node_modules\\selenium-webdriver\\lib\\error.js:523:15)\n    at parseHttpResponse (node_modules\\selenium-webdriver\\lib\\http.js:527:13)\n    at Executor.execute (node_modules\\selenium-webdriver\\lib\\http.js:459:28)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async Driver.execute (node_modules\\selenium-webdriver\\lib\\webdriver.js:745:17)\n    at async Context.<anonymous> (web-selenium\\tests\\auth\\login.spec.js:24:5)",
+                "diff": null
+              },
+              "uuid": "3f760a8b-d0bb-4e50-aa13-e1d4d36d7f45",
+              "parentUUID": "a5487244-a119-495c-848b-32e5e13706cb",
+              "isHook": false,
+              "skipped": false
+            }
+          ],
+          "suites": [],
+          "passes": [],
+          "failures": [
+            "03fac181-b173-420c-a9a5-c0ff38654581",
+            "3f760a8b-d0bb-4e50-aa13-e1d4d36d7f45"
+          ],
+          "pending": [],
+          "skipped": [],
+          "duration": 5046,
+          "root": false,
+          "rootEmpty": false,
+          "_timeout": 60000
+        }
+      ],
+      "passes": [],
+      "failures": [],
+      "pending": [],
+      "skipped": [],
+      "duration": 0,
+      "root": true,
+      "rootEmpty": true,
+      "_timeout": 60000
+    }
+  ],
+  "meta": {
+    "mocha": {
+      "version": "10.8.2"
+    },
+    "mochawesome": {
+      "options": {
+        "quiet": false,
+        "reportFilename": "execution-report",
+        "saveHtml": true,
+        "saveJson": true,
+        "consoleReporter": "spec",
+        "useInlineDiffs": false,
+        "code": true
+      },
+      "version": "7.1.4"
+    },
+    "marge": {
+      "options": {
+        "reportDir": "reports/web",
+        "reportFilename": "execution-report"
+      },
+      "version": "6.3.2"
+    }
+  }
+}

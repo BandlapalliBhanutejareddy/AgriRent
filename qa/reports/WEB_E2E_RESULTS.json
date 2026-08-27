@@ -1,0 +1,30 @@
+[
+  {
+    "id": "TC-WEB-001",
+    "name": "Homepage Load",
+    "status": "FAIL",
+    "duration": 15003,
+    "evidence": "qa/evidence/web/TC-WEB-001_screenshot.png"
+  },
+  {
+    "id": "TC-WEB-002",
+    "name": "Login Page",
+    "status": "FAIL",
+    "duration": 15015,
+    "evidence": "qa/evidence/web/TC-WEB-002_screenshot.png"
+  },
+  {
+    "id": "TC-WEB-003",
+    "name": "Dashboard Load",
+    "status": "PASS",
+    "duration": 7585,
+    "evidence": "qa/evidence/web/TC-WEB-003_screenshot.png"
+  },
+  {
+    "id": "TC-WEB-004",
+    "name": "Marketplace",
+    "status": "PASS",
+    "duration": 248,
+    "evidence": "qa/evidence/web/TC-WEB-004_screenshot.png"
+  }
+]

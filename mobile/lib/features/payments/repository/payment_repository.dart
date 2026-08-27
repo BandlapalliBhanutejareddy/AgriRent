@@ -4,12 +4,23 @@ import '../../../core/errors/api_error_handler.dart';
 class PaymentRepository {
   final ApiClient _apiClient = ApiClient();
 
+  Future<String> getKeyId() async {
+    try {
+      final response = await _apiClient.dio.get('/payments/key');
+      final responseData = response.data['data'] ?? response.data;
+      return responseData['keyId'];
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
+
   Future<Map<String, dynamic>> createOrder(String bookingId) async {
     try {
       final response = await _apiClient.dio.post('/payments/create-order', data: {
         'bookingId': bookingId,
       });
-      return response.data;
+      final responseData = response.data['data'] ?? response.data;
+      return responseData;
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }

@@ -11,7 +11,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { prompt, language = 'English' } = req.body;
-    
+
     if (!prompt || typeof prompt !== 'string') {
       res.status(400).json({ error: 'Prompt is required' });
       return;
@@ -40,10 +40,16 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
       Provide helpful, localized farming advice and recommend specific equipment from the list above if it suits their needs. Keep the response concise, encouraging, and formatted in Markdown.
     `;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: contextPrompt,
+    const generatePromise = ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: contextPrompt,
     });
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI Service Timeout')), 15000)
+    );
+
+    const response = await Promise.race([generatePromise, timeoutPromise]) as any;
 
     await prisma.auditLog.create({
       data: {

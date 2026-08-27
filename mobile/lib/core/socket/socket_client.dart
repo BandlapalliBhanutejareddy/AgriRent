@@ -1,10 +1,11 @@
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'dart:developer';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../constants/api_constants.dart';
 import '../storage/secure_storage.dart';
 
 class SocketClient {
   static final SocketClient _instance = SocketClient._internal();
-  IO.Socket? _socket;
+  io.Socket? _socket;
 
   factory SocketClient() {
     return _instance;
@@ -16,7 +17,7 @@ class SocketClient {
     final token = await SecureStorage.getAccessToken();
     if (token == null) return;
 
-    _socket = IO.io(ApiConstants.socketUrl, <String, dynamic>{
+    _socket = io.io(ApiConstants.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
       'auth': {'token': token},
@@ -25,11 +26,11 @@ class SocketClient {
     _socket?.connect();
 
     _socket?.onConnect((_) {
-      print('Socket Connected');
+      log('Socket Connected');
     });
 
     _socket?.onDisconnect((_) {
-      print('Socket Disconnected');
+      log('Socket Disconnected');
     });
   }
 

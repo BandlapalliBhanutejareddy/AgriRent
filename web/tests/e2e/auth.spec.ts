@@ -7,7 +7,7 @@ test.describe('Authentication Flows', () => {
     await page.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
     await page.locator('input[type="password"]').fill('password123');
     await page.getByTestId('login-button').click();
-    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboard\/farmer/);
     
     const hamburger = page.locator('button:has(svg.lucide-menu)');
     if (await hamburger.isVisible()) {
@@ -22,7 +22,7 @@ test.describe('Authentication Flows', () => {
     await page.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
     await page.locator('input[type="password"]').fill('password123');
     await page.getByTestId('login-button').click();
-    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboard\/farmer/);
     
     const hamburger = page.locator('button:has(svg.lucide-menu)');
     if (await hamburger.isVisible()) {

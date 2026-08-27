@@ -30,13 +30,18 @@ test.describe('Marketplace & Bookings', () => {
     await page.waitForTimeout(3000); // wait for data load
     await page.screenshot({ path: '../../docs/evidence/marketplace/1_marketplace_global.png', fullPage: true });
     
-    // Type in search
+    // Type in search and wait for network
     const searchInput = page.getByTestId('equipment-search');
     await expect(searchInput).toBeVisible();
-    await searchInput.fill('Tractor');
     
-    // Let debounce finish
-    await page.waitForTimeout(2000);
+    const responsePromise = page.waitForResponse(response => 
+      response.url().includes('/equipment') && response.url().includes('search=Pro') && response.status() === 200
+    );
+    await searchInput.fill('Pro Series');
+    await responsePromise;
+    
+    // Give it a bit more time to render
+    await page.waitForTimeout(1000);
     await page.screenshot({ path: '../../docs/evidence/marketplace/2_marketplace_search.png', fullPage: true });
     
     // Verify booking buttons exist on filtered items

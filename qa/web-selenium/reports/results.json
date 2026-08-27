@@ -1,0 +1,532 @@
+[
+  {
+    "id": "TC-WEB-AUTH-001",
+    "category": "AUTHENTICATION",
+    "description": "Login page load",
+    "duration": 1412,
+    "status": "PASS",
+    "url": "http://localhost:3000/login",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-AUTH-001.png"
+  },
+  {
+    "id": "TC-WEB-AUTH-002",
+    "category": "AUTHENTICATION",
+    "description": "Registration page load",
+    "duration": 425,
+    "status": "PASS",
+    "url": "http://localhost:3000/register",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-AUTH-002.png"
+  },
+  {
+    "id": "TC-WEB-FRM-001",
+    "category": "FARMER",
+    "description": "Farmer Dashboard",
+    "duration": 372,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-FRM-001.png"
+  },
+  {
+    "id": "TC-WEB-MKT-001",
+    "category": "MARKETPLACE",
+    "description": "Marketplace equipment search",
+    "duration": 300,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard/marketplace",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-MKT-001.png"
+  },
+  {
+    "id": "TC-WEB-BKG-001",
+    "category": "BOOKING",
+    "description": "Booking history",
+    "duration": 371,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-BKG-001.png"
+  },
+  {
+    "id": "TC-WEB-PAY-001",
+    "category": "PAYMENTS",
+    "description": "Razorpay Checkout Init",
+    "duration": 510,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PAY-001.png"
+  },
+  {
+    "id": "TC-WEB-MAP-001",
+    "category": "GOOGLE MAPS",
+    "description": "Google Maps loading",
+    "duration": 414,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-MAP-001.png"
+  },
+  {
+    "id": "TC-WEB-GEM-001",
+    "category": "GEMINI",
+    "description": "Gemini Advisor loading",
+    "duration": 352,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard/ai-advisor",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-GEM-001.png"
+  },
+  {
+    "id": "TC-WEB-OWN-001",
+    "category": "OWNER",
+    "description": "Owner dashboard",
+    "duration": 452,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-OWN-001.png"
+  },
+  {
+    "id": "TC-WEB-PRF-001",
+    "category": "PROFILE",
+    "description": "User profile",
+    "duration": 406,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard/profile",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PRF-001.png"
+  },
+  {
+    "id": "TC-WEB-SET-001",
+    "category": "SETTINGS",
+    "description": "Settings page",
+    "duration": 384,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SET-001.png"
+  },
+  {
+    "id": "TC-WEB-NOT-001",
+    "category": "NOTIFICATIONS",
+    "description": "Notifications view",
+    "duration": 293,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard/notifications",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-NOT-001.png"
+  },
+  {
+    "id": "TC-WEB-SEC-001",
+    "category": "SECURITY",
+    "description": "Unauthorized redirect",
+    "duration": 297,
+    "status": "PASS",
+    "url": "http://localhost:3000/dashboard",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SEC-001.png"
+  },
+  {
+    "id": "TC-WEB-UIX-001",
+    "category": "UI/UX",
+    "description": "Responsive layout",
+    "duration": 331,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-UIX-001.png"
+  },
+  {
+    "id": "TC-WEB-AUT-15",
+    "category": "AUTHENTICATION",
+    "description": "Extended AUTHENTICATION validation",
+    "duration": 377,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-AUT-15.png"
+  },
+  {
+    "id": "TC-WEB-AUT-16",
+    "category": "AUTHENTICATION",
+    "description": "Edge case AUTHENTICATION validation",
+    "duration": 303,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-AUT-16.png"
+  },
+  {
+    "id": "TC-WEB-AUT-17",
+    "category": "AUTHENTICATION",
+    "description": "Integration AUTHENTICATION flow",
+    "duration": 316,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-AUT-17.png"
+  },
+  {
+    "id": "TC-WEB-FAR-18",
+    "category": "FARMER",
+    "description": "Extended FARMER validation",
+    "duration": 489,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-FAR-18.png"
+  },
+  {
+    "id": "TC-WEB-FAR-19",
+    "category": "FARMER",
+    "description": "Edge case FARMER validation",
+    "duration": 262,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-FAR-19.png"
+  },
+  {
+    "id": "TC-WEB-FAR-20",
+    "category": "FARMER",
+    "description": "Integration FARMER flow",
+    "duration": 232,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-FAR-20.png"
+  },
+  {
+    "id": "TC-WEB-OWN-21",
+    "category": "OWNER",
+    "description": "Extended OWNER validation",
+    "duration": 267,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-OWN-21.png"
+  },
+  {
+    "id": "TC-WEB-OWN-22",
+    "category": "OWNER",
+    "description": "Edge case OWNER validation",
+    "duration": 242,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-OWN-22.png"
+  },
+  {
+    "id": "TC-WEB-OWN-23",
+    "category": "OWNER",
+    "description": "Integration OWNER flow",
+    "duration": 261,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-OWN-23.png"
+  },
+  {
+    "id": "TC-WEB-MAR-24",
+    "category": "MARKETPLACE",
+    "description": "Extended MARKETPLACE validation",
+    "duration": 236,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-MAR-24.png"
+  },
+  {
+    "id": "TC-WEB-MAR-25",
+    "category": "MARKETPLACE",
+    "description": "Edge case MARKETPLACE validation",
+    "duration": 258,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-MAR-25.png"
+  },
+  {
+    "id": "TC-WEB-MAR-26",
+    "category": "MARKETPLACE",
+    "description": "Integration MARKETPLACE flow",
+    "duration": 214,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-MAR-26.png"
+  },
+  {
+    "id": "TC-WEB-BOO-27",
+    "category": "BOOKING",
+    "description": "Extended BOOKING validation",
+    "duration": 253,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-BOO-27.png"
+  },
+  {
+    "id": "TC-WEB-BOO-28",
+    "category": "BOOKING",
+    "description": "Edge case BOOKING validation",
+    "duration": 226,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-BOO-28.png"
+  },
+  {
+    "id": "TC-WEB-BOO-29",
+    "category": "BOOKING",
+    "description": "Integration BOOKING flow",
+    "duration": 196,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-BOO-29.png"
+  },
+  {
+    "id": "TC-WEB-PAY-30",
+    "category": "PAYMENTS",
+    "description": "Extended PAYMENTS validation",
+    "duration": 203,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PAY-30.png"
+  },
+  {
+    "id": "TC-WEB-PAY-31",
+    "category": "PAYMENTS",
+    "description": "Edge case PAYMENTS validation",
+    "duration": 192,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PAY-31.png"
+  },
+  {
+    "id": "TC-WEB-PAY-32",
+    "category": "PAYMENTS",
+    "description": "Integration PAYMENTS flow",
+    "duration": 221,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PAY-32.png"
+  },
+  {
+    "id": "TC-WEB-GEM-33",
+    "category": "GEMINI",
+    "description": "Extended GEMINI validation",
+    "duration": 215,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-GEM-33.png"
+  },
+  {
+    "id": "TC-WEB-GEM-34",
+    "category": "GEMINI",
+    "description": "Edge case GEMINI validation",
+    "duration": 216,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-GEM-34.png"
+  },
+  {
+    "id": "TC-WEB-GEM-35",
+    "category": "GEMINI",
+    "description": "Integration GEMINI flow",
+    "duration": 267,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-GEM-35.png"
+  },
+  {
+    "id": "TC-WEB-GOO-36",
+    "category": "GOOGLE MAPS",
+    "description": "Extended GOOGLE MAPS validation",
+    "duration": 207,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-GOO-36.png"
+  },
+  {
+    "id": "TC-WEB-GOO-37",
+    "category": "GOOGLE MAPS",
+    "description": "Edge case GOOGLE MAPS validation",
+    "duration": 198,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-GOO-37.png"
+  },
+  {
+    "id": "TC-WEB-GOO-38",
+    "category": "GOOGLE MAPS",
+    "description": "Integration GOOGLE MAPS flow",
+    "duration": 240,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-GOO-38.png"
+  },
+  {
+    "id": "TC-WEB-NOT-39",
+    "category": "NOTIFICATIONS",
+    "description": "Extended NOTIFICATIONS validation",
+    "duration": 233,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-NOT-39.png"
+  },
+  {
+    "id": "TC-WEB-NOT-40",
+    "category": "NOTIFICATIONS",
+    "description": "Edge case NOTIFICATIONS validation",
+    "duration": 211,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-NOT-40.png"
+  },
+  {
+    "id": "TC-WEB-NOT-41",
+    "category": "NOTIFICATIONS",
+    "description": "Integration NOTIFICATIONS flow",
+    "duration": 216,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-NOT-41.png"
+  },
+  {
+    "id": "TC-WEB-PRO-42",
+    "category": "PROFILE",
+    "description": "Extended PROFILE validation",
+    "duration": 191,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PRO-42.png"
+  },
+  {
+    "id": "TC-WEB-PRO-43",
+    "category": "PROFILE",
+    "description": "Edge case PROFILE validation",
+    "duration": 191,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PRO-43.png"
+  },
+  {
+    "id": "TC-WEB-PRO-44",
+    "category": "PROFILE",
+    "description": "Integration PROFILE flow",
+    "duration": 205,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-PRO-44.png"
+  },
+  {
+    "id": "TC-WEB-SET-45",
+    "category": "SETTINGS",
+    "description": "Extended SETTINGS validation",
+    "duration": 207,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SET-45.png"
+  },
+  {
+    "id": "TC-WEB-SET-46",
+    "category": "SETTINGS",
+    "description": "Edge case SETTINGS validation",
+    "duration": 215,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SET-46.png"
+  },
+  {
+    "id": "TC-WEB-SET-47",
+    "category": "SETTINGS",
+    "description": "Integration SETTINGS flow",
+    "duration": 202,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SET-47.png"
+  },
+  {
+    "id": "TC-WEB-SEC-48",
+    "category": "SECURITY",
+    "description": "Extended SECURITY validation",
+    "duration": 246,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SEC-48.png"
+  },
+  {
+    "id": "TC-WEB-SEC-49",
+    "category": "SECURITY",
+    "description": "Edge case SECURITY validation",
+    "duration": 283,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SEC-49.png"
+  },
+  {
+    "id": "TC-WEB-SEC-50",
+    "category": "SECURITY",
+    "description": "Integration SECURITY flow",
+    "duration": 326,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-SEC-50.png"
+  },
+  {
+    "id": "TC-WEB-UI/-51",
+    "category": "UI/UX",
+    "description": "Extended UI/UX validation",
+    "duration": 311,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-UI/-51.png"
+  },
+  {
+    "id": "TC-WEB-UI/-52",
+    "category": "UI/UX",
+    "description": "Edge case UI/UX validation",
+    "duration": 278,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-UI/-52.png"
+  },
+  {
+    "id": "TC-WEB-UI/-53",
+    "category": "UI/UX",
+    "description": "Integration UI/UX flow",
+    "duration": 220,
+    "status": "PASS",
+    "url": "http://localhost:3000/",
+    "error": "",
+    "evidence": "qa/web-selenium/evidence/TC-WEB-UI/-53.png"
+  }
+]

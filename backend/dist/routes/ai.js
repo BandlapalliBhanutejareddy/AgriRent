@@ -23,6 +23,10 @@ router.post('/advisor', authMiddleware_1.requireAuth, (req, res) => __awaiter(vo
             res.status(400).json({ error: 'Prompt is required' });
             return;
         }
+        if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.includes('your_api_key_here')) {
+            res.status(503).json({ error: 'AI Advisor is currently unavailable pending production credentials.' });
+            return;
+        }
         // Fetch all available equipment to give context to Gemini
         const equipmentList = yield prisma_1.prisma.equipment.findMany({
             where: { available: true },
@@ -39,10 +43,12 @@ router.post('/advisor', authMiddleware_1.requireAuth, (req, res) => __awaiter(vo
       
       Provide helpful, localized farming advice and recommend specific equipment from the list above if it suits their needs. Keep the response concise, encouraging, and formatted in Markdown.
     `;
-        const response = yield ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+        const generatePromise = ai.models.generateContent({
+            model: 'gemini-3.6-flash',
             contents: contextPrompt,
         });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI Service Timeout')), 15000));
+        const response = yield Promise.race([generatePromise, timeoutPromise]);
         yield prisma_1.prisma.auditLog.create({
             data: {
                 actorId: req.prismaUser.id,

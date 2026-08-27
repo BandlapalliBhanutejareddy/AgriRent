@@ -70,6 +70,7 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3>(1);
   const [otpInput, setOtpInput] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState(false);
@@ -79,6 +80,8 @@ export default function LoginPage() {
   // Register OTP Flow States
   const [showRegisterOtpModal, setShowRegisterOtpModal] = useState(false);
   const [registerOtpError, setRegisterOtpError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [deliveryStatus, setDeliveryStatus] = useState('');
 
   function handlePortalChange(portal: PortalRole) {
     setActivePortal(portal);
@@ -148,22 +151,6 @@ export default function LoginPage() {
     }
   };
 
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [devOtp, setDevOtp] = useState<string | null>(null);
-  const [deliveryStatus, setDeliveryStatus] = useState<string>('');
-
-  // Fetch Dev OTP automatically for testing
-  useEffect(() => {
-    if (showRegisterOtpModal && email) {
-      setDeliveryStatus('Sending email via secure transport...');
-      api.get(`/auth/dev-otp?email=${email}`)
-         .then(res => {
-            if (res.data.otp) setDevOtp(res.data.otp);
-            setDeliveryStatus('Email dispatched securely.');
-         })
-         .catch(() => setDeliveryStatus('Email delivery failed or pending.'));
-    }
-  }, [showRegisterOtpModal, email]);
 
   // Timer for cooldown
   useEffect(() => {
@@ -187,7 +174,6 @@ export default function LoginPage() {
       const response = await api.post('/auth/verify-otp', { email, otp: code, purpose: 'REGISTER' });
       if (response.data.success) {
         setShowRegisterOtpModal(false);
-        setDevOtp(null);
         executeLogin(response.data.user, response.data.token);
       } else {
         setRegisterOtpError('Invalid OTP code. Please check and try again.');
@@ -229,7 +215,6 @@ export default function LoginPage() {
     }
   };
 
-  const [forgotDevOtp, setForgotDevOtp] = useState<string | null>(null);
   const [forgotResendCooldown, setForgotResendCooldown] = useState(0);
 
   // Cooldown timer for forgot OTP resend
@@ -240,15 +225,6 @@ export default function LoginPage() {
     }
     return () => clearInterval(t);
   }, [forgotResendCooldown]);
-
-  // Fetch dev OTP when forgot password step 2 opens
-  useEffect(() => {
-    if (forgotStep === 2 && forgotEmail) {
-      api.get(`/auth/dev-otp?email=${forgotEmail}`)
-         .then(res => { if (res.data.otp) setForgotDevOtp(res.data.otp); })
-         .catch(() => {});
-    }
-  }, [forgotStep, forgotEmail]);
 
   // Auto-verify forgot OTP on 6 digits
   useEffect(() => {
@@ -264,9 +240,6 @@ export default function LoginPage() {
       await api.post('/auth/resend-otp', { email: forgotEmail, purpose: 'FORGOT_PASSWORD' });
       setForgotResendCooldown(60);
       setForgotSuccessMsg('New OTP sent to your email!');
-      // Refresh dev OTP
-      const res = await api.get(`/auth/dev-otp?email=${forgotEmail}`);
-      if (res.data.otp) setForgotDevOtp(res.data.otp);
     } catch (err: any) {
       setForgotError(err.response?.data?.error || 'Failed to resend OTP.');
     }
@@ -306,6 +279,7 @@ export default function LoginPage() {
         purpose: 'FORGOT_PASSWORD'
       });
       if (res.data.success) {
+        setResetToken(res.data.resetToken);
         setForgotStep(3);
       } else {
         setForgotError('Invalid OTP. Please check and try again.');
@@ -335,7 +309,7 @@ export default function LoginPage() {
     try {
       await api.post('/auth/reset-password', {
         email: forgotEmail,
-        otp: otpInput,
+        resetToken: resetToken,
         newPassword
       });
       setForgotSuccess(true);
@@ -343,6 +317,7 @@ export default function LoginPage() {
         setShowForgotModal(false);
         setForgotEmail('');
         setOtpInput('');
+        setResetToken('');
         setNewPassword('');
         setConfirmPassword('');
         setForgotStep(1);
@@ -576,11 +551,6 @@ export default function LoginPage() {
                     {deliveryStatus}
                   </p>
                 )}
-                {devOtp && (
-                  <div className="mt-2 bg-yellow-50 dark:bg-yellow-900/30 p-2 rounded text-xs text-yellow-800 dark:text-yellow-400 font-mono">
-                    {t('dev_mode_otp')}{devOtp}
-                  </div>
-                )}
               </div>
 
               {registerOtpError && (
@@ -713,13 +683,6 @@ export default function LoginPage() {
 
                   {forgotStep === 2 && (
                     <form onSubmit={handleVerifyForgotOtp} className="space-y-4">
-                      {forgotDevOtp && (
-                        <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-xl text-center">
-                          <p className="text-xs text-yellow-700 dark:text-yellow-400 font-mono font-bold">
-                            {t('dev_mode_otp')}{forgotDevOtp}
-                          </p>
-                        </div>
-                      )}
                       <div>
                         <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
                           {t('verify_6_digit_otp_code')}</label>

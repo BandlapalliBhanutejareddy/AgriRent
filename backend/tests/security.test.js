@@ -67,7 +67,8 @@ test('Security Verification Suite', async (t) => {
     const blob = new Blob(['mock exe content'], { type: 'application/x-msdownload' });
     form.set('image', blob, 'virus.exe');
     
-    const res = await fetch('http://localhost:4010/api/upload', {
+    const { API_URL } = require('./utils');
+    const res = await fetch(`${API_URL}/api/upload`, {
       method: 'POST',
       body: form,
       headers: {

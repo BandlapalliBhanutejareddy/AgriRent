@@ -25,9 +25,23 @@ async function main() {
     {
       name: "Agro Admin",
       email: "admin@agrorent.ai",
-      password: await bcrypt.hash("Admin@123", 10),
+      password: await bcrypt.hash("password123", 10),
       role: "ADMIN",
       phone: "+919876543212"
+    },
+    {
+      name: "Marketplace Owner",
+      email: "owner-test@agrorent.ai",
+      password: await bcrypt.hash("password123", 10),
+      role: "OWNER",
+      phone: "+919876543222"
+    },
+    {
+      name: "Test Farmer",
+      email: "farmer-test@agrorent.ai",
+      password: await bcrypt.hash("password123", 10),
+      role: "FARMER",
+      phone: "+919876543223"
     }
   ];
 
@@ -40,9 +54,10 @@ async function main() {
   }
 
   const owner = await prisma.user.findUnique({ where: { email: "owner@agrorent.ai" } });
+  const testOwner = await prisma.user.findUnique({ where: { email: "owner-test@agrorent.ai" } });
 
-  if (owner) {
-    // 2. Create Demo Equipment
+  if (owner && testOwner) {
+    // 2. Create Demo Equipment for owner 1
     const equipments = [
       {
         title: "John Deere 5050 D Tractor",
@@ -63,6 +78,17 @@ async function main() {
         ownerId: owner.id,
         available: true,
         location: "Haryana, India"
+      },
+      // Create equipment for Owner 2 (Test Owner) that matches the E2E expectations
+      {
+        title: "Pro Series Harvester",
+        description: "Advanced Pro Series harvester for multi-owner tests.",
+        category: "HARVESTERS",
+        pricePerDay: 3000,
+        imageUrl: "https://images.unsplash.com/photo-1594411130691-e407137f8846?auto=format&fit=crop&q=80&w=800",
+        ownerId: testOwner.id,
+        available: true,
+        location: "Maharashtra, India"
       }
     ];
 

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/marketplace_provider.dart';
+import 'equipment_details_screen.dart';
+import '../../ai_advisor/ui/ai_advisor_screen.dart';
 
 class FarmerHomeScreen extends ConsumerStatefulWidget {
-  const FarmerHomeScreen({Key? key}) : super(key: key);
+  const FarmerHomeScreen({super.key});
 
   @override
   ConsumerState<FarmerHomeScreen> createState() => _FarmerHomeScreenState();
@@ -138,7 +140,12 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                                   margin: const EdgeInsets.only(bottom: 16),
                                   child: InkWell(
                                     onTap: () {
-                                      // Navigate to equipment details
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => EquipmentDetailsScreen(equipment: item),
+                                        ),
+                                      );
                                     },
                                     borderRadius: BorderRadius.circular(16),
                                     child: Column(
@@ -207,6 +214,16 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                           ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AiAdvisorScreen()),
+          );
+        },
+        icon: const Icon(Icons.psychology),
+        label: const Text('AI Advisor'),
       ),
     );
   }

@@ -22,9 +22,9 @@ class MarketplaceRepository {
         'available': 'true',
         if (category != null && category.isNotEmpty) 'category': category,
         if (search != null && search.isNotEmpty) 'search': search,
-        if (minPrice != null) 'minPrice': minPrice,
-        if (maxPrice != null) 'maxPrice': maxPrice,
-        if (sort != null) 'sort': sort,
+        'minPrice': ?minPrice,
+        'maxPrice': ?maxPrice,
+        'sort': ?sort,
       };
 
       final response = await _apiClient.dio.get(
@@ -32,9 +32,11 @@ class MarketplaceRepository {
         queryParameters: queryParams,
       );
 
-      final List<dynamic> rawData = response.data['data'] ?? [];
+      // The response is wrapped by responseMiddleware, so it looks like { success: true, data: { data: [...], pagination: {...} } }
+      final Map<String, dynamic> payload = response.data['data'] ?? {};
+      final List<dynamic> rawData = payload['data'] is List ? payload['data'] : (payload is List ? payload : []);
       final List<Equipment> equipment = rawData.map((e) => Equipment.fromJson(e)).toList();
-      final pagination = response.data['pagination'] ?? {};
+      final pagination = payload['pagination'] ?? {};
 
       return {
         'equipment': equipment,

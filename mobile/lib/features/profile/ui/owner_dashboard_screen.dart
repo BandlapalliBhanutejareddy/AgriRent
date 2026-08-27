@@ -5,7 +5,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../providers/owner_provider.dart';
 
 class OwnerDashboardScreen extends ConsumerStatefulWidget {
-  const OwnerDashboardScreen({Key? key}) : super(key: key);
+  const OwnerDashboardScreen({super.key});
 
   @override
   ConsumerState<OwnerDashboardScreen> createState() => _OwnerDashboardScreenState();

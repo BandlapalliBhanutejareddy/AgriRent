@@ -8,7 +8,7 @@ class OtpScreen extends ConsumerStatefulWidget {
   final String email;
   final String purpose;
 
-  const OtpScreen({Key? key, required this.email, required this.purpose}) : super(key: key);
+  const OtpScreen({super.key, required this.email, required this.purpose});
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();

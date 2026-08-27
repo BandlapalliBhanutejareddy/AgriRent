@@ -10,7 +10,8 @@ class OwnerRepository {
   Future<List<Equipment>> fetchMyEquipment() async {
     try {
       final response = await _apiClient.dio.get(ApiConstants.myEquipment);
-      final List<dynamic> rawData = response.data;
+      final responseData = response.data['data'] ?? response.data;
+      final List<dynamic> rawData = responseData;
       return rawData.map((e) => Equipment.fromJson(e)).toList();
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
@@ -20,7 +21,8 @@ class OwnerRepository {
   Future<List<Booking>> fetchOwnerBookings() async {
     try {
       final response = await _apiClient.dio.get(ApiConstants.ownerBookings);
-      final List<dynamic> rawData = response.data;
+      final responseData = response.data['data'] ?? response.data;
+      final List<dynamic> rawData = responseData;
       return rawData.map((e) => Booking.fromJson(e)).toList();
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
@@ -30,7 +32,8 @@ class OwnerRepository {
   Future<Equipment> createEquipment(Map<String, dynamic> data) async {
     try {
       final response = await _apiClient.dio.post(ApiConstants.equipment, data: data);
-      return Equipment.fromJson(response.data);
+      final responseData = response.data['data'] ?? response.data;
+      return Equipment.fromJson(responseData);
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
@@ -39,7 +42,8 @@ class OwnerRepository {
   Future<Equipment> updateEquipment(String id, Map<String, dynamic> data) async {
     try {
       final response = await _apiClient.dio.put('${ApiConstants.equipment}/$id', data: data);
-      return Equipment.fromJson(response.data);
+      final responseData = response.data['data'] ?? response.data;
+      return Equipment.fromJson(responseData);
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }

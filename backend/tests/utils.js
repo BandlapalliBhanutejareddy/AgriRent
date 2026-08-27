@@ -2,7 +2,7 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 
-const PORT = 4010; // Use a different port for testing to avoid conflicts
+const PORT = 4012; // Use a different port for testing to avoid conflicts
 const API_URL = `http://localhost:${PORT}`;
 
 let serverProcess = null;

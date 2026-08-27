@@ -5,7 +5,7 @@ import '../providers/auth_provider.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  const RegisterScreen({super.key});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -61,25 +61,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               CustomTextField(label: 'Password', controller: _passwordController, obscureText: true),
               const SizedBox(height: 16),
               const Text('I am a:', style: TextStyle(fontWeight: FontWeight.w600)),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Farmer'),
-                      value: 'FARMER',
-                      groupValue: _role,
-                      onChanged: (val) => setState(() => _role = val!),
-                    ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Owner'),
-                      value: 'OWNER',
-                      groupValue: _role,
-                      onChanged: (val) => setState(() => _role = val!),
-                    ),
-                  ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _role,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'FARMER', child: Text('Farmer')),
+                  DropdownMenuItem(value: 'OWNER', child: Text('Owner')),
                 ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _role = val);
+                  }
+                },
               ),
               const SizedBox(height: 32),
               ElevatedButton(

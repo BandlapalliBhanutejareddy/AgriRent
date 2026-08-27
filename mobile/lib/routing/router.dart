@@ -9,22 +9,30 @@ import '../features/marketplace/ui/farmer_home_screen.dart';
 import '../features/profile/ui/owner_dashboard_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final notifier = ValueNotifier<AuthState>(ref.read(authProvider));
+  
+  ref.listen<AuthState>(authProvider, (_, next) {
+    notifier.value = next;
+  });
 
   return GoRouter(
     initialLocation: '/',
+    refreshListenable: notifier,
     redirect: (context, state) {
+      final authState = notifier.value;
       final isLoggingIn = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/otp';
+      final isRoot = state.matchedLocation == '/';
       
-      if (authState.isLoading) return null;
+      // While initial loading (restoring session), show root
+      if (authState.isLoading && authState.user == null) return null;
 
       if (authState.user == null) {
         return isLoggingIn ? null : '/login';
       }
 
-      if (isLoggingIn) {
+      if (isLoggingIn || isRoot) {
         if (authState.user!.role == 'FARMER') {
           return '/farmer';
         } else if (authState.user!.role == 'OWNER') {

@@ -17,7 +17,8 @@ class BookingRepository {
         'startDate': startDate.toIso8601String(),
         'endDate': endDate.toIso8601String(),
       });
-      return Booking.fromJson(response.data);
+      final responseData = response.data['data'] ?? response.data;
+      return Booking.fromJson(responseData);
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
@@ -28,7 +29,8 @@ class BookingRepository {
       final response = await _apiClient.dio.put('${ApiConstants.bookings}/$bookingId/status', data: {
         'status': status,
       });
-      return Booking.fromJson(response.data);
+      final responseData = response.data['data'] ?? response.data;
+      return Booking.fromJson(responseData);
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }

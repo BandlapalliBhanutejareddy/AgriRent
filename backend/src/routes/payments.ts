@@ -13,6 +13,11 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || 'test_secret',
 });
 
+// Get Razorpay Key ID
+router.get('/key', requireAuth, (req: AuthRequest, res: Response): void => {
+  res.json({ keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_xxxxx' });
+});
+
 // Create Payment Order
 router.post('/create-order', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -252,7 +257,7 @@ router.post('/webhook', async (req: Request | any, res: Response): Promise<void>
     const signature = req.headers['x-razorpay-signature'] as string;
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'test_webhook_secret';
 
-    const bodyStr = JSON.stringify(req.body);
+    const bodyStr = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(bodyStr)

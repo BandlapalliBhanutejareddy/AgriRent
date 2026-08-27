@@ -24,12 +24,12 @@ class AiNotifier extends StateNotifier<AiState> {
 
   AiNotifier(this._repository) : super(AiState());
 
-  Future<void> askQuestion(String prompt) async {
+  Future<void> askQuestion(String prompt, {String language = 'English'}) async {
     if (prompt.trim().isEmpty) return;
     
     state = state.copyWith(isLoading: true, clearError: true, response: '');
     try {
-      final advice = await _repository.getAdvice(prompt);
+      final advice = await _repository.getAdvice(prompt, language: language);
       state = state.copyWith(isLoading: false, response: advice);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

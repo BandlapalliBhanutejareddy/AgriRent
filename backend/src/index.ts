@@ -38,7 +38,11 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 // Structured Logger with Request IDs
 app.use((req, res, next) => {
@@ -76,11 +80,17 @@ app.use(compression());
 
 // Granular Rate Limiters (increased for testing)
 const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_SERVER_EXTERNAL;
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 10000 : 5, message: 'Too many auth requests' });
-const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 15 : 3, message: 'Too many OTP requests' });
-const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: isTest ? 100 : 20, message: 'AI request limit reached' });
-const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 100 : 10, message: 'Too many payment requests' });
-const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: isTest ? 1000 : 100, message: 'Rate limit exceeded' });
+const isPlaywright = process.env.PLAYWRIGHT_TEST === 'true';
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 15 : 5), message: 'Too many auth requests' });
+const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 15 : 3), message: 'Too many OTP requests' });
+const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 100 : 20), message: 'AI request limit reached' });
+const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 100 : 10), message: 'Too many payment requests' });
+const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 1000 : 100), message: 'Rate limit exceeded' });
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10000, // Limit each IP
+});
 
 app.use('/api/', generalLimiter);
 app.use('/api/auth', authLimiter);

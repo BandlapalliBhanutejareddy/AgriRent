@@ -47,7 +47,11 @@ app.use((0, cors_1.default)({
     },
     credentials: true
 }));
-app.use(express_1.default.json());
+app.use(express_1.default.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 // Structured Logger with Request IDs
 app.use((req, res, next) => {
     const reqId = crypto_1.default.randomUUID();
@@ -80,11 +84,16 @@ app.use((0, helmet_1.default)({
 app.use((0, compression_1.default)());
 // Granular Rate Limiters (increased for testing)
 const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_SERVER_EXTERNAL;
-const authLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 10 : 5, message: 'Too many auth requests' });
-const otpLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 15 : 3, message: 'Too many OTP requests' });
-const aiLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 60 * 1000, max: isTest ? 100 : 20, message: 'AI request limit reached' });
-const paymentsLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 100 : 10, message: 'Too many payment requests' });
-const generalLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isTest ? 1000 : 100, message: 'Rate limit exceeded' });
+const isPlaywright = process.env.PLAYWRIGHT_TEST === 'true';
+const authLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 15 : 5), message: 'Too many auth requests' });
+const otpLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 15 : 3), message: 'Too many OTP requests' });
+const aiLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 100 : 20), message: 'AI request limit reached' });
+const paymentsLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 100 : 10), message: 'Too many payment requests' });
+const generalLimiter = (0, express_rate_limit_1.default)({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 1000 : 100), message: 'Rate limit exceeded' });
+const limiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10000, // Limit each IP
+});
 app.use('/api/', generalLimiter);
 app.use('/api/auth', authLimiter);
 app.use('/api/ai', aiLimiter);

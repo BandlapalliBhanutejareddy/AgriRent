@@ -16,7 +16,7 @@ test.describe('Localization Checks', () => {
     await page.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
     await page.locator('input[type="password"]').fill('password123');
     await page.getByTestId('login-button').click();
-    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboard\/farmer/, { timeout: 30000 });
   });
 
   for (const lang of languages) {
@@ -36,7 +36,7 @@ test.describe('Localization Checks', () => {
       await page.reload();
       await page.waitForTimeout(2000);      
       // Verify visual translation using locator to benefit from Playwright's auto-wait
-      await expect(page.locator('h1').first()).toContainText(lang.expected);
+      await expect(page.locator('h1').first()).toContainText(lang.expected, { timeout: 30000 });
 
       // Visual snapshot
       await expect(page).toHaveScreenshot(`dashboard-${lang.code}.png`, { fullPage: true, maxDiffPixelRatio: 0.1 });

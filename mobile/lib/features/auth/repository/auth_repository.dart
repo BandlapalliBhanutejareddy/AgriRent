@@ -45,7 +45,7 @@ class AuthRepository {
         'email': email,
         'password': password,
         'role': role,
-        if (phone != null) 'phone': phone,
+        'phone': ?phone,
       });
 
       if (response.data['success'] == true) {

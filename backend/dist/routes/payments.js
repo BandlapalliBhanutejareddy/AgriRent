@@ -43,6 +43,10 @@ router.post('/create-order', authMiddleware_1.requireAuth, (req, res) => __await
             res.status(400).json({ error: 'Booking is already paid' });
             return;
         }
+        if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('xxxxx')) {
+            res.status(503).json({ error: 'Payment gateway is currently unavailable pending production credentials.' });
+            return;
+        }
         const amountInPaise = Math.round(booking.totalPrice * 100); // Razorpay requires amount in smallest currency unit
         const options = {
             amount: amountInPaise,
@@ -224,7 +228,7 @@ router.post('/webhook', (req, res) => __awaiter(void 0, void 0, void 0, function
     try {
         const signature = req.headers['x-razorpay-signature'];
         const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'test_webhook_secret';
-        const bodyStr = JSON.stringify(req.body);
+        const bodyStr = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
         const expectedSignature = crypto_1.default
             .createHmac('sha256', secret)
             .update(bodyStr)

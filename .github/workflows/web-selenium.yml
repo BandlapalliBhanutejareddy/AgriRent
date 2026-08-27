@@ -1,0 +1,59 @@
+name: Web Selenium QA
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  web-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20.x'
+
+    - name: Install dependencies
+      run: npm install
+      working-directory: ./qa
+
+    - name: Start Backend Services
+      run: |
+        cd backend
+        npm install
+        npm run build
+        npm start &
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+    - name: Start Web Application
+      run: |
+        cd web
+        npm install
+        npm run build
+        npm start &
+
+    - name: Wait for services
+      run: sleep 15
+
+    - name: Run Web Selenium Tests
+      run: npm run test:web
+      working-directory: ./qa
+
+    - name: Generate Reports
+      if: always()
+      run: npm run report:web
+      working-directory: ./qa
+
+    - name: Upload Artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: web-qa-reports
+        path: qa/reports/web/
