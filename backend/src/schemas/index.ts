@@ -17,6 +17,20 @@ export const loginSchema = z.object({
   }),
 });
 
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    email: z.string().email(),
+  }),
+});
+
+export const resetPasswordSchema = z.object({
+  body: z.object({
+    email: z.string().email(),
+    token: z.string().min(32),
+    newPassword: z.string().min(6).max(100),
+  }),
+});
+
 // Equipment Schemas
 export const createEquipmentSchema = z.object({
   body: z.object({

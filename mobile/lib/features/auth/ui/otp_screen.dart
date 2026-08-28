@@ -18,24 +18,30 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   final _otpController = TextEditingController();
 
   void _verify() async {
-    final success = await ref.read(authProvider.notifier).verifyOtp(
-      widget.email,
-      _otpController.text.trim(),
-      widget.purpose,
-    );
+    if (widget.purpose == 'FORGOT_PASSWORD') {
+      final token = await ref.read(authProvider.notifier).verifyForgotPasswordOtp(
+        widget.email,
+        _otpController.text.trim(),
+      );
+      if (token != null && mounted) {
+        context.push('/reset-password', extra: {'email': widget.email, 'token': token});
+      }
+    } else {
+      final success = await ref.read(authProvider.notifier).verifyOtp(
+        widget.email,
+        _otpController.text.trim(),
+        widget.purpose,
+      );
 
-    if (success && mounted) {
-      if (widget.purpose == 'REGISTER' || widget.purpose == 'LOGIN') {
-        final user = ref.read(authProvider).user;
-        if (user?.role == 'OWNER') {
-          context.go('/owner');
-        } else {
-          context.go('/farmer');
+      if (success && mounted) {
+        if (widget.purpose == 'REGISTER' || widget.purpose == 'LOGIN') {
+          final user = ref.read(authProvider).user;
+          if (user?.role == 'OWNER') {
+            context.go('/owner');
+          } else {
+            context.go('/farmer');
+          }
         }
-      } else {
-        // e.g. Forgot Password flow
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OTP Verified. You can reset password now.')));
-        context.go('/login');
       }
     }
   }

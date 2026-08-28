@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primaryGreen = Color(0xFF2E7D32);
-  static const Color lightGreen = Color(0xFF4CAF50);
-  static const Color background = Color(0xFFF9FAFB);
+  static const Color primaryGreen = Color(0xFF163A2D); // Premium Dark Green
+  static const Color secondaryGreen = Color(0xFF2F6B4F); // Secondary Green
+  static const Color accentGreen = Color(0xFF84CC16); // Accent Green
+  static const Color background = Color(0xFFF8FAF8); // Warm Neutral
   static const Color textDark = Color(0xFF1F2937);
   static const Color textLight = Color(0xFF6B7280);
 
@@ -11,7 +12,11 @@ class AppTheme {
     return ThemeData(
       primaryColor: primaryGreen,
       scaffoldBackgroundColor: background,
-      colorScheme: ColorScheme.fromSeed(seedColor: primaryGreen),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryGreen,
+        secondary: secondaryGreen,
+        tertiary: accentGreen,
+      ),
       fontFamily: 'Inter', // Assuming we use system default which looks like Inter or we'll rely on Flutter default
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,

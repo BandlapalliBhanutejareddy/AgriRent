@@ -48,7 +48,7 @@ export default function FarmerDashboard() {
   async function fetchData() {
     try {
       const [bookingsRes, analyticsRes] = await Promise.all([
-        api.get('/bookings'),
+        api.get('/bookings?role=FARMER'),
         api.get('/analytics/farmer')
       ]);
       setBookings(bookingsRes.data);
@@ -105,9 +105,9 @@ export default function FarmerDashboard() {
     <div className="space-y-8 animate-in fade-in duration-700">
       
       {/* Welcome Greeting Hero Box */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-900 p-8 md:p-10 rounded-[32px] text-white shadow-2xl shadow-emerald-900/20 border border-emerald-500/30 relative overflow-hidden backdrop-blur-xl">
-        <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full blur-[80px] bg-teal-400/30" />
-        <div className="absolute top-10 right-10 w-40 h-40 rounded-full blur-[60px] bg-emerald-400/20" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-br from-primary via-secondary to-primary-light p-8 md:p-10 rounded-[32px] text-white shadow-2xl shadow-primary/20 border border-secondary/30 relative overflow-hidden backdrop-blur-xl">
+        <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full blur-[80px] bg-accent/20" />
+        <div className="absolute top-10 right-10 w-40 h-40 rounded-full blur-[60px] bg-accent/20" />
         
         <div className="relative z-10 space-y-3">
           <span className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest bg-white/10 backdrop-blur-md text-white rounded-xl border border-white/20 shadow-sm inline-flex items-center gap-1.5">

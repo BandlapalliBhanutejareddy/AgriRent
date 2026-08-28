@@ -7,6 +7,7 @@ import { useStore } from '@/store/useStore';
 import { useRouter } from 'next/navigation';
 import { Sprout, Tractor, ShieldAlert, Key, Check, Eye, EyeOff, X, User as UserIcon, Phone, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import OTPInput from '@/components/OTPInput';
 
 type PortalRole = 'FARMER' | 'OWNER' | 'ADMIN';
 
@@ -97,7 +98,8 @@ export default function LoginPage() {
     setSession({ access_token: token, user });
 
     if (user.role === 'BOTH') {
-      setShowRoleSelectModal(true);
+      setActiveRole(null);
+      router.push('/dashboard/role-select');
       return;
     }
 
@@ -590,16 +592,12 @@ export default function LoginPage() {
 
               <form onSubmit={handleVerifyRegisterOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1 text-center">
                     {t('enter_6_digit_otp_code')}</label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    required
-                    value={otpInput}
-                    onChange={(e) => setOtpInput(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 text-center tracking-widest placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-lg font-black"
-                    placeholder="••••••"
+                  <OTPInput 
+                    length={6} 
+                    onComplete={(code) => setOtpInput(code)} 
+                    disabled={loading} 
                   />
                 </div>
                 <button
@@ -713,16 +711,12 @@ export default function LoginPage() {
                   {forgotStep === 2 && (
                     <form onSubmit={handleVerifyForgotOtp} className="space-y-4">
                       <div>
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1 text-center">
                           {t('verify_6_digit_otp_code')}</label>
-                        <input
-                          type="text"
-                          maxLength={6}
-                          required
-                          value={otpInput}
-                          onChange={(e) => setOtpInput(e.target.value)}
-                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 text-center tracking-widest placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-lg font-black"
-                          placeholder="••••••"
+                        <OTPInput 
+                          length={6} 
+                          onComplete={(code) => setOtpInput(code)} 
+                          disabled={loading} 
                         />
                       </div>
                       <button

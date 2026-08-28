@@ -14,7 +14,9 @@ void main() {
       
       for (int i = 0; i < 20; i++) {
         await tester.pump(const Duration(milliseconds: 500));
-        if (find.byType(TextField).evaluate().length >= 2) break;
+        if (find.byType(TextField).evaluate().length >= 2) {
+          break;
+        }
       }
 
       final textFields = find.byType(TextField);
@@ -38,7 +40,9 @@ void main() {
       
       for (int i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 500));
-        if (find.textContaining('Invalid').evaluate().isNotEmpty || find.textContaining('invalid').evaluate().isNotEmpty) break;
+        if (find.textContaining('Invalid').evaluate().isNotEmpty || find.textContaining('invalid').evaluate().isNotEmpty) {
+          break;
+        }
       }
       
       // TC-AUTH-001: Correct Password
@@ -55,7 +59,9 @@ void main() {
       for (int i = 0; i < 15; i++) {
         await tester.pump(const Duration(milliseconds: 1000));
         if (find.text('Farmer Dashboard').evaluate().isNotEmpty || 
-            find.byIcon(Icons.agriculture).evaluate().length > 1) break;
+            find.byIcon(Icons.agriculture).evaluate().length > 1) {
+          break;
+        }
       }
       
       // Test Gemini AI Advisor (TC-GEM-001 & TC-GEM-002)
@@ -78,7 +84,9 @@ void main() {
         
         for (int i = 0; i < 30; i++) {
           await tester.pump(const Duration(milliseconds: 1000));
-          if (find.text('How can I help you farm better today?').evaluate().isEmpty) break;
+          if (find.text('How can I help you farm better today?').evaluate().isEmpty) {
+            break;
+          }
         }
       }
     });
@@ -87,9 +95,9 @@ void main() {
       // TC-AUTH-005: Single use token
       // TC-AUTH-006: DB hash
       // TC-AUTH-007: Wipe storage
-      await SecureStorage.writeToken('dummy');
+      await SecureStorage.saveTokens('dummy', 'dummy');
       await SecureStorage.clearAll();
-      final token = await SecureStorage.getToken();
+      final token = await SecureStorage.getAccessToken();
       expect(token, isNull);
 
       // TC-NET-001: Network Error

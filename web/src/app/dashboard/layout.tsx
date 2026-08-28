@@ -52,12 +52,26 @@ export default function DashboardLayout({
     }
   }, [user]);
 
-  const currentRole = activeRole || (user?.role === 'BOTH' ? 'FARMER' : user?.role || 'OWNER');
+  const storedActive = activeRole;
+  const currentRole = storedActive || (user?.role === 'BOTH' ? 'ROLE_SELECT' : user?.role || 'OWNER');
 
   // Strict Role Guards to prevent role leakage
   useEffect(() => {
     if (!user) return;
+    
+    if (pathname === '/dashboard/role-select') {
+      if (user.role !== 'BOTH' || storedActive) {
+        window.location.href = storedActive === 'FARMER' ? '/dashboard/farmer' : '/dashboard';
+      }
+      return;
+    }
+
     const role = currentRole;
+    
+    if (role === 'ROLE_SELECT') {
+      window.location.href = '/dashboard/role-select';
+      return;
+    }
     
     if (role === 'FARMER') {
       if (pathname === '/dashboard' || pathname.startsWith('/dashboard/equipment') || pathname.startsWith('/dashboard/admin')) {
@@ -72,7 +86,7 @@ export default function DashboardLayout({
         window.location.href = '/dashboard/admin';
       }
     }
-  }, [user, currentRole, pathname]);
+  }, [user, currentRole, pathname, storedActive]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -165,6 +179,34 @@ export default function DashboardLayout({
       </>
     );
   };
+
+  if (currentRole === 'ROLE_SELECT') {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans selection:bg-emerald-500/30">
+        <header className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl h-20 flex items-center justify-between px-6 md:px-10 z-30 border-b border-slate-200/50 dark:border-slate-800/50">
+          <Link href="/" className="flex flex-col">
+            <span className="text-2xl font-black bg-gradient-to-r from-emerald-500 to-blue-600 bg-clip-text text-transparent tracking-tight">
+              {t('agrorent_ai')}</span>
+          </Link>
+          <div className="flex items-center space-x-3 md:space-x-5">
+            <LanguageSwitcher />
+            <button 
+              onClick={toggleTheme}
+              className="p-2.5 text-slate-500 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 rounded-2xl transition-all"
+            >
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button onClick={handleLogout} className="text-sm font-bold text-slate-500 hover:text-red-500 transition-colors">
+              {t('sign_out')}
+            </button>
+          </div>
+        </header>
+        <main className="pt-8">
+          {children}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 font-sans selection:bg-emerald-500/30">

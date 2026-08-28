@@ -4,15 +4,15 @@ import '../../auth/providers/auth_provider.dart';
 
 final feedbackProvider = StateNotifierProvider<FeedbackNotifier, AsyncValue<List<dynamic>>>((ref) {
   final authState = ref.watch(authProvider);
-  return FeedbackNotifier(ref, authState.user?.role);
+  return FeedbackNotifier(authState.user?.role);
 });
 
 class FeedbackNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
-  final Ref _ref;
+  
   final String? _activeRole;
   final ApiClient _apiClient = ApiClient();
 
-  FeedbackNotifier(this._ref, this._activeRole) : super(const AsyncValue.loading()) {
+  FeedbackNotifier(this._activeRole) : super(const AsyncValue.loading()) {
     loadMyFeedback();
   }
 

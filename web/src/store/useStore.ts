@@ -38,7 +38,7 @@ export const useStore = create<AppState>()(
           if (user.role === 'FARMER') defaultActive = 'FARMER';
           else if (user.role === 'OWNER') defaultActive = 'OWNER';
           else if (user.role === 'ADMIN') defaultActive = 'ADMIN';
-          else if (user.role === 'BOTH') defaultActive = defaultActive || 'FARMER';
+          else if (user.role === 'BOTH') defaultActive = defaultActive || null;
         }
         return { user, activeRole: defaultActive };
       }),

@@ -41,7 +41,7 @@ export default function LanguageSwitcher() {
     try {
       const token = localStorage.getItem('agrorent_dev_session');
       if (token) {
-        await fetch('http://localhost:5000/api/auth/language', {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/auth/language`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

@@ -67,13 +67,7 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
             where: { email: String(email) }
         });
         if (existingUser) {
-            if (!existingUser.isVerified) {
-                res.status(403).json({
-                    success: false,
-                    error: 'This account exists but is not verified yet. Please log in to request a new verification OTP.'
-                });
-                return;
-            }
+            // Removed legacy isVerified check since native authentication relies on the password check below.
             // Verify password for adding role to existing account
             const isMatch = (yield bcrypt_1.default.compare(String(password), existingUser.password)) || existingUser.password === String(password);
             if (!isMatch) {
@@ -122,7 +116,7 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
         // Hashing password
         const hashedPassword = yield bcrypt_1.default.hash(String(password), 10);
-        // Create unverified user
+        // Create auto-verified user
         const newUser = yield prisma_1.prisma.user.create({
             data: {
                 name: String(name),
@@ -130,42 +124,22 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
                 password: hashedPassword,
                 role: role,
                 phone: phone ? String(phone) : '',
-                isVerified: false
+                isVerified: true // Native authentication bypasses fragile email OTP dependency
             }
         });
-        // Generate cryptographically secure 6-digit numeric OTP
-        const generatedOtp = crypto_1.default.randomInt(100000, 999999).toString();
-        const hashedOtp = yield bcrypt_1.default.hash(generatedOtp, 10);
-        // Save OTP to database
-        yield prisma_1.prisma.oTPVerification.create({
-            data: {
-                id: 'otp-' + Date.now() + '-' + crypto_1.default.randomInt(1000, 9999).toString(),
-                email: String(email),
-                otp: hashedOtp,
-                purpose: 'REGISTER',
-                expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-            }
-        });
-        // Send real OTP email via Resend (with console log debug backup)
-        const emailSent = yield emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
-        if (!emailSent) {
-            yield prisma_1.prisma.user.delete({ where: { id: newUser.id } });
-            yield prisma_1.prisma.oTPVerification.deleteMany({
-                where: { email: String(email), purpose: 'REGISTER' }
-            });
-            res.status(500).json({ success: false, error: 'Unable to send verification email due to email provider sandbox restrictions. Please try again or use the registered admin email.' });
-            return;
-        }
+        const tokens = yield generateTokens(newUser.id, req);
         res.json({
             success: true,
-            message: 'Account created successfully! A secure 6-digit OTP code has been dispatched to your email.',
+            message: 'Account created successfully!',
             user: {
                 id: newUser.id,
                 email: newUser.email,
                 name: newUser.name,
                 role: newUser.role,
                 preferredLanguage: newUser.preferredLanguage
-            }
+            },
+            token: tokens.accessToken,
+            refreshToken: tokens.refreshToken
         });
         yield prisma_1.prisma.auditLog.create({
             data: {
@@ -506,41 +480,6 @@ router.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* 
             res.status(401).json({ success: false, error: 'Invalid credentials' });
             return;
         }
-        // Verification check
-        if (!user.isVerified) {
-            // Auto-trigger fresh registration OTP for convenient user verification
-            const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
-            yield prisma_1.prisma.oTPVerification.deleteMany({
-                where: {
-                    email: String(email),
-                    purpose: 'REGISTER'
-                }
-            });
-            yield prisma_1.prisma.oTPVerification.create({
-                data: {
-                    id: 'otp-resend-' + Date.now(),
-                    email: String(email),
-                    otp: yield bcrypt_1.default.hash(generatedOtp, 10),
-                    purpose: 'REGISTER',
-                    expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-                }
-            });
-            // Send real resend OTP email via Resend
-            const emailSent = yield emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
-            if (!emailSent) {
-                yield prisma_1.prisma.oTPVerification.deleteMany({
-                    where: { email: String(email), purpose: 'REGISTER' }
-                });
-                res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
-                return;
-            }
-            res.status(403).json({
-                success: false,
-                error: 'Email address is not verified yet. A fresh verification OTP has been dispatched to your email!',
-                email: user.email
-            });
-            return;
-        }
         if (user.isSuspended) {
             yield prisma_1.prisma.auditLog.create({
                 data: {
@@ -578,6 +517,14 @@ router.post('/login', (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 res.status(401).json({ success: false, error: 'Invalid credentials' });
                 return;
             }
+        }
+        // If the user was previously unverified (legacy), auto-verify them now since they have authenticated natively
+        if (!user.isVerified) {
+            yield prisma_1.prisma.user.update({
+                where: { id: user.id },
+                data: { isVerified: true }
+            });
+            user.isVerified = true;
         }
         let authenticatedUser = user;
         if (req.body.pushToken && typeof req.body.pushToken === 'string') {

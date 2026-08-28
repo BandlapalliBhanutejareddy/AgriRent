@@ -90,7 +90,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     if (!hasSession && !isAuthRoute) {
       router.replace('/login');
     } else if (hasSession && isAuthRoute) {
-      const currentActive = useStore.getState().activeRole || (user?.role === 'BOTH' ? 'FARMER' : user?.role);
+      const storedActive = useStore.getState().activeRole;
+      
+      if (!storedActive && user?.role === 'BOTH') {
+        router.replace('/dashboard/role-select');
+        return;
+      }
+
+      const currentActive = storedActive || user?.role;
+      
       if (currentActive === 'FARMER') {
         router.replace('/dashboard/farmer');
       } else if (currentActive === 'OWNER') {
@@ -98,7 +106,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       } else if (currentActive === 'ADMIN') {
         router.replace('/dashboard/admin');
       } else {
-        router.replace('/dashboard/farmer');
+        router.replace('/dashboard/role-select');
       }
     }
   }, [session, user, loading, pathname, router]);

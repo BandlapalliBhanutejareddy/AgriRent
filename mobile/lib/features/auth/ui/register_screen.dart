@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+
 import '../providers/auth_provider.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 
@@ -28,7 +28,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
 
     if (success && mounted) {
-      context.push('/otp', extra: {'email': _emailController.text.trim(), 'purpose': 'REGISTER'});
+      // GoRouter redirect automatically handles routing authenticated users to the correct dashboard based on their role
     }
   }
 
@@ -71,6 +71,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 items: const [
                   DropdownMenuItem(value: 'FARMER', child: Text('Farmer')),
                   DropdownMenuItem(value: 'OWNER', child: Text('Owner')),
+                  DropdownMenuItem(value: 'BOTH', child: Text('Both (Farmer & Owner)')),
                 ],
                 onChanged: (val) {
                   if (val != null) {

@@ -49,7 +49,16 @@ class AuthRepository {
       });
 
       if (response.data['success'] == true) {
-        return User.fromJson(response.data['user']);
+        final userData = response.data['user'];
+        final token = response.data['token'];
+        final refreshToken = response.data['refreshToken'];
+
+        if (token != null && refreshToken != null) {
+          await SecureStorage.saveTokens(token, refreshToken);
+          await SecureStorage.saveUser(jsonEncode(userData));
+        }
+
+        return User.fromJson(userData);
       } else {
         throw Exception(response.data['error'] ?? 'Registration failed');
       }
@@ -81,6 +90,48 @@ class AuthRepository {
         }
       } else {
         throw Exception(response.data['error'] ?? 'OTP verification failed');
+      }
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
+
+  Future<void> forgotPassword(String email) async {
+    try {
+      final response = await _apiClient.dio.post('/auth/forgot-password', data: {'email': email});
+      if (response.data['success'] != true) {
+        throw Exception(response.data['error'] ?? 'Failed to request reset');
+      }
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
+
+  Future<String> verifyForgotPasswordOtp(String email, String otp) async {
+    try {
+      final response = await _apiClient.dio.post(ApiConstants.verifyOtp, data: {
+        'email': email,
+        'otp': otp,
+        'purpose': 'FORGOT_PASSWORD',
+      });
+      if (response.data['success'] == true) {
+        return response.data['resetToken'] as String;
+      }
+      throw Exception(response.data['error'] ?? 'OTP verification failed');
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
+
+  Future<void> resetPassword(String email, String resetToken, String newPassword) async {
+    try {
+      final response = await _apiClient.dio.post('/auth/reset-password', data: {
+        'email': email,
+        'resetToken': resetToken,
+        'newPassword': newPassword,
+      });
+      if (response.data['success'] != true) {
+        throw Exception(response.data['error'] ?? 'Failed to reset password');
       }
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));

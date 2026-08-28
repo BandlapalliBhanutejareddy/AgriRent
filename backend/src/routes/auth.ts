@@ -4,6 +4,8 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { requireAuth } from '../middlewares/authMiddleware';
+import { validate } from '../middlewares/validate';
+import { forgotPasswordSchema, resetPasswordSchema } from '../schemas';
 import { EmailService } from '../services/email/email.service';
 
 const emailService = new EmailService();
@@ -65,13 +67,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (existingUser) {
-      if (!existingUser.isVerified) {
-        res.status(403).json({ 
-          success: false, 
-          error: 'This account exists but is not verified yet. Please log in to request a new verification OTP.' 
-        });
-        return;
-      }
+      // Removed legacy isVerified check since native authentication relies on the password check below.
 
       // Verify password for adding role to existing account
       const isMatch = await bcrypt.compare(String(password), existingUser.password) || existingUser.password === String(password);
@@ -128,7 +124,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     // Hashing password
     const hashedPassword = await bcrypt.hash(String(password), 10);
 
-    // Create unverified user
+    // Create auto-verified user
     const newUser = await prisma.user.create({
       data: {
         name: String(name),
@@ -136,46 +132,24 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         password: hashedPassword,
         role: role as 'FARMER' | 'OWNER',
         phone: phone ? String(phone) : '',
-        isVerified: false
+        isVerified: true // Native authentication bypasses fragile email OTP dependency
       }
     });
 
-    // Generate cryptographically secure 6-digit numeric OTP
-    const generatedOtp = crypto.randomInt(100000, 999999).toString();
-    const hashedOtp = await bcrypt.hash(generatedOtp, 10);
-    
-    // Save OTP to database
-    await prisma.oTPVerification.create({
-      data: {
-        id: 'otp-' + Date.now() + '-' + crypto.randomInt(1000, 9999).toString(),
-        email: String(email),
-        otp: hashedOtp,
-        purpose: 'REGISTER',
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-      }
-    });
-
-    // Send real OTP email via Resend (with console log debug backup)
-    const emailSent = await emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
-    if (!emailSent) {
-      await prisma.user.delete({ where: { id: newUser.id } });
-      await prisma.oTPVerification.deleteMany({
-        where: { email: String(email), purpose: 'REGISTER' }
-      });
-      res.status(500).json({ success: false, error: 'Unable to send verification email due to email provider sandbox restrictions. Please try again or use the registered admin email.' });
-      return;
-    }
+    const tokens = await generateTokens(newUser.id, req);
 
     res.json({
       success: true,
-      message: 'Account created successfully! A secure 6-digit OTP code has been dispatched to your email.',
+      message: 'Account created successfully!',
       user: {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
         role: newUser.role,
         preferredLanguage: newUser.preferredLanguage
-      }
+      },
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
 
     await prisma.auditLog.create({
@@ -237,13 +211,23 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
         where: { email: String(email), purpose: String(purpose) }
       });
       
-      const secret = process.env.JWT_SECRET || 'fallback_secret';
-      const resetToken = jwt.sign({ email: String(email), purpose: 'password_reset' }, secret, { expiresIn: '15m' });
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = await bcrypt.hash(rawToken, 10);
+      
+      await prisma.oTPVerification.create({
+        data: {
+          id: 'reset-token-' + Date.now(),
+          email: String(email),
+          otp: hashedToken,
+          purpose: 'PASSWORD_RESET_TOKEN',
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+        }
+      });
       
       res.json({
         success: true,
         message: 'OTP verified. You may now reset your password.',
-        resetToken
+        resetToken: rawToken
       });
       return;
     }
@@ -447,26 +431,48 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Verify JWT Reset Token
-    const secret = process.env.JWT_SECRET || 'fallback_secret';
-    try {
-      const decoded = jwt.verify(String(resetToken), secret) as { email: string, purpose: string };
-      if (decoded.email !== email || decoded.purpose !== 'password_reset') {
-        throw new Error('Invalid token payload');
-      }
-    } catch (err) {
+    // Validate Reset Token securely against the database
+    const tokenRecords = await prisma.oTPVerification.findMany({
+      where: {
+        email: String(email),
+        purpose: 'PASSWORD_RESET_TOKEN',
+        expiresAt: { gt: new Date() }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (tokenRecords.length === 0) {
+      res.status(400).json({ success: false, error: 'Invalid or expired reset authorization. Please request a new OTP.' });
+      return;
+    }
+
+    const latestToken = tokenRecords[0];
+    const isTokenValid = await bcrypt.compare(String(resetToken), latestToken.otp);
+
+    if (!isTokenValid) {
       res.status(400).json({ success: false, error: 'Invalid or expired reset authorization. Please request a new OTP.' });
       return;
     }
 
     // Update user password hashed
     const hashedPassword = await bcrypt.hash(String(newPassword), 10);
-    await prisma.user.update({
+    const user = await prisma.user.update({
       where: { email: String(email) },
       data: { 
         password: hashedPassword,
         isVerified: true // Auto-verify if they recover their account
       }
+    });
+
+    // Invalidate all existing sessions
+    await prisma.session.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+
+    // Delete utilized reset token
+    await prisma.oTPVerification.deleteMany({
+      where: { email: String(email), purpose: 'PASSWORD_RESET_TOKEN' }
     });
 
     res.json({
@@ -564,45 +570,6 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Verification check
-    if (!user.isVerified) {
-      // Auto-trigger fresh registration OTP for convenient user verification
-      const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
-      await prisma.oTPVerification.deleteMany({
-        where: {
-          email: String(email),
-          purpose: 'REGISTER'
-        }
-      });
-      await prisma.oTPVerification.create({
-        data: {
-          id: 'otp-resend-' + Date.now(),
-          email: String(email),
-          otp: await bcrypt.hash(generatedOtp, 10),
-          purpose: 'REGISTER',
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-        }
-      });
-
-      // Send real resend OTP email via Resend
-      const emailSent = await emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
-      
-      if (!emailSent) {
-        await prisma.oTPVerification.deleteMany({
-          where: { email: String(email), purpose: 'REGISTER' }
-        });
-        res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
-        return;
-      }
-
-      res.status(403).json({ 
-        success: false, 
-        error: 'Email address is not verified yet. A fresh verification OTP has been dispatched to your email!',
-        email: user.email
-      });
-      return;
-    }
-
     if (user.isSuspended) {
       await prisma.auditLog.create({
         data: {
@@ -641,6 +608,15 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         res.status(401).json({ success: false, error: 'Invalid credentials' });
         return;
       }
+    }
+
+    // If the user was previously unverified (legacy), auto-verify them now since they have authenticated natively
+    if (!user.isVerified) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true }
+      });
+      user.isVerified = true;
     }
 
     let authenticatedUser = user;

@@ -24,12 +24,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
 
     if (success && mounted) {
-      final user = ref.read(authProvider).user;
-      if (user?.role == 'OWNER') {
-        context.go('/owner');
-      } else {
-        context.go('/farmer');
-      }
+      // The GoRouter redirect logic handles the actual navigation based on role.
+      // We just need to trigger a navigation to '/' to let the redirect logic take over,
+      // or we can just rely on the router's refreshListenable.
+      context.go('/');
     }
   }
 
@@ -94,6 +92,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     : const Text('Login'),
               ),
               const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => context.push('/forgot-password'),
+                child: const Text('Forgot Password?', style: TextStyle(color: Colors.green)),
+              ),
               TextButton(
                 onPressed: () => context.push('/register'),
                 child: const Text('Don\'t have an account? Register'),

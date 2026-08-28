@@ -132,7 +132,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
+                            color: Colors.blue.withValues(alpha: (0.1) ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -147,7 +147,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: fb['status'] == 'PENDING' ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                            color: fb['status'] == 'PENDING' ? Colors.orange.withValues(alpha: (0.1) ) : Colors.green.withValues(alpha: (0.1) ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -193,9 +193,9 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                         margin: const EdgeInsets.only(top: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
+                          color: Colors.green.withValues(alpha: (0.1) ),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.withOpacity(0.3)),
+                          border: Border.all(color: Colors.green.withValues(alpha: (0.3) )),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,7 +244,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
-                  side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                  side: BorderSide(color: Colors.grey.withValues(alpha: (0.2) )),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -267,7 +267,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                         const Text('Category', style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
-                          value: _category,
+                          initialValue: _category,
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),

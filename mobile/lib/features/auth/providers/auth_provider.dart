@@ -10,19 +10,22 @@ class AuthState {
   final User? user;
   final bool isLoading;
   final String? error;
+  final String? activeRole;
 
-  AuthState({this.user, this.isLoading = false, this.error});
+  AuthState({this.user, this.isLoading = false, this.error, this.activeRole});
 
   AuthState copyWith({
     User? user,
     bool? isLoading,
     String? error,
     bool clearError = false,
+    String? activeRole,
   }) {
     return AuthState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+      activeRole: activeRole ?? this.activeRole,
     );
   }
 }
@@ -64,9 +67,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      await _repository.register(name: name, email: email, password: password, role: role, phone: phone);
-      state = state.copyWith(isLoading: false);
-      return true; // Successfully sent OTP
+      final user = await _repository.register(name: name, email: email, password: password, role: role, phone: phone);
+      state = state.copyWith(user: user, isLoading: false);
+      return true; // Successfully registered and logged in
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       return false;
@@ -89,6 +92,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> forgotPassword(String email) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _repository.forgotPassword(email);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<String?> verifyForgotPasswordOtp(String email, String otp) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final token = await _repository.verifyForgotPasswordOtp(email, otp);
+      state = state.copyWith(isLoading: false);
+      return token;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return null;
+    }
+  }
+
+  Future<bool> resetPassword(String email, String resetToken, String newPassword) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _repository.resetPassword(email, resetToken, newPassword);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
     await _repository.logout();
@@ -97,6 +136,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void clearError() {
     state = state.copyWith(clearError: true);
+  }
+
+  void setActiveRole(String role) {
+    state = state.copyWith(activeRole: role);
   }
 }
 

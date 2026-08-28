@@ -131,26 +131,14 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
     const isOwner = booking.equipment.ownerId === userId;
     const isFarmer = booking.farmerId === userId;
 
-    if (role === 'OWNER') {
-      if (!isOwner) {
-        res.status(403).json({ error: 'You do not have permission to manage this booking' });
-        return;
-      }
-      if (status !== 'ACCEPTED' && status !== 'REJECTED') {
-        res.status(400).json({ error: 'Owners can only accept or reject booking requests' });
-        return;
-      }
-    } else if (role === 'FARMER') {
-      if (!isFarmer) {
-        res.status(403).json({ error: 'You do not own this booking' });
-        return;
-      }
-      if (status !== 'CANCELLED') {
-        res.status(400).json({ error: 'Farmers can only cancel their own booking requests' });
-        return;
-      }
-    } else if (role !== 'ADMIN') {
-      res.status(403).json({ error: 'Role cannot update booking status' });
+    if (role === 'ADMIN') {
+      // Admins can do anything
+    } else if (isOwner && (status === 'ACCEPTED' || status === 'REJECTED')) {
+      // Owner of equipment can accept or reject
+    } else if (isFarmer && status === 'CANCELLED') {
+      // Farmer who made booking can cancel
+    } else {
+      res.status(403).json({ error: 'You do not have permission to perform this action' });
       return;
     }
 
@@ -230,10 +218,21 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response, next: any):
     const userId = req.prismaUser.id;
 
     let where: any = {};
+    const activeContext = req.query.role as string;
+
     if (role === 'FARMER') {
       where.farmerId = userId;
     } else if (role === 'OWNER') {
       where.equipment = { ownerId: userId };
+    } else if (role === 'BOTH') {
+      if (activeContext === 'FARMER') {
+        where.farmerId = userId;
+      } else if (activeContext === 'OWNER') {
+        where.equipment = { ownerId: userId };
+      } else {
+        // Fallback for safety, fetch all related
+        where.OR = [{ farmerId: userId }, { equipment: { ownerId: userId } }];
+      }
     }
 
     const bookings = await prisma.booking.findMany({
