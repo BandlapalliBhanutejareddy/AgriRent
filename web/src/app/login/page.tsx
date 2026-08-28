@@ -135,7 +135,14 @@ export default function LoginPage() {
           setError('Invalid credentials');
         }
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Login failed. Please verify your credentials and try again.');
+        const errorMsg = err.response?.data?.error || 'Login failed. Please verify your credentials and try again.';
+        setError(errorMsg);
+        
+        // Deadlock fix: If user is unverified and backend dispatched a new OTP, show the OTP modal.
+        if (errorMsg.includes('not verified') && errorMsg.includes('dispatched')) {
+          setOtpInput('');
+          setShowRegisterOtpModal(true);
+        }
       } finally {
         setLoading(false);
       }
