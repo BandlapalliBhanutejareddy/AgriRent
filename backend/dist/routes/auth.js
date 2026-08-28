@@ -67,6 +67,13 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
             where: { email: String(email) }
         });
         if (existingUser) {
+            if (!existingUser.isVerified) {
+                res.status(403).json({
+                    success: false,
+                    error: 'This account exists but is not verified yet. Please log in to request a new verification OTP.'
+                });
+                return;
+            }
             // Verify password for adding role to existing account
             const isMatch = (yield bcrypt_1.default.compare(String(password), existingUser.password)) || existingUser.password === String(password);
             if (!isMatch) {
@@ -142,10 +149,11 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
         // Send real OTP email via Resend (with console log debug backup)
         const emailSent = yield emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
         if (!emailSent) {
+            yield prisma_1.prisma.user.delete({ where: { id: newUser.id } });
             yield prisma_1.prisma.oTPVerification.deleteMany({
                 where: { email: String(email), purpose: 'REGISTER' }
             });
-            res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+            res.status(500).json({ success: false, error: 'Unable to send verification email due to email provider sandbox restrictions. Please try again or use the registered admin email.' });
             return;
         }
         res.json({
@@ -264,6 +272,10 @@ router.post('/resend-otp', (req, res) => __awaiter(void 0, void 0, void 0, funct
         const user = yield prisma_1.prisma.user.findUnique({ where: { email: String(email) } });
         if (!user) {
             res.json({ success: true, message: 'If an account exists, a new OTP has been sent.' });
+            return;
+        }
+        if (purpose === 'REGISTER' && user.isVerified) {
+            res.status(400).json({ success: false, error: 'Account is already verified. Please log in.' });
             return;
         }
         // Cooldown check (60 seconds)

@@ -190,7 +190,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
                     ),
                     if (fb['adminResponse'] != null)
                       Container(
-                        margin: const EdgeInsets.top(12),
+                        margin: const EdgeInsets.only(top: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.green.withOpacity(0.1),

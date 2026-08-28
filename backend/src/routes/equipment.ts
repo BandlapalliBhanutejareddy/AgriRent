@@ -4,7 +4,7 @@ import { validate } from '../middlewares/validate';
 import { createEquipmentSchema, updateEquipmentSchema } from '../schemas';
 import { deleteFileByUrl } from '../lib/storage';
 import { prisma } from '../lib/prisma';
-import { sendPushNotification } from '../lib/push';
+
 import axios from 'axios';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
@@ -314,17 +314,7 @@ router.put('/:id', requireAuth, requireRole('OWNER'), validate(updateEquipmentSc
         }))
       });
 
-      const pushTokens = adminUsers
-        .map(admin => admin.pushToken)
-        .filter(Boolean) as string[];
 
-      if (pushTokens.length > 0) {
-        await sendPushNotification(pushTokens, {
-          title: 'Equipment flagged for review',
-          body: `${req.prismaUser.name} marked ${equipment.title} unavailable. Please review.`,
-          data: { equipmentId: equipment.id, screen: 'admin/alerts' }
-        });
-      }
     }
 
     res.json(equipment);

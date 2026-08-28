@@ -18,7 +18,6 @@ const validate_1 = require("../middlewares/validate");
 const schemas_1 = require("../schemas");
 const storage_1 = require("../lib/storage");
 const prisma_1 = require("../lib/prisma");
-const push_1 = require("../lib/push");
 const axios_1 = __importDefault(require("axios"));
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 const router = (0, express_1.Router)();
@@ -310,16 +309,6 @@ router.put('/:id', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRol
                     relatedId: equipment.id
                 }))
             });
-            const pushTokens = adminUsers
-                .map(admin => admin.pushToken)
-                .filter(Boolean);
-            if (pushTokens.length > 0) {
-                yield (0, push_1.sendPushNotification)(pushTokens, {
-                    title: 'Equipment flagged for review',
-                    body: `${req.prismaUser.name} marked ${equipment.title} unavailable. Please review.`,
-                    data: { equipmentId: equipment.id, screen: 'admin/alerts' }
-                });
-            }
         }
         res.json(equipment);
     }

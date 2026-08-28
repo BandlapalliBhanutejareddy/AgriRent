@@ -3,7 +3,7 @@ import { requireAuth, requireRole, AuthRequest } from '../middlewares/authMiddle
 import { validate } from '../middlewares/validate';
 import { createBookingSchema, updateBookingStatusSchema } from '../schemas';
 import { prisma } from '../lib/prisma';
-import { sendPushNotification } from '../lib/push';
+
 
 const router = Router();
 
@@ -84,14 +84,7 @@ router.post('/', requireAuth, requireRole('FARMER'), validate(createBookingSchem
       }
     });
 
-    // Send push notification to owner
-    if (equipment.owner?.pushToken) {
-      await sendPushNotification(equipment.owner.pushToken, {
-        title: '🔔 New Booking Request',
-        body: `${req.prismaUser.name} wants to rent your ${equipment.title}`,
-        data: { bookingId: booking.id, screen: 'owner/requests' }
-      });
-    }
+
 
     await prisma.auditLog.create({
       data: {
@@ -165,8 +158,8 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
       where: { id: bookingId },
       data: { status: status as any },
       include: {
-        equipment: { include: { owner: { select: { id: true, pushToken: true } } } },
-        farmer: { select: { id: true, name: true, pushToken: true } }
+        equipment: { include: { owner: { select: { id: true } } } },
+        farmer: { select: { id: true, name: true } }
       }
     });
 
@@ -185,29 +178,7 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
       }
     });
 
-    // Push notifications
-    const statusEmoji: Record<string, string> = {
-      ACCEPTED: '✅', REJECTED: '❌', COMPLETED: '🎉', CANCELLED: '🚫'
-    };
-    const emoji = statusEmoji[status] || '📋';
 
-    // Notify farmer when owner acts
-    if (isOwner && updatedBooking.farmer?.pushToken) {
-      await sendPushNotification(updatedBooking.farmer.pushToken, {
-        title: `${emoji} Booking ${status}`,
-        body: `Your booking for ${booking.equipment.title} was ${status.toLowerCase()}`,
-        data: { bookingId: booking.id, screen: 'bookings' }
-      });
-    }
-
-    // Notify owner when farmer cancels
-    if (isFarmer && updatedBooking.equipment?.owner?.pushToken) {
-      await sendPushNotification(updatedBooking.equipment.owner.pushToken, {
-        title: `${emoji} Booking Cancelled`,
-        body: `A farmer cancelled their booking for ${booking.equipment.title}`,
-        data: { bookingId: booking.id, screen: 'owner/requests' }
-      });
-    }
 
     res.json(updatedBooking);
   } catch (error) {

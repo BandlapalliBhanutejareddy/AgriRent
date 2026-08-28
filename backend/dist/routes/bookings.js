@@ -14,11 +14,9 @@ const authMiddleware_1 = require("../middlewares/authMiddleware");
 const validate_1 = require("../middlewares/validate");
 const schemas_1 = require("../schemas");
 const prisma_1 = require("../lib/prisma");
-const push_1 = require("../lib/push");
 const router = (0, express_1.Router)();
 // Create Booking (Farmer Only)
 router.post('/', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)('FARMER'), (0, validate_1.validate)(schemas_1.createBookingSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const { equipmentId, startDate, endDate } = req.body;
         const start = new Date(startDate);
@@ -85,14 +83,6 @@ router.post('/', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)
                 relatedId: booking.id
             }
         });
-        // Send push notification to owner
-        if ((_a = equipment.owner) === null || _a === void 0 ? void 0 : _a.pushToken) {
-            yield (0, push_1.sendPushNotification)(equipment.owner.pushToken, {
-                title: '🔔 New Booking Request',
-                body: `${req.prismaUser.name} wants to rent your ${equipment.title}`,
-                data: { bookingId: booking.id, screen: 'owner/requests' }
-            });
-        }
         yield prisma_1.prisma.auditLog.create({
             data: {
                 actorId: req.prismaUser.id,
@@ -114,7 +104,6 @@ router.post('/', authMiddleware_1.requireAuth, (0, authMiddleware_1.requireRole)
 }));
 // Booking Status Update
 router.put('/:id/status', authMiddleware_1.requireAuth, (0, validate_1.validate)(schemas_1.updateBookingStatusSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
     try {
         const { status } = req.body;
         const bookingId = String(req.params.id);
@@ -161,8 +150,8 @@ router.put('/:id/status', authMiddleware_1.requireAuth, (0, validate_1.validate)
             where: { id: bookingId },
             data: { status: status },
             include: {
-                equipment: { include: { owner: { select: { id: true, pushToken: true } } } },
-                farmer: { select: { id: true, name: true, pushToken: true } }
+                equipment: { include: { owner: { select: { id: true } } } },
+                farmer: { select: { id: true, name: true } }
             }
         });
         // In-app notification
@@ -178,27 +167,6 @@ router.put('/:id/status', authMiddleware_1.requireAuth, (0, validate_1.validate)
                 relatedId: booking.id
             }
         });
-        // Push notifications
-        const statusEmoji = {
-            ACCEPTED: '✅', REJECTED: '❌', COMPLETED: '🎉', CANCELLED: '🚫'
-        };
-        const emoji = statusEmoji[status] || '📋';
-        // Notify farmer when owner acts
-        if (isOwner && ((_a = updatedBooking.farmer) === null || _a === void 0 ? void 0 : _a.pushToken)) {
-            yield (0, push_1.sendPushNotification)(updatedBooking.farmer.pushToken, {
-                title: `${emoji} Booking ${status}`,
-                body: `Your booking for ${booking.equipment.title} was ${status.toLowerCase()}`,
-                data: { bookingId: booking.id, screen: 'bookings' }
-            });
-        }
-        // Notify owner when farmer cancels
-        if (isFarmer && ((_c = (_b = updatedBooking.equipment) === null || _b === void 0 ? void 0 : _b.owner) === null || _c === void 0 ? void 0 : _c.pushToken)) {
-            yield (0, push_1.sendPushNotification)(updatedBooking.equipment.owner.pushToken, {
-                title: `${emoji} Booking Cancelled`,
-                body: `A farmer cancelled their booking for ${booking.equipment.title}`,
-                data: { bookingId: booking.id, screen: 'owner/requests' }
-            });
-        }
         res.json(updatedBooking);
     }
     catch (error) {

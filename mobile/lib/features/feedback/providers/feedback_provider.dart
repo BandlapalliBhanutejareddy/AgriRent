@@ -19,7 +19,7 @@ class FeedbackNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
   Future<void> loadMyFeedback() async {
     try {
       state = const AsyncValue.loading();
-      final response = await _apiClient.get('/feedback/my');
+      final response = await _apiClient.dio.get('/feedback/my');
       
       if (response.statusCode == 200) {
         state = AsyncValue.data(List<dynamic>.from(response.data['data'] ?? []));
@@ -38,7 +38,7 @@ class FeedbackNotifier extends StateNotifier<AsyncValue<List<dynamic>>> {
     required String message,
   }) async {
     try {
-      final response = await _apiClient.post('/feedback', data: {
+      final response = await _apiClient.dio.post('/feedback', data: {
         'rating': rating,
         'category': category,
         'subject': subject,
