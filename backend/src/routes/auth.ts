@@ -51,8 +51,13 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, password, role, phone } = req.body;
 
-    if (!name || !email || !password || !role) {
-      res.status(400).json({ success: false, error: 'Name, email, password, and role are required' });
+    if (!name || !email || !password || !role || !phone) {
+      res.status(400).json({ success: false, error: 'Name, email, password, role, and phone number are required' });
+      return;
+    }
+
+    if (phone.length < 10) {
+      res.status(400).json({ success: false, error: 'Valid phone number is required' });
       return;
     }
 
@@ -680,7 +685,7 @@ router.put('/me', requireAuth, async (req: any, res: Response): Promise<void> =>
       return;
     }
     const userId = req.prismaUser.id;
-    const { name, phone, preferredLanguage } = req.body;
+    const { name, phone, preferredLanguage, profileImage } = req.body;
 
     const dataToUpdate: any = {};
     if (name !== undefined && String(name).trim() !== '') {
@@ -691,6 +696,9 @@ router.put('/me', requireAuth, async (req: any, res: Response): Promise<void> =>
     }
     if (preferredLanguage !== undefined) {
       dataToUpdate.preferredLanguage = String(preferredLanguage).trim();
+    }
+    if (profileImage !== undefined) {
+      dataToUpdate.profileImage = profileImage;
     }
 
     const updatedUser = await prisma.user.update({
@@ -706,7 +714,8 @@ router.put('/me', requireAuth, async (req: any, res: Response): Promise<void> =>
         name: updatedUser.name,
         role: updatedUser.role,
         phone: updatedUser.phone,
-        preferredLanguage: updatedUser.preferredLanguage
+        preferredLanguage: updatedUser.preferredLanguage,
+        profileImage: updatedUser.profileImage
       }
     });
   } catch (error) {

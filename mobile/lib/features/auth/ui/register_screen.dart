@@ -19,11 +19,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _role = 'FARMER';
 
   void _register() async {
+    final phone = _phoneController.text.trim();
+    if (phone.length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A valid 10-digit phone number is required.')),
+      );
+      return;
+    }
+
     final success = await ref.read(authProvider.notifier).register(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      phone: _phoneController.text.trim(),
+      phone: phone,
       role: _role,
     );
 
@@ -56,7 +64,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 16),
               CustomTextField(label: 'Email', controller: _emailController, keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 16),
-              CustomTextField(label: 'Phone (Optional)', controller: _phoneController, keyboardType: TextInputType.phone),
+              CustomTextField(label: 'Phone Number', controller: _phoneController, keyboardType: TextInputType.phone),
               const SizedBox(height: 16),
               CustomTextField(label: 'Password', controller: _passwordController, obscureText: true),
               const SizedBox(height: 16),

@@ -286,6 +286,13 @@ export default function FarmerDashboard() {
                         >
                           Request Refund
                         </button>
+                      ) : booking.status === 'COMPLETED' ? (
+                        <Link 
+                          href={`/dashboard/feedback?type=equipment&id=${booking.equipment?.id}`}
+                          className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 hover:text-indigo-700 border border-indigo-200 dark:border-indigo-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm inline-block"
+                        >
+                          Rate Equipment
+                        </Link>
                       ) : null}
                     </td>
                   </tr>

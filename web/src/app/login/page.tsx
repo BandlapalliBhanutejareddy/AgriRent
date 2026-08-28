@@ -155,6 +155,11 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
+      if (registerPhone.trim().length < 10) {
+        setError('A valid 10-digit phone number is required for registration.');
+        setLoading(false);
+        return;
+      }
       try {
         const response = await api.post('/auth/register', { 
           name: registerName, 
@@ -470,10 +475,11 @@ export default function LoginPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
-                      {t('phone_number_optional')}</label>
+                      {t('phone_number', { defaultValue: 'PHONE NUMBER' })}</label>
                     <div className="relative">
                       <input
                         type="text"
+                        required
                         className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 placeholder-slate-400 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 transition-all text-sm font-medium"
                         placeholder="+91 9876543210"
                         value={registerPhone}

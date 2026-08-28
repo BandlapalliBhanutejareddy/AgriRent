@@ -46,8 +46,16 @@ api.interceptors.response.use(
       // Handle Session Expiration
       if (status === 401) {
         useStore.getState().logout();
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login?expired=true';
+        if (typeof window !== 'undefined') {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('@cache_')) {
+              localStorage.removeItem(key);
+            }
+          }
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login?expired=true';
+          }
         }
       }
       

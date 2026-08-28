@@ -122,7 +122,7 @@ router.post('/verify', requireAuth, async (req: AuthRequest, res: Response): Pro
         data: {
           paymentStatus: 'PAID',
           paymentId: razorpay_payment_id,
-          status: 'CONFIRMED' // Auto confirm on successful payment verification
+          status: 'PENDING' // Await Owner Acceptance
         }
       });
     });
@@ -296,7 +296,7 @@ router.post('/webhook', async (req: Request | any, res: Response): Promise<void>
           });
           await tx.booking.update({
             where: { id: transaction.bookingId },
-            data: { paymentStatus: 'PAID', paymentId: paymentEntity.id, status: 'CONFIRMED' }
+            data: { paymentStatus: 'PAID', paymentId: paymentEntity.id, status: 'PENDING' }
           });
           await tx.auditLog.create({
             data: {

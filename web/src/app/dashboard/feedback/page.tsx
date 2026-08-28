@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/store/useStore';
 import { api } from '@/lib/api';
 import { Star, MessageSquare, Save, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
@@ -17,14 +18,26 @@ interface FeedbackItem {
   createdAt: string;
 }
 
-export default function FeedbackPage() {
+function FeedbackContent() {
   const { t } = useTranslation();
   const { user, activeRole } = useStore();
+  const searchParams = useSearchParams();
   
   const [rating, setRating] = useState<number>(5);
   const [category, setCategory] = useState<string>('General');
   const [subject, setSubject] = useState<string>('');
   const [message, setMessage] = useState<string>('');
+  const [isLocked, setIsLocked] = useState(false);
+
+  useEffect(() => {
+    const urlType = searchParams.get('type');
+    const urlId = searchParams.get('id');
+    if (urlType === 'equipment' && urlId) {
+      setCategory('Equipment');
+      setSubject(urlId);
+      setIsLocked(true);
+    }
+  }, [searchParams]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -76,8 +89,10 @@ export default function FeedbackPage() {
 
       setSubmitSuccess(true);
       setRating(5);
-      setCategory('General');
-      setSubject('');
+      if (!isLocked) {
+        setCategory('General');
+        setSubject('');
+      }
       setMessage('');
       
       // Reload the feedback list
@@ -175,7 +190,7 @@ export default function FeedbackPage() {
                   <select 
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLocked}
                     className="w-full pl-4 pr-10 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all appearance-none disabled:opacity-50"
                   >
                     {categories.map(cat => (
@@ -194,8 +209,8 @@ export default function FeedbackPage() {
                   type="text" 
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  disabled={isSubmitting}
-                  placeholder="Brief summary of your feedback"
+                  disabled={isSubmitting || isLocked}
+                  placeholder={isLocked ? "Equipment ID" : "Brief summary of your feedback"}
                   className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all disabled:opacity-50"
                 />
               </div>
@@ -294,5 +309,13 @@ export default function FeedbackPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function FeedbackPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center animate-pulse text-slate-400">Loading feedback form...</div>}>
+      <FeedbackContent />
+    </Suspense>
   );
 }

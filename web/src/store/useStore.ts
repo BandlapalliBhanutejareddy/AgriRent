@@ -8,7 +8,7 @@ interface User {
   name: string | null;
   role: string;
   preferredLanguage?: string;
-  avatar?: string | null;
+  profileImage?: string | null;
 }
 
 interface ThemeState {

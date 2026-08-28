@@ -33,19 +33,19 @@ export default function ProfilePage() {
   // Form states
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [email, setEmail] = useState(user?.phone ? `${user.phone.replace(/[^0-9]/g, '')}@agrorent.ai` : 'user@agrorent.ai');
-  const [avatar, setAvatar] = useState<string | null>(null);
+  const [email, setEmail] = useState(user?.email || '');
+  const [avatar, setAvatar] = useState<string | null>(user?.profileImage || null);
   // Preferences
   const [preferredLanguage, setPreferredLanguage] = useState(user?.preferredLanguage || 'en');
 
-
-  // Load avatar from localStorage if saved previously
+  // Synchronize state when user changes
   useEffect(() => {
-    const savedAvatar = localStorage.getItem('agrorent_user_avatar');
-    if (savedAvatar) {
-      setAvatar(savedAvatar);
-    }
-  }, []);
+    setName(user?.name || '');
+    setPhone(user?.phone || '');
+    setEmail(user?.email || '');
+    setAvatar(user?.profileImage || null);
+    setPreferredLanguage(user?.preferredLanguage || 'en');
+  }, [user]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -63,8 +63,7 @@ export default function ProfilePage() {
       reader.onloadend = () => {
         const base64String = reader.result as string;
         setAvatar(base64String);
-        localStorage.setItem('agrorent_user_avatar', base64String);
-        showToast('Avatar updated successfully!', 'success');
+        showToast('Avatar selected. Please click Save Changes to upload.', 'success');
       };
       reader.readAsDataURL(file);
     }
@@ -81,16 +80,18 @@ export default function ProfilePage() {
       const response = await api.put('/auth/me', {
         name: name.trim(),
         phone: phone.trim(),
-        preferredLanguage: preferredLanguage
+        preferredLanguage: preferredLanguage,
+        profileImage: avatar
       });
 
       if (response.data && (response.data.id || response.data.name)) {
-        const fresh = response.data;
+        const fresh = response.data.data || response.data; // fallback for nested .data
         const updatedUser = {
           ...user!,
           name: fresh.name,
           phone: fresh.phone,
-          preferredLanguage: fresh.preferredLanguage
+          preferredLanguage: fresh.preferredLanguage,
+          profileImage: fresh.profileImage
         };
         setUser(updatedUser);
         showToast('Profile updated and saved to database successfully!', 'success');
@@ -101,7 +102,7 @@ export default function ProfilePage() {
       console.error('Save Profile Error:', err);
       // Local fallback for offline/persistence display
       if (user) {
-        setUser({ ...user, name: name.trim(), phone: phone.trim(), preferredLanguage });
+        setUser({ ...user, name: name.trim(), phone: phone.trim(), preferredLanguage, profileImage: avatar });
       }
       showToast(err.response?.data?.error || 'Profile saved locally', 'success');
     }

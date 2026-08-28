@@ -133,8 +133,8 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
 
     if (role === 'ADMIN') {
       // Admins can do anything
-    } else if (isOwner && (status === 'ACCEPTED' || status === 'REJECTED')) {
-      // Owner of equipment can accept or reject
+    } else if (isOwner && (status === 'ACCEPTED' || status === 'REJECTED' || status === 'COMPLETED')) {
+      // Owner of equipment can accept, reject, or mark as completed
     } else if (isFarmer && status === 'CANCELLED') {
       // Farmer who made booking can cancel
     } else {

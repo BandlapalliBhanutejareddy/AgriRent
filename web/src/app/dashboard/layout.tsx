@@ -46,9 +46,10 @@ export default function DashboardLayout({
   const [headerAvatar, setHeaderAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('agrorent_user_avatar');
-    if (saved) {
-      setHeaderAvatar(saved);
+    if (user?.profileImage) {
+      setHeaderAvatar(user.profileImage);
+    } else {
+      setHeaderAvatar(null);
     }
   }, [user]);
 
@@ -91,6 +92,13 @@ export default function DashboardLayout({
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('agrorent_dev_session');
+    // Clear any cached API responses to prevent cross-user data exposure
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('@cache_')) {
+        localStorage.removeItem(key);
+      }
+    }
     logout();
     window.location.href = '/login';
   };
@@ -161,7 +169,6 @@ export default function DashboardLayout({
           <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides')} />
           <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label={t('ai_advisor')} />
           <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
-          <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
         </>
       );
     }
@@ -171,9 +178,9 @@ export default function DashboardLayout({
         <NavLink href="/dashboard" icon={LayoutDashboard} label={t('dashboard')} exact />
         <NavLink href="/dashboard/equipment" icon={Tractor} label={t('fleet_management')} exact />
         <NavLink href="/dashboard/equipment/new" icon={PlusCircle} label={t('add_equipment')} />
-        <NavLink href="/dashboard#bookings" icon={ClipboardList} label={t('booking_requests')} />
-        <NavLink href="/dashboard#analytics" icon={BarChart3} label={t('analytics')} />
-        <NavLink href="/dashboard#revenue" icon={CreditCard} label={t('revenue')} />
+        <NavLink href="/dashboard/bookings" icon={ClipboardList} label={t('booking_requests')} />
+        <NavLink href="/dashboard/analytics" icon={BarChart3} label={t('analytics')} />
+        <NavLink href="/dashboard/analytics" icon={CreditCard} label={t('revenue')} />
         <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
         <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
       </>

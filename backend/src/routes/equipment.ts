@@ -104,8 +104,35 @@ router.get('/', async (req: Request, res: Response, next: any): Promise<void> =>
       })
     ]);
 
+    const equipmentIds = equipment.map(e => e.id);
+    const feedbacks = await prisma.feedback.findMany({
+      where: {
+        category: 'Equipment',
+        subject: { in: equipmentIds }
+      },
+      include: {
+        user: { select: { name: true } }
+      }
+    });
+
+    const enrichedEquipment = equipment.map(eq => {
+      const eqFeedbacks = feedbacks.filter(f => f.subject === eq.id);
+      const ratingSum = eqFeedbacks.reduce((sum, f) => sum + f.rating, 0);
+      return {
+        ...eq,
+        rating: eqFeedbacks.length > 0 ? (ratingSum / eqFeedbacks.length).toFixed(1) : 0,
+        reviewCount: eqFeedbacks.length,
+        reviews: eqFeedbacks.map(f => ({
+          rating: f.rating,
+          text: f.message,
+          author: f.user.name,
+          createdAt: f.createdAt
+        }))
+      };
+    });
+
     res.json({
-      data: equipment,
+      data: enrichedEquipment,
       pagination: {
         page: pageNum,
         limit: limitNum,

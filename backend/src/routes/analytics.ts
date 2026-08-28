@@ -23,7 +23,7 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
     const acceptedBookings = bookings.filter(b => b.status === 'ACCEPTED').length;
 
     const totalRevenue = bookings
-      .filter(b => ['ACCEPTED', 'COMPLETED'].includes(b.status) || b.paymentStatus === 'PAID')
+      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
       .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
     const topEquipmentMap = bookings.reduce((acc: Record<string, { title: string; bookings: number; revenue: number }>, b) => {
@@ -45,7 +45,7 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
     });
 
     const revenueByMonth = bookings
-      .filter(b => ['ACCEPTED', 'COMPLETED'].includes(b.status) || b.paymentStatus === 'PAID')
+      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
       .reduce((acc: Record<string, number>, b) => {
         const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
         acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
@@ -57,12 +57,28 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
       revenue: revenueByMonth[month] || 0
     }));
 
+    const equipmentList = await prisma.equipment.findMany({
+      where: { ownerId },
+      select: { id: true }
+    });
+    
+    const ownerFeedback = await prisma.feedback.findMany({
+      where: {
+        category: 'Equipment',
+        subject: { in: equipmentList.map(e => e.id) }
+      }
+    });
+
+    const avgRating = ownerFeedback.length > 0 
+      ? ownerFeedback.reduce((sum, f) => sum + f.rating, 0) / ownerFeedback.length 
+      : 0;
+
     res.json({
       totalRevenue: totalRevenue || 0,
       totalBookings,
       pendingBookings,
       completedBookings,
-      averageRating: 4.6,
+      averageRating: parseFloat(avgRating.toFixed(1)),
       topEquipment,
       monthlyRevenue,
       utilization: totalBookings > 0 ? Math.round(((acceptedBookings + completedBookings) / totalBookings) * 100) : 0
@@ -84,8 +100,10 @@ router.get('/admin', requireAuth, requireRole('ADMIN'), async (req: AuthRequest,
 
     const allBookings = await prisma.booking.findMany({
       where: {
-        status: { in: ['ACCEPTED', 'COMPLETED'] },
-        paymentStatus: 'PAID'
+        OR: [
+          { status: 'COMPLETED' },
+          { paymentStatus: 'PAID' }
+        ]
       }
     });
 
@@ -121,14 +139,14 @@ router.get('/farmer', requireAuth, requireRole('FARMER'), async (req: AuthReques
     });
 
     const totalSpent = bookings
-      .filter(b => b.status === 'ACCEPTED' || b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
+      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
       .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
     const activeRentals = bookings.filter(b => b.status === 'ACCEPTED').length;
     const completedRentals = bookings.filter(b => b.status === 'COMPLETED').length;
 
     const spendingByMonth = bookings
-      .filter(b => b.status === 'ACCEPTED' || b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
+      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
       .reduce((acc: any, b) => {
         const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
         acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
