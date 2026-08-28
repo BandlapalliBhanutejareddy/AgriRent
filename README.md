@@ -6,8 +6,9 @@ A comprehensive agricultural equipment rental platform with AI-powered features,
 
 - **Web Application**: [https://agri-rent-two.vercel.app](https://agri-rent-two.vercel.app)
 - **Backend API**: [https://agrirent-5qpx.onrender.com](https://agrirent-5qpx.onrender.com)
+- **GitHub Repository**: [https://github.com/BandlapalliBhanutejareddy/AgriRent](https://github.com/BandlapalliBhanutejareddy/AgriRent)
 - **Database**: Supabase PostgreSQL (Managed Cloud)
-- **Mobile Application**: Flutter (Android/iOS)
+- **Mobile Application**: Flutter (Android/iOS) - Build locally using `flutter build apk --release`
 
 ## 📋 Features
 
