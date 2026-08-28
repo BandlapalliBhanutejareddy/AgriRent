@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/owner_provider.dart';
 
@@ -35,11 +36,25 @@ class _OwnerDashboardScreenState extends ConsumerState<OwnerDashboardScreen> wit
       appBar: AppBar(
         title: Text('Owner: ${user?.name ?? ""}'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(authProvider.notifier).logout();
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.person),
+            onSelected: (value) {
+              if (value == 'feedback') {
+                GoRouter.of(context).push('/feedback');
+              } else if (value == 'logout') {
+                ref.read(authProvider.notifier).logout();
+              }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'feedback',
+                child: Text('Feedback'),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Text('Logout'),
+              ),
+            ],
           )
         ],
         bottom: TabBar(

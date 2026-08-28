@@ -25,7 +25,8 @@ import {
   BarChart3,
   CalendarDays,
   CreditCard,
-  History
+  History,
+  MessageSquare
 } from 'lucide-react';
 import { useStore, useThemeStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
@@ -132,6 +133,7 @@ export default function DashboardLayout({
           <NavLink href="/dashboard/admin#revenue" icon={BarChart3} label={t('revenue')} />
           <NavLink href="/dashboard/admin#health" icon={Activity} label={t('system_health')} />
           <NavLink href="/dashboard/admin#audit" icon={History} label={t('audit_logs')} />
+          <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
         </>
       );
     }
@@ -145,6 +147,7 @@ export default function DashboardLayout({
           <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides')} />
           <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label={t('ai_advisor')} />
           <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
+          <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
         </>
       );
     }
@@ -158,6 +161,7 @@ export default function DashboardLayout({
         <NavLink href="/dashboard#analytics" icon={BarChart3} label={t('analytics')} />
         <NavLink href="/dashboard#revenue" icon={CreditCard} label={t('revenue')} />
         <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
+        <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
       </>
     );
   };

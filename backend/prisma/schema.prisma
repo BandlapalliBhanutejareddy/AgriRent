@@ -28,6 +28,7 @@ model User {
   notifications     Notification[]
   savedEquipment    SavedEquipment[]
   sessions          Session[]
+  feedbacks         Feedback[]
 }
 
 model Equipment {
@@ -205,3 +206,22 @@ model PaymentTransaction {
   updatedAt         DateTime @updatedAt
   booking           Booking  @relation(fields: [bookingId], references: [id])
 }
+  
+model Feedback {  
+  id            String   @id @default(cuid())  
+  userId        String  
+  rating        Int  
+  category      String  
+  subject       String?  
+  message       String  
+  attachmentUrl String?  
+  status        String   @default("PENDING")
+  adminResponse String?  
+  activeRole    String?  
+  createdAt     DateTime @default(now())  
+  updatedAt     DateTime @updatedAt  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)  
+  
+  @@index([userId])  
+  @@index([createdAt])  
+} 

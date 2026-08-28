@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/marketplace_provider.dart';
 import 'equipment_details_screen.dart';
 import '../../ai_advisor/ui/ai_advisor_screen.dart';
@@ -55,11 +56,25 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
       appBar: AppBar(
         title: const Text('Marketplace'),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.person),
-            onPressed: () {
-              // TODO: Navigate to Profile
+            onSelected: (value) {
+              if (value == 'feedback') {
+                GoRouter.of(context).push('/feedback');
+              } else if (value == 'profile') {
+                // TODO: Navigate to Profile
+              }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'profile',
+                child: Text('Profile'),
+              ),
+              const PopupMenuItem(
+                value: 'feedback',
+                child: Text('Feedback'),
+              ),
+            ],
           )
         ],
       ),

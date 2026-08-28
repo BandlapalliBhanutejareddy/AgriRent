@@ -7,6 +7,7 @@ import '../features/auth/ui/register_screen.dart';
 import '../features/auth/ui/otp_screen.dart';
 import '../features/marketplace/ui/farmer_home_screen.dart';
 import '../features/profile/ui/owner_dashboard_screen.dart';
+import '../features/feedback/ui/feedback_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AuthState>(ref.read(authProvider));
@@ -74,6 +75,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/owner',
         builder: (context, state) => const OwnerDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/feedback',
+        builder: (context, state) => const FeedbackScreen(),
       ),
     ],
   );

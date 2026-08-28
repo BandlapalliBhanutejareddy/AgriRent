@@ -17,7 +17,7 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.includes('your_api_key_here')) {
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.includes('your_api_key_here') || process.env.GEMINI_API_KEY.includes('MOCK')) {
       res.status(503).json({ error: 'AI Advisor is currently unavailable pending production credentials.' });
       return;
     }

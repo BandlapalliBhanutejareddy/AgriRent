@@ -62,12 +62,47 @@ router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, functio
             res.status(400).json({ success: false, error: 'Invalid role. Must be FARMER or OWNER' });
             return;
         }
-        // Email unique check
+        // Email existing account check (multi-role capability support)
         const existingUser = yield prisma_1.prisma.user.findUnique({
             where: { email: String(email) }
         });
         if (existingUser) {
-            res.status(400).json({ success: false, error: 'Email address is already registered' });
+            // Verify password for adding role to existing account
+            const isMatch = (yield bcrypt_1.default.compare(String(password), existingUser.password)) || existingUser.password === String(password);
+            if (!isMatch) {
+                res.status(400).json({
+                    success: false,
+                    error: 'An account with this email address already exists. Please enter your valid password to add the new role capability.'
+                });
+                return;
+            }
+            if (existingUser.role === role || existingUser.role === 'BOTH') {
+                res.status(400).json({
+                    success: false,
+                    error: `This account already has ${role === 'BOTH' ? 'Farmer and Owner' : role} capability. Please sign in directly.`
+                });
+                return;
+            }
+            // Upgrade existing account to multi-role BOTH
+            const updatedUser = yield prisma_1.prisma.user.update({
+                where: { id: existingUser.id },
+                data: { role: 'BOTH' }
+            });
+            const tokens = yield generateTokens(updatedUser.id, req);
+            res.json({
+                success: true,
+                message: `Role capability successfully added! You can now use AgroRent as both Farmer and Owner.`,
+                user: {
+                    id: updatedUser.id,
+                    email: updatedUser.email,
+                    name: updatedUser.name,
+                    role: updatedUser.role,
+                    phone: updatedUser.phone,
+                    preferredLanguage: updatedUser.preferredLanguage
+                },
+                token: tokens.accessToken,
+                refreshToken: tokens.refreshToken
+            });
             return;
         }
         // Password strength check
@@ -580,6 +615,46 @@ router.get('/me', authMiddleware_1.requireAuth, (req, res) => __awaiter(void 0, 
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+}));
+// Update current user profile
+router.put('/me', authMiddleware_1.requireAuth, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!req.prismaUser) {
+            res.status(401).json({ error: 'Not authenticated' });
+            return;
+        }
+        const userId = req.prismaUser.id;
+        const { name, phone, preferredLanguage } = req.body;
+        const dataToUpdate = {};
+        if (name !== undefined && String(name).trim() !== '') {
+            dataToUpdate.name = String(name).trim();
+        }
+        if (phone !== undefined) {
+            dataToUpdate.phone = String(phone).trim();
+        }
+        if (preferredLanguage !== undefined) {
+            dataToUpdate.preferredLanguage = String(preferredLanguage).trim();
+        }
+        const updatedUser = yield prisma_1.prisma.user.update({
+            where: { id: userId },
+            data: dataToUpdate
+        });
+        res.json({
+            success: true,
+            data: {
+                id: updatedUser.id,
+                email: updatedUser.email,
+                name: updatedUser.name,
+                role: updatedUser.role,
+                phone: updatedUser.phone,
+                preferredLanguage: updatedUser.preferredLanguage
+            }
+        });
+    }
+    catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update profile details' });
     }
 }));
 // 8. Refresh Token Endpoint

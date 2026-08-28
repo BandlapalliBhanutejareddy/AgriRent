@@ -134,6 +134,7 @@ import uploadRoutes from './routes/upload';
 import aiRoutes from './routes/ai';
 import paymentRoutes from './routes/payments';
 import analyticsRoutes from './routes/analytics';
+import feedbackRoutes from './routes/feedback';
 
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -145,6 +146,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Centralized Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

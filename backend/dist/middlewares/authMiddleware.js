@@ -63,7 +63,12 @@ const requireRole = (role) => {
             res.status(401).json({ error: 'User profile not found in database' });
             return;
         }
-        if (req.prismaUser.role !== role && req.prismaUser.role !== 'ADMIN') {
+        const userRole = req.prismaUser.role;
+        const hasRequiredRole = userRole === 'ADMIN' ||
+            userRole === role ||
+            userRole === 'BOTH' ||
+            (typeof userRole === 'string' && userRole.split(',').map((r) => r.trim()).includes(role));
+        if (!hasRequiredRole) {
             res.status(403).json({ error: `Forbidden: Requires ${role} role` });
             return;
         }

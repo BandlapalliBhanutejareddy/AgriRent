@@ -129,6 +129,7 @@ const upload_1 = __importDefault(require("./routes/upload"));
 const ai_1 = __importDefault(require("./routes/ai"));
 const payments_1 = __importDefault(require("./routes/payments"));
 const analytics_1 = __importDefault(require("./routes/analytics"));
+const feedback_1 = __importDefault(require("./routes/feedback"));
 app.use('/api/equipment', equipment_1.default);
 app.use('/api/bookings', bookings_1.default);
 app.use('/api/notifications', notifications_1.default);
@@ -139,6 +140,7 @@ app.use('/api/upload', upload_1.default);
 app.use('/api/ai', ai_1.default);
 app.use('/api/payments', payments_1.default);
 app.use('/api/analytics', analytics_1.default);
+app.use('/api/feedback', feedback_1.default);
 // Centralized Error Handling Middleware
 app.use((err, req, res, next) => {
     const fs = require('fs');
