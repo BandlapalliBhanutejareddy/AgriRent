@@ -71,7 +71,7 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
     res.json({ reply: responseText });
   } catch (error: any) {
     console.error('AI Advisor Error:', error);
-    res.status(500).json({ error: 'Failed to generate AI response' });
+    res.status(500).json({ error: 'Failed to generate AI response', details: error.message || error.toString() });
   }
 });
 
