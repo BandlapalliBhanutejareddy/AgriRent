@@ -2,13 +2,31 @@
 
 A comprehensive agricultural equipment rental platform with AI-powered features, built with modern web and mobile technologies. This repository contains the full production-ready release of AgroRent AI (v1.0.0).
 
-## 🚀 Live Deployments
+## 🚀 Live Applications
 
-- **Web Application**: [https://agri-rent-two.vercel.app](https://agri-rent-two.vercel.app)
-- **Backend API**: [https://agrirent-5qpx.onrender.com](https://agrirent-5qpx.onrender.com)
-- **GitHub Repository**: [https://github.com/BandlapalliBhanutejareddy/AgriRent](https://github.com/BandlapalliBhanutejareddy/AgriRent)
-- **Database**: Supabase PostgreSQL (Managed Cloud)
-- **Mobile Application**: Flutter (Android/iOS) - Build locally using `flutter build apk --release`
+### 🌐 Web Application
+[Open AgroRent AI Web App](https://agri-rent-two.vercel.app)
+
+### 📱 Mobile Application
+Android APK — build locally using `flutter build apk --release`
+
+### 🔗 Backend API
+[AgroRent AI API](https://agrirent-5qpx.onrender.com)
+- Health Endpoint: [https://agrirent-5qpx.onrender.com/api/health](https://agrirent-5qpx.onrender.com/api/health)
+- Ready Endpoint: [https://agrirent-5qpx.onrender.com/api/ready](https://agrirent-5qpx.onrender.com/api/ready)
+
+### 📂 GitHub Repository
+[https://github.com/BandlapalliBhanutejareddy/AgriRent](https://github.com/BandlapalliBhanutejareddy/AgriRent)
+
+## 🧪 Demo / Test Accounts
+
+> **WARNING:** These credentials are for demonstration/testing only. Never use production credentials in this repository.
+
+| Role | Email | Password |
+|------|-------|----------|
+| Farmer | `farmer_test@example.com` | `Password123!` |
+| Owner | `owner_test@example.com` | `Password123!` |
+| BOTH | `both_202608281720@test.com` | `Password123!` |
 
 ## 📋 Features
 
