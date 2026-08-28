@@ -76,7 +76,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     const user = req.prismaUser;
 
     const feedback = await prisma.feedback.findUnique({
-      where: { id }
+      where: { id: String(id) }
     });
 
     if (!feedback) {
