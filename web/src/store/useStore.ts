@@ -7,6 +7,8 @@ interface User {
   phone: string;
   name: string | null;
   role: string;
+  preferredLanguage?: string;
+  avatar?: string | null;
 }
 
 interface ThemeState {

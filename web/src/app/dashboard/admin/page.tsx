@@ -186,14 +186,7 @@ export default function AdminDashboard() {
             {t('monitor_real_time_rental_transactions_mo')}</p>
         </div>
         <div className="relative z-10 flex gap-4 shrink-0">
-          <div className="px-5 py-4 bg-white/10 border border-white/20 rounded-2xl backdrop-blur-md flex flex-col items-center shadow-lg">
-            <span className="text-2xl font-black text-emerald-400 tracking-tighter">99.9%</span>
-            <span className="text-[10px] uppercase font-black text-slate-300 tracking-widest mt-1">{t('health')}</span>
-          </div>
-          <div className="px-5 py-4 bg-white/10 border border-white/20 rounded-2xl backdrop-blur-md flex flex-col items-center shadow-lg">
-            <span className="text-2xl font-black text-indigo-400 tracking-tighter">{t('0_8s')}</span>
-            <span className="text-[10px] uppercase font-black text-slate-300 tracking-widest mt-1">{t('latency')}</span>
-          </div>
+          {/* Removed hardcoded fake health stats */}
         </div>
       </div>
 
@@ -254,8 +247,8 @@ export default function AdminDashboard() {
 
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div id="revenue" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm lg:col-span-2">
+      <div className="grid grid-cols-1 gap-6">
+        <div id="revenue" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm w-full">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">{t('financial_growth')}</h3>
@@ -293,45 +286,6 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* AI advisor Usage Stats */}
-        <div id="health" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">{t('system_health')}</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t('resource_load')}</p>
-              </div>
-              <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-2xl">
-                <Brain size={20} className="text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                  <span>{t('gemini_recommendations')}</span>
-                  <span className="text-slate-600 dark:text-slate-300">{t('active')}</span>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                  <div className="bg-purple-500 h-full rounded-full w-[15%]"></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                  <span>{t('storage_utilization')}</span>
-                  <span className="text-slate-600 dark:text-slate-300">{t('stable')}</span>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                  <div className="bg-indigo-500 h-full rounded-full w-[8%]"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-50/50 dark:bg-slate-800/30 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium mt-6">
-            🤖 <strong>{t('ai_cluster_active')}</strong>{t('automatic_model_switches_configured_bet')}</div>
         </div>
       </div>
 

@@ -34,19 +34,10 @@ export default function ProfilePage() {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [email, setEmail] = useState(user?.phone ? `${user.phone.replace(/[^0-9]/g, '')}@agrorent.ai` : 'user@agrorent.ai');
-  const [location, setLocation] = useState('Nellore, Andhra Pradesh');
   const [avatar, setAvatar] = useState<string | null>(null);
-  
-  // Custom states based on role
-  const [farmingType, setFarmingType] = useState('Organic Crop');
-  const [fleetSize, setFleetSize] = useState('5 Tractors');
-  const [securityCleared, setSecurityCleared] = useState(true);
-  
   // Preferences
-  const [smsAlerts, setSmsAlerts] = useState(true);
-  const [emailAlerts, setEmailAlerts] = useState(false);
-  const [bookingAlerts, setBookingAlerts] = useState(true);
-  const [weatherAlerts, setWeatherAlerts] = useState(true);
+  const [preferredLanguage, setPreferredLanguage] = useState(user?.preferredLanguage || 'en');
+
 
   // Load avatar from localStorage if saved previously
   useEffect(() => {
@@ -89,15 +80,17 @@ export default function ProfilePage() {
     try {
       const response = await api.put('/auth/me', {
         name: name.trim(),
-        phone: phone.trim()
+        phone: phone.trim(),
+        preferredLanguage: preferredLanguage
       });
 
-      if (response.data.success || response.data.data) {
-        const fresh = response.data.data || response.data;
+      if (response.data && (response.data.id || response.data.name)) {
+        const fresh = response.data;
         const updatedUser = {
           ...user!,
           name: fresh.name,
-          phone: fresh.phone
+          phone: fresh.phone,
+          preferredLanguage: fresh.preferredLanguage
         };
         setUser(updatedUser);
         showToast('Profile updated and saved to database successfully!', 'success');
@@ -108,7 +101,7 @@ export default function ProfilePage() {
       console.error('Save Profile Error:', err);
       // Local fallback for offline/persistence display
       if (user) {
-        setUser({ ...user, name: name.trim(), phone: phone.trim() });
+        setUser({ ...user, name: name.trim(), phone: phone.trim(), preferredLanguage });
       }
       showToast(err.response?.data?.error || 'Profile saved locally', 'success');
     }
@@ -206,14 +199,6 @@ export default function ProfilePage() {
                   <span className="text-slate-800 dark:text-white font-black">{phone || 'N/A'}</span>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3 text-xs font-bold text-slate-500 dark:text-slate-400">
-                <MapPin size={16} className="text-slate-400" />
-                <div>
-                  <span className="block text-[10px] text-slate-400">{t('location_reference', { defaultValue: 'LOCATION REFERENCE' })}</span>
-                  <span className="text-slate-800 dark:text-white font-black">{location}</span>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -272,77 +257,9 @@ export default function ProfilePage() {
                   required
                 />
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('farming_region', { defaultValue: 'Farming Region / Base' })}</label>
-                <input 
-                  type="text" 
-                  value={location} 
-                  onChange={e => setLocation(e.target.value)} 
-                  placeholder={t('district_state', { defaultValue: 'District, State' })} 
-                  className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-sm font-medium transition-all text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400"
-                />
-              </div>
             </div>
 
-            {/* Conditionally rendered fields based on Role */}
-            {user?.role === 'FARMER' && (
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                <h4 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                  <Sprout size={16} /> {t('farmer_specific_details')}</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('primary_cultivation_focus', { defaultValue: 'Primary Cultivation Focus' })}</label>
-                    <select 
-                      value={farmingType} 
-                      onChange={e => setFarmingType(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-sm font-medium text-slate-900 dark:text-slate-50 cursor-pointer"
-                    >
-                      <option value="Organic Crop">{t('organic_paddy_rice')}</option>
-                      <option value="Commercial Grains">{t('commercial_grains_wheat_maize')}</option>
-                      <option value="Horticulture">{t('horticulture_vegetables')}</option>
-                      <option value="Mixed Farming">{t('mixed_crops_seed_cultivation')}</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {user?.role === 'OWNER' && (
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                <h4 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                  <Tractor size={16} /> {t('fleet_logistics_details')}</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('target_fleet_size', { defaultValue: 'Current Target Fleet Size' })}</label>
-                    <select 
-                      value={fleetSize} 
-                      onChange={e => setFleetSize(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-sm font-medium text-slate-900 dark:text-slate-50 cursor-pointer"
-                    >
-                      <option value="1-3 Machinery">{t('1_3_vehicles_machinery')}</option>
-                      <option value="5 Tractors">{t('5_10_tractors_harvesters')}</option>
-                      <option value="Enterprise Fleet">{t('enterprise_level_fleet_operations')}</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {user?.role === 'ADMIN' && (
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                <h4 className="text-sm font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
-                  <ShieldCheck size={16} /> {t('administrative_cleared_parameters')}</h4>
-                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-850 rounded-2xl">
-                  <div className="text-xs">
-                    <span className="block font-bold text-slate-800 dark:text-white">{t('mfa_protected', { defaultValue: 'MFA Encryption Protected' })}</span>
-                    <span className="text-slate-400 font-medium">{t('mfa_desc', { defaultValue: 'Auto logging auditing is fully verified.' })}</span>
-                  </div>
-                  <div className="px-3 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-xl text-[9px] font-black uppercase tracking-wider">
-                    {t('cleared_level_1')}</div>
-                </div>
-              </div>
-            )}
+            {/* Removed unsupported role specific inputs */}
 
             {/* Notification triggers */}
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
@@ -351,17 +268,20 @@ export default function ProfilePage() {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-850 rounded-2xl cursor-pointer">
-                  <div className="text-xs">
-                    <span className="block font-bold text-slate-850 dark:text-white">{t('sms_booking_alerts', { defaultValue: 'SMS Booking Alerts' })}</span>
-                    <span className="text-slate-400 font-medium">{t('sms_desc', { defaultValue: 'Send real-time sms alerts.' })}</span>
+                  <div className="text-xs w-full">
+                    <span className="block font-bold text-slate-850 dark:text-white">Preferred Language</span>
+                    <select 
+                      value={preferredLanguage} 
+                      onChange={e => setPreferredLanguage(e.target.value)}
+                      className="mt-2 w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs font-medium text-slate-900 dark:text-slate-50"
+                    >
+                      <option value="en">English</option>
+                      <option value="hi">हिंदी</option>
+                      <option value="te">తెలుగు</option>
+                      <option value="ta">தமிழ்</option>
+                      <option value="kn">ಕನ್ನಡ</option>
+                    </select>
                   </div>
-                  <input 
-                    type="checkbox" 
-                    data-testid="notification-toggle"
-                    checked={smsAlerts} 
-                    onChange={e => setSmsAlerts(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0" 
-                  />
                 </label>
 
                 <label className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-850 rounded-2xl cursor-pointer">

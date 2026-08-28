@@ -102,14 +102,7 @@ export default function OwnerDashboard() {
           </p>
         </div>
         <div className="relative z-10 flex gap-4 shrink-0">
-          <div className="px-5 py-4 bg-white/10 border border-white/20 rounded-2xl backdrop-blur-md text-center shadow-lg">
-            <span className="block text-[10px] uppercase font-black text-blue-200 tracking-widest">{t('fleet_util', { defaultValue: 'Fleet Util.' })}</span>
-            <span className="text-2xl font-black text-white mt-1 block">84%</span>
-          </div>
-          <div className="px-5 py-4 bg-white/10 border border-white/20 rounded-2xl backdrop-blur-md text-center shadow-lg">
-            <span className="block text-[10px] uppercase font-black text-blue-200 tracking-widest">{t('rating', { defaultValue: 'Rating' })}</span>
-            <span className="text-2xl font-black text-amber-400 mt-1 block">4.9 ★</span>
-          </div>
+          {/* Removed hardcoded non-functional stats */}
         </div>
       </div>
 

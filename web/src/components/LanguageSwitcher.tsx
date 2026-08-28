@@ -9,13 +9,7 @@ const languages = [
   { code: 'te', name: 'తెలుగు' },
   { code: 'hi', name: 'हिन्दी' },
   { code: 'ta', name: 'தமிழ்' },
-  { code: 'kn', name: 'ಕನ್ನಡ' },
-  { code: 'ml', name: 'മലയാളം (Coming Soon)' },
-  { code: 'mr', name: 'मराठी (Coming Soon)' },
-  { code: 'bn', name: 'বাংলা (Coming Soon)' },
-  { code: 'gu', name: 'ગુજરાતી (Coming Soon)' },
-  { code: 'pa', name: 'ਪੰਜਾਬੀ (Coming Soon)' },
-  { code: 'or', name: 'ଓଡ଼ିଆ (Coming Soon)' }
+  { code: 'kn', name: 'ಕನ್ನಡ' }
 ];
 
 export default function LanguageSwitcher() {
@@ -75,10 +69,8 @@ export default function LanguageSwitcher() {
             <button
               key={lang.code}
               data-testid="language-select"
-              onClick={() => !lang.name.includes('Coming Soon') && changeLanguage(lang.code)}
+              onClick={() => changeLanguage(lang.code)}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                lang.name.includes('Coming Soon') ? 'opacity-50 cursor-not-allowed' : ''
-              } ${
                 i18n.language === lang.code 
                   ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-bold' 
                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'

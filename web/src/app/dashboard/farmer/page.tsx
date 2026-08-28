@@ -29,17 +29,7 @@ export default function FarmerDashboard() {
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const weather = {
-    temp: '32°C',
-    condition: t('mostly_sunny', { defaultValue: 'Mostly Sunny' }),
-    location: 'Nellore, Andhra Pradesh',
-    advice: t('weather_advice', { defaultValue: 'Excellent weather window for harvesting Kharif crops. Avoid sowing until humidity levels stabilize next week.' })
-  };
 
-  const aiSuggestions = [
-    { name: 'John Deere Harvester', reason: t('rec_reason_1', { defaultValue: 'Ideal for rapid paddy harvesting based on local forecast.' }) },
-    { name: 'Laser Land Leveler', reason: t('rec_reason_2', { defaultValue: 'Saves water usage up to 35% during rice transplantation.' }) }
-  ];
 
   useEffect(() => {
     fetchData();
@@ -131,61 +121,7 @@ export default function FarmerDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weather Card */}
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('weather_insight', { defaultValue: 'Weather Insight' })}</span>
-              <CloudSun className="text-amber-500" size={24} />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-slate-800 dark:text-white tracking-tighter">{weather.temp}</span>
-              <span className="text-sm font-bold text-slate-400">{weather.condition}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-500 mt-3 text-xs font-bold">
-              <MapPin size={14} className="text-emerald-500" />
-              <span>{weather.location}</span>
-            </div>
-          </div>
-          <div className="mt-6 pt-5 border-t border-slate-200/50 dark:border-slate-800/50 text-xs flex items-start gap-3 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-2xl">
-            <AlertCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-            <p className="font-semibold leading-relaxed text-emerald-800 dark:text-emerald-300">{weather.advice}</p>
-          </div>
-        </div>
 
-        {/* AI Recommendations */}
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm lg:col-span-2 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('ai_recommendations_title', { defaultValue: 'AI Farm Advisor Recommendations' })}</span>
-              <Sparkles className="text-emerald-500 animate-pulse" size={20} />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {aiSuggestions.map((rec, i) => (
-                <div key={i} className="p-5 bg-gradient-to-br from-slate-50 to-white dark:from-slate-800/40 dark:to-slate-800/10 border border-slate-200/60 dark:border-slate-700/50 rounded-2xl space-y-2 hover:border-emerald-500/30 transition-colors shadow-sm">
-                  <h4 className="font-black text-sm text-slate-800 dark:text-white tracking-tight">{rec.name}</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{rec.reason}</p>
-                  <Link 
-                    href={`/dashboard/marketplace?search=${encodeURIComponent(rec.name)}`}
-                    className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mt-2 group"
-                  >
-                    {t('locate_nearby', { defaultValue: 'Locate nearby' })} <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <Link 
-            href="/dashboard/ai-advisor"
-            className="flex items-center justify-center gap-2 mt-6 py-3.5 bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all"
-          >
-            {t('consult_full_ai', { defaultValue: 'Consult Full AI Advisor' })}
-          </Link>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col">

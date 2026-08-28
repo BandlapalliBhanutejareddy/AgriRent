@@ -13,18 +13,10 @@ import {
   Lightbulb,
   Volume2
 } from 'lucide-react';
-import axios from 'axios';
-import Link from 'next/link';
+import { api } from '@/lib/api';
+import ReactMarkdown from 'react-markdown';
 import { useStore } from '@/store/useStore';
-import { useTranslation } from "react-i18next";
-
-// Use environment variable if available, otherwise default to local FastAPI port
-const AI_SERVICE_URL = process.env.NEXT_PUBLIC_AI_SERVICE_URL || 'http://localhost:8000';
-
-const aiApi = axios.create({
-  baseURL: AI_SERVICE_URL,
-  headers: { 'Content-Type': 'application/json' }
-});
+import { useTranslation } from 'react-i18next';
 
 export default function AiAdvisorPage() {
     const { t } = useTranslation();
@@ -32,28 +24,54 @@ export default function AiAdvisorPage() {
   const [crop, setCrop] = useState('');
   const [soilType, setSoilType] = useState('');
   const [acreage, setAcreage] = useState('');
+  const [location, setLocation] = useState('');
+  const [season, setSeason] = useState('Kharif');
+  const [objective, setObjective] = useState('');
+  const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleGetAdvice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!crop.trim()) return;
+    if (!crop.trim() && !question.trim()) {
+      setError('Please provide at least a crop or a question.');
+      return;
+    }
 
     setLoading(true);
     setResult(null);
     setError(null);
 
+    const prompt = `
+      Context:
+      Crop: ${crop || 'Not specified'}
+      Soil Type: ${soilType || 'Not specified'}
+      Land Size (Acreage): ${acreage || 'Not specified'}
+      Location: ${location || 'Not specified'}
+      Season: ${season}
+      Farming Objective: ${objective || 'Not specified'}
+      Question: ${question || 'Please provide a comprehensive farm plan and equipment recommendations.'}
+      
+      Please provide a structured response covering:
+      1. Recommended equipment (why it is useful)
+      2. Suggested farming steps
+      3. Approximate timing
+      4. Important precautions
+    `;
+
     try {
-      const response = await aiApi.post('/recommend-equipment', {
-        crop,
-        soil_type: soilType || undefined,
-        acreage: acreage ? parseFloat(acreage) : undefined
+      const response = await api.post('/ai/advisor', {
+        prompt,
+        language: user?.preferredLanguage === 'hi' ? 'Hindi' : 
+                  user?.preferredLanguage === 'te' ? 'Telugu' : 
+                  user?.preferredLanguage === 'ta' ? 'Tamil' : 
+                  user?.preferredLanguage === 'kn' ? 'Kannada' : 'English'
       });
-      setResult(response.data);
-    } catch (err) {
+      setResult(response.data.reply || response.data.data?.reply || response.data);
+    } catch (err: any) {
       console.error('AI Service Error:', err);
-      setError('Could not connect to the AI Service. Please ensure the service is running at ' + AI_SERVICE_URL);
+      setError('AI Advisor is temporarily unavailable. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -104,10 +122,10 @@ export default function AiAdvisorPage() {
                 <div className="space-y-4">
                   <label className="flex items-center gap-2 text-sm font-black text-slate-700 uppercase tracking-wider">
                     <Droplets size={16} className="text-blue-500" />
-                    {t('soil_type')}</label>
+                    {t('soil_type', { defaultValue: 'Soil Type' })}</label>
                   <input 
                     type="text"
-                    placeholder={t('e_g_loamy')}
+                    placeholder={t('e_g_loamy', { defaultValue: 'e.g., Loamy' })}
                     className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-slate-900 font-medium"
                     value={soilType}
                     onChange={(e) => setSoilType(e.target.value)}
@@ -116,15 +134,68 @@ export default function AiAdvisorPage() {
                 <div className="space-y-4">
                   <label className="flex items-center gap-2 text-sm font-black text-slate-700 uppercase tracking-wider">
                     <MapIcon size={16} className="text-amber-500" />
-                    {t('acreage')}</label>
+                    {t('acreage', { defaultValue: 'Acreage' })}</label>
                   <input 
                     type="number"
-                    placeholder={t('e_g_5')}
+                    placeholder={t('e_g_5', { defaultValue: 'e.g., 5' })}
                     className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-slate-900 font-medium"
                     value={acreage}
                     onChange={(e) => setAcreage(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <label className="flex items-center gap-2 text-sm font-black text-slate-700 uppercase tracking-wider">
+                    <MapIcon size={16} className="text-indigo-500" />
+                    Location</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g., Nellore, AP"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-slate-900 font-medium"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-4">
+                  <label className="flex items-center gap-2 text-sm font-black text-slate-700 uppercase tracking-wider">
+                    Season</label>
+                  <select 
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-slate-900 font-medium cursor-pointer"
+                    value={season}
+                    onChange={(e) => setSeason(e.target.value)}
+                  >
+                    <option value="Kharif">Kharif (Monsoon)</option>
+                    <option value="Rabi">Rabi (Winter)</option>
+                    <option value="Zaid">Zaid (Summer)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 text-sm font-black text-slate-700 uppercase tracking-wider">
+                  Farming Objective</label>
+                <input 
+                  type="text"
+                  placeholder="e.g., Increase yield, reduce pests"
+                  className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-slate-900 font-medium"
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 text-sm font-black text-slate-700 uppercase tracking-wider">
+                  <Lightbulb size={16} className="text-yellow-500" />
+                  Your Question (Optional)</label>
+                <textarea 
+                  placeholder="Ask a specific question..."
+                  rows={3}
+                  className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-slate-900 font-medium resize-none"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                />
               </div>
 
               <button 
@@ -176,77 +247,10 @@ export default function AiAdvisorPage() {
 
            {result && (
              <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-                <div className="flex items-center justify-between">
-                   <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{t('ai_strategy_recommendations')}</h2>
-                   <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-black uppercase tracking-widest border border-emerald-100">
-                      <Sparkles size={12} />
-                      {result.source === 'gemini' ? 'Gemini 1.5 Flash' : 'Standard Logic'}
-                   </div>
-                </div>
-
-                <div className="p-8 bg-emerald-50 rounded-[32px] border border-emerald-100 relative overflow-hidden">
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="text-emerald-900 font-black flex items-center gap-2">
-                          <Lightbulb size={20} />
-                          {t('cultivation_insight')}</h4>
-                        <button 
-                          onClick={() => handleTTS(result.reasoning)}
-                          data-testid="advisor-speak"
-                          className="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-full transition-colors shadow-sm"
-                          title={t('read_aloud')}
-                        >
-                          <Volume2 size={16} />
-                        </button>
-                      </div>
-                      <p className="text-emerald-800 text-lg leading-relaxed font-medium italic">
-                        "{result.reasoning}"
-                      </p>
-                   </div>
-                   <Bot size={120} className="absolute -bottom-10 -right-10 text-emerald-100/50" />
-                </div>
-
-                <div className="space-y-4">
-                   {result.recommendations.map((rec: any, idx: number) => (
-                     <div key={idx} className="group bg-white p-6 rounded-3xl border border-slate-200 hover:border-emerald-200 hover:shadow-xl transition-all duration-300">
-                        <div className="flex justify-between items-start mb-4">
-                           <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 transition-colors">
-                                 <Tractor size={24} />
-                              </div>
-                              <div>
-                                 <h4 className="text-xl font-bold text-slate-900">{rec.name}</h4>
-                                 <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">{rec.category}</p>
-                              </div>
-                           </div>
-                           <Link 
-                             href={user?.role === 'FARMER' 
-                               ? `/dashboard/marketplace?search=${encodeURIComponent(rec.name)}`
-                               : `/dashboard/equipment/new?suggestion=${encodeURIComponent(rec.name)}`
-                             }
-                             className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"
-                             title={user?.role === 'FARMER' ? 'Rent This Tool' : 'Add Tool to Fleet'}
-                           >
-                              <Search size={20} />
-                           </Link>
-                        </div>
-                        <p className="text-slate-600 font-medium leading-relaxed">
-                          {rec.why}
-                        </p>
-                     </div>
-                   ))}
-                </div>
-
-                <div className="p-8 bg-slate-900 rounded-[32px] text-white flex flex-col md:flex-row items-center justify-between gap-6">
-                   <div>
-                      <h3 className="text-2xl font-bold">{t('ready_to_implement_this')}</h3>
-                      <p className="text-slate-400">{t('check_out_our_step_by_step_cultivation_g')}</p>
-                   </div>
-                   <Link 
-                     href={`/dashboard/guides/${crop}`}
-                     className="px-8 py-4 bg-emerald-500 text-white rounded-2xl font-black hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
-                   >
-                     {t('view')}{crop} {t('guide')}</Link>
+                <div className="p-8 bg-white rounded-[32px] border border-slate-200 relative overflow-hidden">
+                    <div className="relative z-10 prose prose-emerald prose-lg max-w-none dark:prose-invert">
+                       <ReactMarkdown>{result.reply || result}</ReactMarkdown>
+                    </div>
                 </div>
              </div>
            )}
