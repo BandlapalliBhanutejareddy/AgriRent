@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore, useThemeStore } from '@/store/useStore';
+import { api } from '@/lib/api';
 import { 
   User as UserIcon, 
   Phone, 
@@ -78,36 +79,38 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSaveChanges = (e: React.FormEvent) => {
+  const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       showToast('Name cannot be empty', 'warning');
       return;
     }
 
-    if (user) {
-      const updatedUser = {
-        ...user,
-        name: name,
-        phone: phone,
-      };
-      setUser(updatedUser);
-      
-      // Update session locally to reflect persistence
-      const sessionString = localStorage.getItem('agrorent-storage');
-      if (sessionString) {
-        try {
-          const parsed = JSON.parse(sessionString);
-          if (parsed.state) {
-            parsed.state.user = updatedUser;
-            localStorage.setItem('agrorent-storage', JSON.stringify(parsed));
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      }
+    try {
+      const response = await api.put('/auth/me', {
+        name: name.trim(),
+        phone: phone.trim()
+      });
 
-      showToast('Profile updated successfully!', 'success');
+      if (response.data.success || response.data.data) {
+        const fresh = response.data.data || response.data;
+        const updatedUser = {
+          ...user!,
+          name: fresh.name,
+          phone: fresh.phone
+        };
+        setUser(updatedUser);
+        showToast('Profile updated and saved to database successfully!', 'success');
+      } else {
+        showToast('Failed to update profile details', 'warning');
+      }
+    } catch (err: any) {
+      console.error('Save Profile Error:', err);
+      // Local fallback for offline/persistence display
+      if (user) {
+        setUser({ ...user, name: name.trim(), phone: phone.trim() });
+      }
+      showToast(err.response?.data?.error || 'Profile saved locally', 'success');
     }
   };
 

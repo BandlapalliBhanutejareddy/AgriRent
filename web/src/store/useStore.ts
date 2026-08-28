@@ -6,7 +6,7 @@ interface User {
   email: string;
   phone: string;
   name: string | null;
-  role: 'FARMER' | 'OWNER' | 'ADMIN';
+  role: string;
 }
 
 interface ThemeState {
@@ -17,8 +17,10 @@ interface ThemeState {
 interface AppState {
   session: any | null;
   user: User | null;
+  activeRole: 'FARMER' | 'OWNER' | 'ADMIN' | null;
   setSession: (session: any) => void;
   setUser: (user: User) => void;
+  setActiveRole: (activeRole: 'FARMER' | 'OWNER' | 'ADMIN' | null) => void;
   logout: () => void;
 }
 
@@ -27,9 +29,20 @@ export const useStore = create<AppState>()(
     (set) => ({
       session: null,
       user: null,
+      activeRole: null,
       setSession: (session) => set({ session }),
-      setUser: (user) => set({ user }),
-      logout: () => set({ session: null, user: null }),
+      setUser: (user) => set((state) => {
+        let defaultActive = state.activeRole;
+        if (!defaultActive || (user.role !== 'BOTH' && user.role !== defaultActive)) {
+          if (user.role === 'FARMER') defaultActive = 'FARMER';
+          else if (user.role === 'OWNER') defaultActive = 'OWNER';
+          else if (user.role === 'ADMIN') defaultActive = 'ADMIN';
+          else if (user.role === 'BOTH') defaultActive = defaultActive || 'FARMER';
+        }
+        return { user, activeRole: defaultActive };
+      }),
+      setActiveRole: (activeRole) => set({ activeRole }),
+      logout: () => set({ session: null, user: null, activeRole: null }),
     }),
     {
       name: 'agrorent-storage',

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
 import { useStore } from '@/store/useStore';
 import { useRouter } from 'next/navigation';
-import { Sprout, Tractor, ShieldAlert, Key, Check, Eye, EyeOff, X, User as UserIcon, Phone } from 'lucide-react';
+import { Sprout, Tractor, ShieldAlert, Key, Check, Eye, EyeOff, X, User as UserIcon, Phone, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type PortalRole = 'FARMER' | 'OWNER' | 'ADMIN';
@@ -60,10 +60,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setUser, setSession } = useStore();
+  const { setUser, setSession, setActiveRole } = useStore();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  const [showRoleSelectModal, setShowRoleSelectModal] = useState(false);
 
   // Forgot Password Flow States
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -93,10 +95,25 @@ export default function LoginPage() {
   function executeLogin(user: any, token: string) {
     setUser(user);
     setSession({ access_token: token, user });
-    if (user.role === 'OWNER') router.push('/dashboard');
-    else if (user.role === 'FARMER') router.push('/dashboard/farmer');
-    else if (user.role === 'ADMIN') router.push('/dashboard/admin');
-    else router.push('/dashboard');
+
+    if (user.role === 'BOTH') {
+      setShowRoleSelectModal(true);
+      return;
+    }
+
+    if (user.role === 'FARMER') {
+      setActiveRole('FARMER');
+      router.push('/dashboard/farmer');
+    } else if (user.role === 'OWNER') {
+      setActiveRole('OWNER');
+      router.push('/dashboard');
+    } else if (user.role === 'ADMIN') {
+      setActiveRole('ADMIN');
+      router.push('/dashboard/admin');
+    } else {
+      setActiveRole('FARMER');
+      router.push('/dashboard/farmer');
+    }
   };
 
   async function handleAuthSubmit(e: React.FormEvent) {
@@ -755,6 +772,53 @@ export default function LoginPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Multi-Role Portal Mode Selection Modal */}
+      {showRoleSelectModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-3xl max-w-md w-full shadow-2xl text-center space-y-6"
+          >
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <Sparkles size={28} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Multi-Role Account Detected</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Your account possesses both Farmer and Fleet Owner capabilities. Which portal would you like to enter?</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <button
+                onClick={() => {
+                  setActiveRole('FARMER');
+                  setShowRoleSelectModal(false);
+                  router.push('/dashboard/farmer');
+                }}
+                className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-emerald-500/30 hover:border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 font-bold transition-all hover:scale-105"
+              >
+                <Sprout size={28} className="mb-2 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-sm">Farmer Portal</span>
+                <span className="text-[10px] text-emerald-600/70 font-normal mt-0.5">Rent equipment & AI advice</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveRole('OWNER');
+                  setShowRoleSelectModal(false);
+                  router.push('/dashboard');
+                }}
+                className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-indigo-500/30 hover:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-800 dark:text-indigo-300 font-bold transition-all hover:scale-105"
+              >
+                <Tractor size={28} className="mb-2 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-sm">Owner Portal</span>
+                <span className="text-[10px] text-indigo-600/70 font-normal mt-0.5">Manage fleet & earnings</span>
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

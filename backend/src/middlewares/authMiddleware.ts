@@ -59,7 +59,14 @@ export const requireRole = (role: 'FARMER' | 'OWNER' | 'ADMIN') => {
       return;
     }
 
-    if (req.prismaUser.role !== role && req.prismaUser.role !== 'ADMIN') {
+    const userRole = req.prismaUser.role;
+    const hasRequiredRole = 
+      userRole === 'ADMIN' || 
+      userRole === role || 
+      userRole === 'BOTH' || 
+      (typeof userRole === 'string' && userRole.split(',').map((r: string) => r.trim()).includes(role));
+
+    if (!hasRequiredRole) {
       res.status(403).json({ error: `Forbidden: Requires ${role} role` });
       return;
     }

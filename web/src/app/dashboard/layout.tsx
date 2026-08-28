@@ -39,7 +39,7 @@ export default function DashboardLayout({
 }) {
     const { t } = useTranslation();
   const pathname = usePathname();
-  const { user, logout } = useStore();
+  const { user, activeRole, setActiveRole, logout } = useStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [headerAvatar, setHeaderAvatar] = useState<string | null>(null);
@@ -51,10 +51,12 @@ export default function DashboardLayout({
     }
   }, [user]);
 
+  const currentRole = activeRole || (user?.role === 'BOTH' ? 'FARMER' : user?.role || 'OWNER');
+
   // Strict Role Guards to prevent role leakage
   useEffect(() => {
     if (!user) return;
-    const role = user.role;
+    const role = currentRole;
     
     if (role === 'FARMER') {
       if (pathname === '/dashboard' || pathname.startsWith('/dashboard/equipment') || pathname.startsWith('/dashboard/admin')) {
@@ -69,7 +71,7 @@ export default function DashboardLayout({
         window.location.href = '/dashboard/admin';
       }
     }
-  }, [user, pathname]);
+  }, [user, currentRole, pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -78,7 +80,7 @@ export default function DashboardLayout({
     window.location.href = '/login';
   };
 
-  const role = user?.role || 'OWNER';
+  const role = currentRole;
 
   const getRoleBadge = () => {
     switch (role) {
@@ -216,8 +218,22 @@ export default function DashboardLayout({
             >
               <Menu size={20} />
             </button>
-            <div className="hidden sm:block">
+            <div className="hidden sm:flex items-center gap-3">
               {getRoleBadge()}
+              {user?.role === 'BOTH' && (
+                <button
+                  onClick={() => {
+                    const nextRole = currentRole === 'FARMER' ? 'OWNER' : 'FARMER';
+                    setActiveRole(nextRole);
+                    window.location.href = nextRole === 'FARMER' ? '/dashboard/farmer' : '/dashboard';
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-emerald-500 to-indigo-600 text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
+                  title="Switch active portal mode"
+                >
+                  <Sparkles size={14} />
+                  <span>Switch to {currentRole === 'FARMER' ? 'Owner' : 'Farmer'} Mode</span>
+                </button>
+              )}
             </div>
           </div>
           

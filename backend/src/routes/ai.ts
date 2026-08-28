@@ -40,16 +40,21 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
       Provide helpful, localized farming advice and recommend specific equipment from the list above if it suits their needs. Keep the response concise, encouraging, and formatted in Markdown.
     `;
 
-    const generatePromise = ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: contextPrompt,
-    });
-
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('AI Service Timeout')), 15000)
-    );
-
-    const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+    let responseText = '';
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: contextPrompt,
+      });
+      responseText = response.text || '';
+    } catch (modelErr: any) {
+      console.warn('Gemini 2.5 Flash model call failed, falling back to 1.5 Flash:', modelErr.message);
+      const fallbackResponse = await ai.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: contextPrompt,
+      });
+      responseText = fallbackResponse.text || '';
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -63,7 +68,7 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
       }
     });
 
-    res.json({ reply: response.text });
+    res.json({ reply: responseText });
   } catch (error: any) {
     console.error('AI Advisor Error:', error);
     res.status(500).json({ error: 'Failed to generate AI response' });

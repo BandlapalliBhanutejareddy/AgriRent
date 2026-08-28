@@ -90,10 +90,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     if (!hasSession && !isAuthRoute) {
       router.replace('/login');
     } else if (hasSession && isAuthRoute) {
-      if (user?.role === 'FARMER') {
+      const currentActive = useStore.getState().activeRole || (user?.role === 'BOTH' ? 'FARMER' : user?.role);
+      if (currentActive === 'FARMER') {
         router.replace('/dashboard/farmer');
-      } else {
+      } else if (currentActive === 'OWNER') {
         router.replace('/dashboard');
+      } else if (currentActive === 'ADMIN') {
+        router.replace('/dashboard/admin');
+      } else {
+        router.replace('/dashboard/farmer');
       }
     }
   }, [session, user, loading, pathname, router]);
