@@ -65,6 +65,14 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (existingUser) {
+      if (!existingUser.isVerified) {
+        res.status(403).json({ 
+          success: false, 
+          error: 'This account exists but is not verified yet. Please log in to request a new verification OTP.' 
+        });
+        return;
+      }
+
       // Verify password for adding role to existing account
       const isMatch = await bcrypt.compare(String(password), existingUser.password) || existingUser.password === String(password);
       if (!isMatch) {
@@ -150,10 +158,11 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     // Send real OTP email via Resend (with console log debug backup)
     const emailSent = await emailService.sendOtp(String(email), generatedOtp, 'REGISTER');
     if (!emailSent) {
+      await prisma.user.delete({ where: { id: newUser.id } });
       await prisma.oTPVerification.deleteMany({
         where: { email: String(email), purpose: 'REGISTER' }
       });
-      res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
+      res.status(500).json({ success: false, error: 'Unable to send verification email due to email provider sandbox restrictions. Please try again or use the registered admin email.' });
       return;
     }
 
@@ -287,6 +296,11 @@ router.post('/resend-otp', async (req: Request, res: Response): Promise<void> =>
     const user = await prisma.user.findUnique({ where: { email: String(email) } });
     if (!user) {
       res.json({ success: true, message: 'If an account exists, a new OTP has been sent.' });
+      return;
+    }
+
+    if (purpose === 'REGISTER' && user.isVerified) {
+      res.status(400).json({ success: false, error: 'Account is already verified. Please log in.' });
       return;
     }
 
