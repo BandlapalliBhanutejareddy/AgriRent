@@ -162,8 +162,13 @@ export default function LoginPage() {
           role: activePortal 
         });
         if (response.data.success) {
-          setOtpInput('');
-          setShowRegisterOtpModal(true);
+          if (response.data.token) {
+            // Role upgrade case: User provided correct password for existing verified account
+            executeLogin(response.data.user, response.data.token);
+          } else {
+            setOtpInput('');
+            setShowRegisterOtpModal(true);
+          }
         } else {
           setError('Registration failed.');
         }

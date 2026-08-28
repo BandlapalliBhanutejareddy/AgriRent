@@ -32,6 +32,7 @@ export const useStore = create<AppState>()(
       activeRole: null,
       setSession: (session) => set({ session }),
       setUser: (user) => set((state) => {
+        if (!user) return { user: null, activeRole: null };
         let defaultActive = state.activeRole;
         if (!defaultActive || (user.role !== 'BOTH' && user.role !== defaultActive)) {
           if (user.role === 'FARMER') defaultActive = 'FARMER';
