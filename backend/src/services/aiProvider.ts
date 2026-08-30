@@ -36,9 +36,7 @@ export class AIProviderService {
         payload.format = 'json';
       }
 
-      const headers: Record<string, string> = {
-        'X-Pinggy-No-Screen': 'true'
-      };
+      const headers: Record<string, string> = {};
 
       const response = await axios.post(`${OLLAMA_URL}/api/generate`, payload, {
         headers,
