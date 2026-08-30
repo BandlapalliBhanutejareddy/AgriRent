@@ -158,8 +158,8 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   errorMiddleware(err, req, res, next);
 });
 
-const activeServer = server.listen(port, () => {
-  console.log(`Backend server running on http://localhost:${port}`);
+const activeServer = server.listen(port as number, '0.0.0.0', () => {
+  console.log(`Backend server running on http://0.0.0.0:${port}`);
 });
 
 // Graceful Shutdown

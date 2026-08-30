@@ -5,7 +5,6 @@ const requiredEnvs = [
   'DATABASE_URL',
   'JWT_SECRET',
   'RESEND_API_KEY',
-  'GEMINI_API_KEY',
   'RAZORPAY_KEY_ID',
   'RAZORPAY_KEY_SECRET'
 ];

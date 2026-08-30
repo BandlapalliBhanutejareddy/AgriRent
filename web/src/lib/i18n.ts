@@ -323,7 +323,7 @@ const resources = {
       "platform_revenue_volume_inr": "Platform Revenue Volume (INR)",
       "no_revenue_records_found": "No Revenue Records Found",
       "resource_load": "Resource Load",
-      "gemini_recommendations": "Gemini Recommendations",
+      "gemini_recommendations": "AI Recommendations",
       "storage_utilization": "Storage Utilization",
       "stable": "Stable",
       "ai_cluster_active": "AI Cluster Active",

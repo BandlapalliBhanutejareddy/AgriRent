@@ -5,9 +5,7 @@ import { createEquipmentSchema, updateEquipmentSchema } from '../schemas';
 import { deleteFileByUrl } from '../lib/storage';
 import { prisma } from '../lib/prisma';
 
-import axios from 'axios';
-
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+import { aiProvider } from '../services/aiProvider';
 
 const router = Router();
 
@@ -58,8 +56,7 @@ router.get('/', async (req: Request, res: Response, next: any): Promise<void> =>
       if (!keyword) {
         // Fallback to AI intent
         try {
-          const aiResponse = await axios.post(`${AI_SERVICE_URL}/search-intent`, { query: searchStr });
-          keyword = aiResponse.data.keywords;
+          keyword = await aiProvider.getSearchIntent(searchStr);
         } catch (e) {
           keyword = searchStr;
         }
@@ -244,11 +241,7 @@ router.post('/', requireAuth, requireRole('OWNER'), validate(createEquipmentSche
 
     let transData: any = {};
     try {
-      const aiResponse = await axios.post(`${AI_SERVICE_URL}/translate-listing`, {
-        title: String(title),
-        description: description ? String(description) : ''
-      });
-      transData = aiResponse.data;
+      transData = await aiProvider.translateListing(String(title), description ? String(description) : '');
     } catch (e) {
       console.warn('AI translation failed, storing without translations', e);
     }

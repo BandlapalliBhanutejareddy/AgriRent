@@ -273,7 +273,7 @@ export default function LandingPage() {
 
             <div className="order-1 lg:order-2 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-emerald-400 font-bold text-xs uppercase tracking-wider">
-                <MessageSquare size={14} /> Powered by Gemini AI
+                <MessageSquare size={14} /> Powered by AgroRent AI
               </div>
               <h2 className="text-3xl md:text-5xl font-black leading-tight">Your Personal <br/><span className="text-emerald-400">Agricultural Expert.</span></h2>
               <p className="text-slate-400 text-lg font-medium leading-relaxed">

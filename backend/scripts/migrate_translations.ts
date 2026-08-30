@@ -1,8 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import axios from 'axios';
+import { aiProvider } from '../src/services/aiProvider';
 
 const prisma = new PrismaClient();
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 async function migrate() {
   console.log('Starting migration for existing equipment translations...');
@@ -21,12 +20,7 @@ async function migrate() {
   for (const eq of equipments) {
     try {
       console.log(`Translating: ${eq.title}...`);
-      const response = await axios.post(`${AI_SERVICE_URL}/translate-listing`, {
-        title: eq.title,
-        description: eq.description
-      });
-      
-      const trans = response.data;
+      const trans = await aiProvider.translateListing(eq.title, eq.description || '');
       
       await prisma.equipment.update({
         where: { id: eq.id },
