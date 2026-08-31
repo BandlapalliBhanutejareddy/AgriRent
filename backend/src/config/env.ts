@@ -4,7 +4,9 @@ dotenv.config();
 const requiredEnvs = [
   'DATABASE_URL',
   'JWT_SECRET',
-  'RESEND_API_KEY',
+  'SMTP_HOST',
+  'SMTP_USER',
+  'SMTP_PASSWORD',
   'RAZORPAY_KEY_ID',
   'RAZORPAY_KEY_SECRET'
 ];

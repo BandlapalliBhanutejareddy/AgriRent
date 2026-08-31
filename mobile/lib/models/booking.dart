@@ -13,6 +13,7 @@ class Booking {
   
   final User? farmer;
   final Equipment? equipment;
+  final List<dynamic>? payments;
 
   Booking({
     required this.id,
@@ -25,6 +26,7 @@ class Booking {
     required this.paymentStatus,
     this.farmer,
     this.equipment,
+    this.payments,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -39,6 +41,7 @@ class Booking {
       paymentStatus: json['paymentStatus'] ?? 'PENDING',
       farmer: json['farmer'] != null ? User.fromJson(json['farmer']) : null,
       equipment: json['equipment'] != null ? Equipment.fromJson(json['equipment']) : null,
+      payments: json['payments'] != null ? List<dynamic>.from(json['payments']) : [],
     );
   }
 

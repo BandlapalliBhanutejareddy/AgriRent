@@ -224,4 +224,4 @@ model Feedback {
   
   @@index([userId])  
   @@index([createdAt])  
-} 
+}

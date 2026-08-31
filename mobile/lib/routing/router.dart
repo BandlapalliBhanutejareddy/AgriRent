@@ -8,9 +8,15 @@ import '../features/auth/ui/otp_screen.dart';
 import '../features/auth/ui/role_select_screen.dart';
 import '../features/auth/ui/forgot_password_screen.dart';
 import '../features/auth/ui/reset_password_screen.dart';
-import '../features/marketplace/ui/farmer_home_screen.dart';
+import '../features/marketplace/ui/farmer_main_screen.dart';
+import '../features/marketplace/ui/crop_advisor_screen.dart';
+import '../features/marketplace/ui/knowledge_base_screen.dart';
 import '../features/profile/ui/owner_dashboard_screen.dart';
+import '../features/profile/ui/add_equipment_screen.dart';
 import '../features/feedback/ui/feedback_screen.dart';
+import '../features/admin/ui/admin_dashboard_screen.dart';
+import '../features/profile/ui/edit_profile_screen.dart';
+import '../features/profile/ui/change_password_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AuthState>(ref.read(authProvider));
@@ -51,6 +57,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           return '/farmer';
         } else if (authState.user!.role == 'OWNER') {
           return '/owner';
+        } else if (authState.user!.role == 'ADMIN') {
+          return '/admin';
         } else {
           return '/farmer'; // Fallback
         }
@@ -100,7 +108,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/farmer',
-        builder: (context, state) => const FarmerHomeScreen(),
+        builder: (context, state) => const FarmerMainScreen(),
+      ),
+      GoRoute(
+        path: '/crop-advisor',
+        builder: (context, state) => const CropAdvisorScreen(),
+      ),
+      GoRoute(
+        path: '/knowledge',
+        builder: (context, state) => const KnowledgeBaseScreen(),
       ),
       GoRoute(
         path: '/owner',
@@ -109,6 +125,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/feedback',
         builder: (context, state) => const FeedbackScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/add-equipment',
+        builder: (context, state) => const AddEquipmentScreen(),
+      ),
+      GoRoute(
+        path: '/edit-profile',
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/change-password',
+        builder: (context, state) => const ChangePasswordScreen(),
       ),
     ],
   );

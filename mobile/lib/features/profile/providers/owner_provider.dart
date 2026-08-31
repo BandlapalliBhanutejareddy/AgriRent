@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/equipment.dart';
 import '../../../models/booking.dart';
+import '../../bookings/repository/booking_repository.dart';
 import '../repository/owner_repository.dart';
 
 final ownerRepositoryProvider = Provider((ref) => OwnerRepository());
@@ -68,6 +69,18 @@ class OwnerNotifier extends StateNotifier<OwnerState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       await _repository.updateEquipment(id, data);
+      await fetchDashboardData();
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+  Future<bool> updateBookingStatus(String bookingId, String status) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final repo = BookingRepository();
+      await repo.updateBookingStatus(bookingId, status);
       await fetchDashboardData();
       return true;
     } catch (e) {

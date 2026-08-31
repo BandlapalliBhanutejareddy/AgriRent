@@ -8,12 +8,16 @@ import '../../../models/user.dart';
 class AuthRepository {
   final ApiClient _apiClient = ApiClient();
 
-  Future<User> login(String email, String password) async {
+  Future<User> login(String email, String password, {String? role}) async {
     try {
-      final response = await _apiClient.dio.post(ApiConstants.login, data: {
+      final Map<String, dynamic> reqData = {
         'email': email,
         'password': password,
-      });
+      };
+      if (role != null) {
+        reqData['role'] = role;
+      }
+      final response = await _apiClient.dio.post(ApiConstants.login, data: reqData);
 
       if (response.data['success'] == true) {
         final token = response.data['token'];

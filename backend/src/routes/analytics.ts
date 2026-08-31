@@ -95,8 +95,36 @@ router.get('/admin', requireAuth, requireRole('ADMIN'), async (req: AuthRequest,
     const totalUsers = await prisma.user.count();
     const totalFarmers = await prisma.user.count({ where: { role: 'FARMER' } });
     const totalOwners = await prisma.user.count({ where: { role: 'OWNER' } });
+    const totalAdmins = await prisma.user.count({ where: { role: 'ADMIN' } });
+    
     const totalEquipment = await prisma.equipment.count();
+    const availableEquipment = await prisma.equipment.count({ where: { available: true } });
+
     const activeRentals = await prisma.booking.count({ where: { status: 'ACCEPTED' } });
+    const pendingBookings = await prisma.booking.count({ where: { status: 'PENDING' } });
+    const completedRentals = await prisma.booking.count({ where: { status: 'COMPLETED' } });
+    const cancelledRentals = await prisma.booking.count({ where: { status: { in: ['REJECTED', 'CANCELLED'] } } });
+
+    const recentUsers = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, name: true, email: true, role: true, createdAt: true }
+    });
+
+    const recentEquipment = await prisma.equipment.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { owner: { select: { name: true } } }
+    });
+
+    const recentBookings = await prisma.booking.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { 
+        equipment: { select: { title: true } },
+        farmer: { select: { name: true } }
+      }
+    });
 
     const allBookings = await prisma.booking.findMany({
       where: {
@@ -115,12 +143,27 @@ router.get('/admin', requireAuth, requireRole('ADMIN'), async (req: AuthRequest,
 
     const revenueGraph = Object.entries(revenueByMonth).map(([name, revenue]) => ({ name, revenue }));
 
+    // Platform Activity (Audit Logs)
+    const platformActivity = await prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
     res.json({
       totalUsers,
       totalFarmers,
       totalOwners,
+      totalAdmins,
       totalEquipment,
+      availableEquipment,
       activeRentals,
+      pendingBookings,
+      completedRentals,
+      cancelledRentals,
+      recentUsers,
+      recentEquipment,
+      recentBookings,
+      platformActivity,
       revenueGraph
     });
   } catch (error) {

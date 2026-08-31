@@ -24,6 +24,7 @@ class ApiErrorHandler {
           if (statusCode == 401) return 'Session expired. Please log in again.';
           if (statusCode == 403) return 'You do not have permission to perform this action.';
           if (statusCode == 404) return 'Resource not found.';
+          if (statusCode == 409) return 'These dates are already booked. Please choose different dates.';
           if (statusCode == 429) return 'Too many requests. Please try again later.';
           if (statusCode == 500) return 'Internal server error. Please try again later.';
           if (statusCode == 503) return 'Service temporarily unavailable.';

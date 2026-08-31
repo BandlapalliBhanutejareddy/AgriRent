@@ -158,28 +158,59 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   errorMiddleware(err, req, res, next);
 });
 
-const activeServer = server.listen(port as number, '0.0.0.0', () => {
-  console.log(`Backend server running on http://0.0.0.0:${port}`);
-});
-
-// Graceful Shutdown
-const shutdown = async (signal: string) => {
-  console.log(`\n${signal} signal received: closing HTTP server`);
-  activeServer.close(async () => {
-    console.log('HTTP server closed');
-    try {
-      await prisma.$disconnect();
-      console.log('Prisma connection disconnected');
-      process.exit(0);
-    } catch (err) {
-      console.error('Error during disconnection', err);
-      process.exit(1);
+async function provisionAdmin() {
+  const adminEmail = 'bandlapalliteja369@gmail.com';
+  const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123';
+  try {
+    const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+    if (existingAdmin) {
+      if (existingAdmin.role !== 'ADMIN') {
+        await prisma.user.update({ where: { id: existingAdmin.id }, data: { role: 'ADMIN' } });
+        console.log(`Updated existing user ${adminEmail} to ADMIN role.`);
+      }
+    } else {
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      await prisma.user.create({
+        data: {
+          name: 'Admin User',
+          email: adminEmail,
+          password: hashedPassword,
+          role: 'ADMIN',
+          isVerified: true
+        }
+      });
+      console.log(`Created initial ADMIN account for ${adminEmail}.`);
     }
-  });
-};
+  } catch (error) {
+    console.error('Failed to provision ADMIN account:', error);
+  }
+}
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+provisionAdmin().then(() => {
+  const activeServer = server.listen(port as number, '0.0.0.0', () => {
+    console.log(`Backend server running on http://0.0.0.0:${port}`);
+  });
+
+  // Graceful Shutdown
+  const shutdown = async (signal: string) => {
+    console.log(`\n${signal} signal received: closing HTTP server`);
+    activeServer.close(async () => {
+      console.log('HTTP server closed');
+      try {
+        await prisma.$disconnect();
+        console.log('Prisma connection disconnected');
+        process.exit(0);
+      } catch (err) {
+        console.error('Error during disconnection', err);
+        process.exit(1);
+      }
+    });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+});
 
 // Force keep-alive (Development only)
 setInterval(() => {}, 10000);

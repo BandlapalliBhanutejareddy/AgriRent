@@ -35,4 +35,24 @@ class BookingRepository {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
   }
+
+  Future<List<Booking>> fetchMyRentals(String role) async {
+    try {
+      final response = await _apiClient.dio.get('${ApiConstants.bookings}?role=$role');
+      final List<dynamic> data = response.data['data'] ?? response.data;
+      return data.map((json) => Booking.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
+
+  Future<List<Booking>> fetchOwnerBookings() async {
+    try {
+      final response = await _apiClient.dio.get(ApiConstants.ownerBookings);
+      final List<dynamic> data = response.data['data'] ?? response.data;
+      return data.map((json) => Booking.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
 }

@@ -30,7 +30,15 @@ export default function AdminDashboard() {
     totalEquipment: 0,
     activeRentals: 0,
     platformRevenue: 0,
-    revenueGraph: []
+    revenueGraph: [],
+    totalAdmins: 0,
+    availableEquipment: 0,
+    pendingBookings: 0,
+    completedRentals: 0,
+    cancelledRentals: 0,
+    recentUsers: [],
+    recentEquipment: [],
+    recentBookings: []
   });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,8 +64,24 @@ export default function AdminDashboard() {
           totalEquipment: response.data.totalEquipment || 0,
           activeRentals: response.data.activeRentals || 0,
           platformRevenue: (response.data.totalEquipment * 12500) || 0, // In a real app this would be actual calculated platform fee
-          revenueGraph: response.data.revenueGraph || []
+          revenueGraph: response.data.revenueGraph || [],
+          totalAdmins: response.data.totalAdmins || 0,
+          availableEquipment: response.data.availableEquipment || 0,
+          pendingBookings: response.data.pendingBookings || 0,
+          completedRentals: response.data.completedRentals || 0,
+          cancelledRentals: response.data.cancelledRentals || 0,
+          recentUsers: response.data.recentUsers || [],
+          recentEquipment: response.data.recentEquipment || [],
+          recentBookings: response.data.recentBookings || []
         });
+        
+        if (response.data.platformActivity) {
+          setActivityLogs(response.data.platformActivity.map((log: any) => ({
+            time: new Date(log.createdAt).toLocaleString(),
+            message: `[${log.action}] ${log.actorRole} on ${log.resource}`,
+            type: 'SYSTEM'
+          })));
+        }
       }
 
       const usersRes = await api.get('/analytics/admin/users');
@@ -202,7 +226,9 @@ export default function AdminDashboard() {
           <div>
             <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('total_users')}</span>
             <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{stats.totalUsers}</h3>
-            <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1 mt-1"><TrendingUp size={12}/> {t('verified')}</span>
+            <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1 mt-1">
+              Farmers: {stats.totalFarmers} | Owners: {stats.totalOwners} | Admins: {stats.totalAdmins}
+            </span>
           </div>
         </div>
 
@@ -215,7 +241,7 @@ export default function AdminDashboard() {
           <div>
             <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('platform_machinery')}</span>
             <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{stats.totalEquipment}</h3>
-            <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1"><TrendingUp size={12}/> {t('listed')}</span>
+            <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1"><TrendingUp size={12}/> {stats.availableEquipment} Available</span>
           </div>
         </div>
 
@@ -228,7 +254,11 @@ export default function AdminDashboard() {
           <div>
             <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('active_bookings')}</span>
             <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{stats.activeRentals}</h3>
-            <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1 mt-1 animate-pulse">{t('live_pool')}</span>
+            <span className="text-[10px] font-bold text-amber-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+              <span>Pending: {stats.pendingBookings}</span>
+              <span>Completed: {stats.completedRentals}</span>
+              <span>Cancelled: {stats.cancelledRentals}</span>
+            </span>
           </div>
         </div>
 

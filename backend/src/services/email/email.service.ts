@@ -1,4 +1,4 @@
-import { ResendProvider } from './providers/resend.provider';
+import { SmtpProvider } from './providers/smtp.provider';
 
 export interface EmailProvider {
     sendEmail(to: string, subject: string, bodyText: string, bodyHtml: string): Promise<boolean>;
@@ -8,14 +8,7 @@ export class EmailService {
     private provider: EmailProvider;
 
     constructor() {
-        const providerName = process.env.EMAIL_PROVIDER || 'resend';
-        
-        if (providerName === 'resend') {
-            this.provider = new ResendProvider();
-        } else {
-            // Default or fallback provider
-            this.provider = new ResendProvider();
-        }
+        this.provider = new SmtpProvider();
     }
 
     async sendOtp(email: string, otp: string, purpose: string): Promise<boolean> {

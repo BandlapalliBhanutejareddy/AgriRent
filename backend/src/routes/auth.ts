@@ -548,7 +548,7 @@ router.post('/change-password', requireAuth, async (req: any, res: Response): Pr
 // 6. Traditional login (with verified checks)
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     if (!email || !password) {
       res.status(400).json({ success: false, error: 'Email and password required' });
@@ -612,6 +612,47 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         });
         res.status(401).json({ success: false, error: 'Invalid credentials' });
         return;
+      }
+    }
+
+    // Role Verification
+    if (role) {
+      if (user.role === 'ADMIN' && role !== 'ADMIN') {
+        res.status(403).json({
+          success: false,
+          error: 'ROLE_MISMATCH',
+          message: 'These credentials belong to an Admin. Please use the Admin login.'
+        });
+        return;
+      }
+
+      if (role === 'ADMIN' && user.role !== 'ADMIN') {
+        res.status(403).json({
+          success: false,
+          error: 'ROLE_MISMATCH',
+          message: 'These credentials do not belong to an Admin.'
+        });
+        return;
+      }
+
+      if (user.role !== 'BOTH' && user.role !== 'ADMIN') {
+        if (role === 'FARMER' && user.role !== 'FARMER') {
+          res.status(403).json({
+            success: false,
+            error: 'ROLE_MISMATCH',
+            message: 'These credentials belong to an Equipment Owner. Please select Equipment Owner.'
+          });
+          return;
+        }
+
+        if (role === 'OWNER' && user.role !== 'OWNER') {
+          res.status(403).json({
+            success: false,
+            error: 'ROLE_MISMATCH',
+            message: 'These credentials belong to a Farmer. Please select Farmer.'
+          });
+          return;
+        }
       }
     }
 

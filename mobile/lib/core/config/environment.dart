@@ -1,4 +1,5 @@
 class Environment {
+  // Using const top-level fields ensures --dart-define evaluates correctly at compile-time globally.
   static const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'development');
   
   static const String _devBaseUrl = 'http://10.0.2.2:4000/api';
@@ -9,27 +10,28 @@ class Environment {
   static const String _stagingSocketUrl = 'https://staging-api.agrorent.ai';
   static const String _prodSocketUrl = 'https://agrirent-5qpx.onrender.com';
 
+  static const String _injectedBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const String _injectedSocketUrl = String.fromEnvironment('SOCKET_URL');
+
   static String get baseUrl {
+    if (_injectedBaseUrl.isNotEmpty) return _injectedBaseUrl;
+    
     switch (flavor) {
-      case 'production':
-        return String.fromEnvironment('BASE_URL', defaultValue: _prodBaseUrl);
-      case 'staging':
-        return String.fromEnvironment('BASE_URL', defaultValue: _stagingBaseUrl);
+      case 'production': return _prodBaseUrl;
+      case 'staging': return _stagingBaseUrl;
       case 'development':
-      default:
-        return String.fromEnvironment('BASE_URL', defaultValue: _devBaseUrl);
+      default: return _devBaseUrl;
     }
   }
 
   static String get socketUrl {
+    if (_injectedSocketUrl.isNotEmpty) return _injectedSocketUrl;
+    
     switch (flavor) {
-      case 'production':
-        return String.fromEnvironment('SOCKET_URL', defaultValue: _prodSocketUrl);
-      case 'staging':
-        return String.fromEnvironment('SOCKET_URL', defaultValue: _stagingSocketUrl);
+      case 'production': return _prodSocketUrl;
+      case 'staging': return _stagingSocketUrl;
       case 'development':
-      default:
-        return String.fromEnvironment('SOCKET_URL', defaultValue: _devSocketUrl);
+      default: return _devSocketUrl;
     }
   }
 }

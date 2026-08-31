@@ -14,7 +14,7 @@ let isReady = false;
 serverProcess.stdout.on('data', (data) => {
   const output = data.toString();
   console.log(`[SERVER STDOUT]: ${output}`);
-  if (output.includes('Backend server running on http://localhost')) {
+  if (output.includes('Backend server running on http://0.0.0.0')) {
     if (!isReady) {
       isReady = true;
       runTests();

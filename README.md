@@ -32,7 +32,7 @@ Android APK — build locally using `flutter build apk --release`
 
 - **Multi-Role Authentication System**: Secure JWT-based auth separating Farmer and Owner portals, with a unique `BOTH` role capability that allows seamless role-switching.
 - **Secure Password Recovery**: Robust OTP-to-Hash password recovery utilizing cryptographically secure single-use database tokens, rate limiting, and zero account enumeration.
-- **AI Service**: Intelligent equipment recommendations and farming insights via Gemini AI.
+- **AI Service**: Intelligent equipment recommendations and farming insights via local Ollama and Qwen3.5:9b.
 - **Booking & Payments**: End-to-end sandbox-verified payment orchestration with Razorpay.
 - **Cross-Platform Experience**: fully synchronized UI/UX state between the Vercel-hosted Next.js web application and the Flutter mobile client.
 
@@ -59,7 +59,6 @@ Android APK — build locally using `flutter build apk --release`
 
 ```
 AgriRent_AI/
-├── ai_service/          # AI recommendation service
 ├── backend/             # Node.js API with Prisma
 ├── mobile/              # Flutter app
 ├── web/                 # Next.js web application
@@ -76,3 +75,18 @@ AgriRent_AI/
 ## 🌐 Repository
 
 **GitHub**: https://github.com/BandlapalliBhanutejareddy/AgriRent.git
+
+## 🤖 Setting up Local AI (Ollama + Qwen3.5:9b)
+
+1. **Install Ollama**: Download from [ollama.com](https://ollama.com)
+2. **Download Model**: Run `ollama run qwen3.5:9b` in your terminal. This model requires at least 8GB of RAM.
+3. **Configure Backend**: Ensure your `backend/.env` file points to local Ollama:
+   ```env
+   AI_PROVIDER=ollama
+   OLLAMA_URL=http://localhost:11434
+   OLLAMA_MODEL=qwen3.5:9b
+   ```
+
+> [!WARNING]
+> **Production GPU Requirement**
+> Do NOT use `http://localhost:11434` for cloud deployments (Vercel/Render). Production deployments MUST use a secure, HTTPS-enabled cloud GPU instance (e.g. RunPod, AWS EC2 with GPU, or managed Ollama) for acceptable inference speeds. Local CPU inference takes ~60 seconds per query, which is unsuited for production load.

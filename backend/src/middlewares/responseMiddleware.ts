@@ -10,10 +10,12 @@ export const responseMiddleware = (req: Request, res: Response, next: NextFuncti
       return originalJson.call(this, data);
     }
     
-    // Default success wrapper
+    // Default success wrapper based on status code
+    const isError = this.statusCode >= 400;
     const formattedResponse = {
-      success: true,
-      data: data
+      success: !isError,
+      data: isError ? undefined : data,
+      error: isError ? (data.error || data.message || 'An error occurred') : undefined
     };
     
     return originalJson.call(this, formattedResponse);
