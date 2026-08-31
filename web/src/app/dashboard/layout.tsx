@@ -165,7 +165,7 @@ export default function DashboardLayout({
         <>
           <NavLink href="/dashboard/farmer" icon={LayoutDashboard} label={t('dashboard')} exact />
           <NavLink href="/dashboard/marketplace" icon={Search} label={t('marketplace')} />
-          <NavLink href="/dashboard/farmer#rentals" icon={CalendarDays} label={t('my_rentals')} />
+          <NavLink href="/dashboard/rentals" icon={CalendarDays} label={t('my_rentals')} />
           <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides')} />
           <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label={t('ai_advisor')} />
           <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />

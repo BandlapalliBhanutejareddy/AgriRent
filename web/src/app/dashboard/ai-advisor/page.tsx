@@ -221,16 +221,33 @@ export default function AiAdvisorPage() {
 
         {/* Results Section */}
         <div className="lg:col-span-7">
-           {!result && !loading && (
+           {!result && !loading && !error && (
              <div className="h-full min-h-[400px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] flex flex-col items-center justify-center p-12 text-center space-y-6">
                 <div className="p-6 bg-white rounded-3xl shadow-sm text-slate-200">
                    <Sparkles size={64} />
                 </div>
                 <div>
-                   <h3 className="text-2xl font-bold text-slate-900">{t('your_ai_insights_will_appear_here')}</h3>
+                   <h3 className="text-2xl font-bold text-slate-900">{t('your_ai_insights_will_appear_here', { defaultValue: 'Your AI Insights will appear here' })}</h3>
                    <p className="text-slate-500 mt-2 max-w-sm">
-                     {t('enter_your_crop_details_to_see_personali')}</p>
+                     {t('enter_your_crop_details_to_see_personali', { defaultValue: 'Enter your crop details to see personalized farming advice.' })}</p>
                 </div>
+             </div>
+           )}
+
+           {error && !loading && (
+             <div className="h-full min-h-[400px] bg-red-50 border-2 border-dashed border-red-200 rounded-[40px] flex flex-col items-center justify-center p-12 text-center space-y-6">
+                <div className="p-6 bg-white rounded-3xl shadow-sm text-red-500">
+                   <Bot size={64} />
+                </div>
+                <div>
+                   <h3 className="text-xl font-bold text-red-800">{error}</h3>
+                </div>
+                <button 
+                  onClick={handleGetAdvice}
+                  className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-black uppercase tracking-wider transition-all shadow-md"
+                >
+                  Retry Request
+                </button>
              </div>
            )}
 

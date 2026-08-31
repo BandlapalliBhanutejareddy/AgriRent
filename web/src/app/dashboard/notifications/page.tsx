@@ -183,11 +183,11 @@ export default function NotificationsPage() {
                         {notif.title}
                       </h4>
                       <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-                        <Clock size={10} /> {notif.time}
+                        <Clock size={10} /> {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString() : 'Just now'}
                       </span>
                     </div>
                     <p className={`text-xs font-medium leading-relaxed ${notif.read ? 'text-slate-405 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'}`}>
-                      {notif.description}
+                      {notif.message || notif.description}
                     </p>
                     
                     <div className="flex gap-2 pt-2">
