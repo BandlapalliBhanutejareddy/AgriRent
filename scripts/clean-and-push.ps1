@@ -1,7 +1,10 @@
 param(
     [string]$CommitMessage = "chore: automated validated update",
     [switch]$WithDocker,
-    [string]$DockerRegistry = ""
+    [string]$DockerUsername = ($env:DOCKER_USERNAME ? $env:DOCKER_USERNAME : "teja3"),
+    [string]$DockerRegistry = ($env:DOCKER_REGISTRY ? $env:DOCKER_REGISTRY : "docker.io"),
+    [string]$BackendRepo = ($env:AGRORENT_BACKEND_REPO ? $env:AGRORENT_BACKEND_REPO : "agrirent-backend"),
+    [string]$WebRepo = ($env:AGRORENT_WEB_REPO ? $env:AGRORENT_WEB_REPO : "agrirent-web")
 )
 
 $ErrorActionPreference = "Stop"
@@ -83,7 +86,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "✅ Git push succeeded!" -ForegroundColor Green
 
-# 8. Optional Docker Build
+# 8. Optional Docker Build & Registry Push
 if ($WithDocker) {
     Write-Host "`nBuilding Docker images..." -ForegroundColor Cyan
     docker compose build
@@ -93,14 +96,31 @@ if ($WithDocker) {
     }
     Write-Host "✅ Docker build succeeded!" -ForegroundColor Green
 
-    if ($DockerRegistry) {
-        Write-Host "Tagging and pushing images to $DockerRegistry..." -ForegroundColor Cyan
+    if ($DockerUsername) {
         $gitSha = (git rev-parse --short HEAD).Trim()
-        docker tag agrirent-backend:latest "$DockerRegistry/agrirent-backend:$gitSha"
-        docker tag agrirent-web:latest "$DockerRegistry/agrirent-web:$gitSha"
-        docker push "$DockerRegistry/agrirent-backend:$gitSha"
-        docker push "$DockerRegistry/agrirent-web:$gitSha"
-        Write-Host "✅ Docker images pushed successfully!" -ForegroundColor Green
+        $backendTarget = if ($DockerRegistry -eq "docker.io") { "$DockerUsername/$BackendRepo" } else { "$DockerRegistry/$DockerUsername/$BackendRepo" }
+        $webTarget = if ($DockerRegistry -eq "docker.io") { "$DockerUsername/$WebRepo" } else { "$DockerRegistry/$DockerUsername/$WebRepo" }
+
+        Write-Host "Tagging and pushing images to $backendTarget and $webTarget (tag: $gitSha and latest)..." -ForegroundColor Cyan
+
+        docker tag agrirent-backend:latest "$backendTarget`:$gitSha"
+        docker tag agrirent-backend:latest "$backendTarget`:latest"
+        docker tag agrirent-web:latest "$webTarget`:$gitSha"
+        docker tag agrirent-web:latest "$webTarget`:latest"
+
+        docker push "$backendTarget`:$gitSha"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to push $backendTarget`:$gitSha" }
+
+        docker push "$backendTarget`:latest"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to push $backendTarget`:latest" }
+
+        docker push "$webTarget`:$gitSha"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to push $webTarget`:$gitSha" }
+
+        docker push "$webTarget`:latest"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to push $webTarget`:latest" }
+
+        Write-Host "✅ Docker images pushed successfully to registry!" -ForegroundColor Green
     }
 }
 

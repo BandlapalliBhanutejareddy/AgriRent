@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: agrirent-backend:latest
+    image: ${DOCKER_REGISTRY_USER:-teja3}/agrirent-backend:${AGRORENT_VERSION:-latest}
     container_name: agrorent-backend
     restart: always
     extra_hosts:
@@ -28,7 +28,7 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
-    image: agrirent-web:latest
+    image: ${DOCKER_REGISTRY_USER:-teja3}/agrirent-web:${AGRORENT_VERSION:-latest}
     container_name: agrorent-web
     restart: always
     environment:
