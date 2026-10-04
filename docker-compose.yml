@@ -1,4 +1,4 @@
-name: agrorent
+name: agrirent
 
 services:
   backend:
@@ -21,8 +21,11 @@ services:
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL:-}}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-agrorent-production-jwt-secret}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen:0.5b}
+    networks:
+      - agrirent_network
     ports:
       - "4000:4000"
 
@@ -39,7 +42,14 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL}}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    networks:
+      - agrirent_network
     ports:
       - "${WEB_PORT:-3001}:3000"
     depends_on:
       - backend
+
+networks:
+  agrirent_network:
+    name: agrirent_network
+    driver: bridge
