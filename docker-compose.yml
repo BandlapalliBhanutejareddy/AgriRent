@@ -1,3 +1,5 @@
+name: agrorent
+
 services:
   backend:
     build:
