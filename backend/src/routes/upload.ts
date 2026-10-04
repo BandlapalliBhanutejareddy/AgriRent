@@ -34,8 +34,8 @@ const upload = multer({
   }
 });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'placeholder-key';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 router.post('/', requireAuth, upload.single('image'), async (req: AuthRequest, res: Response): Promise<void> => {
