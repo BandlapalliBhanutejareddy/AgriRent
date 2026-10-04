@@ -469,21 +469,19 @@ router.get('/data-quality', async (req: AuthRequest, res: Response): Promise<voi
   try {
     const issues: any[] = [];
     
-    const [noEmail, noOwner, invalidBookings] = await Promise.all([
-      // @ts-ignore
-      prisma.user.findMany({ where: { OR: [{ email: null }, { email: '' }] }, take: 10 }),
-      // @ts-ignore
-      prisma.equipment.findMany({ where: { ownerId: null }, take: 10 }),
-      // @ts-ignore
-      prisma.booking.findMany({ where: { equipmentId: null }, take: 10 })
+    const [emptyUsers, pendingEquip, unconfirmedBookings] = await Promise.all([
+      prisma.user.findMany({ where: { OR: [{ name: '' }, { phone: null }] }, take: 10 }),
+      prisma.equipment.findMany({ where: { pricePerDay: { lte: 0 } }, take: 10 }),
+      prisma.booking.findMany({ where: { status: 'PENDING', createdAt: { lte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }, take: 10 })
     ]);
 
-    noEmail.forEach((u: any) => issues.push({ entity: 'User', id: u.id, problem: 'Missing Email', createdAt: u.createdAt, action: 'Disable user or request update' }));
-    noOwner.forEach((e: any) => issues.push({ entity: 'Equipment', id: e.id, problem: 'Missing Owner', createdAt: e.createdAt, action: 'Delete or assign owner' }));
-    invalidBookings.forEach((b: any) => issues.push({ entity: 'Booking', id: b.id, problem: 'Missing Equipment reference', createdAt: b.createdAt, action: 'Cancel booking' }));
+    emptyUsers.forEach((u: any) => issues.push({ entity: 'User', id: u.id, problem: 'Incomplete Profile (Missing phone or name)', createdAt: u.createdAt, action: 'Request user profile update' }));
+    pendingEquip.forEach((e: any) => issues.push({ entity: 'Equipment', id: e.id, problem: 'Zero or Negative Daily Rate', createdAt: e.createdAt, action: 'Disable equipment listing' }));
+    unconfirmedBookings.forEach((b: any) => issues.push({ entity: 'Booking', id: b.id, problem: 'Stale Pending Booking (>7 days)', createdAt: b.createdAt, action: 'Auto-expire or cancel booking' }));
 
     res.json(issues);
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Data Quality Error:', error);
     res.status(500).json({ error: 'Failed to fetch data quality' });
   }
 });
