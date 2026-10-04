@@ -126,25 +126,19 @@ export default function LoginPage() {
     }
     setLoading(true);
     setError('');
-    
+
     if (isLoginMode) {
       // LOGIN MODE
       try {
-        const response = await api.post('/auth/login', { email, password });
+        const response = await api.post('/auth/login', { email, password, role: activePortal });
         if (response.data.success) {
           executeLogin(response.data.user, response.data.token);
         } else {
           setError('Invalid credentials');
         }
       } catch (err: any) {
-        const errorMsg = err.response?.data?.error || 'Login failed. Please verify your credentials and try again.';
+        const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Login failed. Please verify your credentials and try again.';
         setError(errorMsg);
-        
-        // Deadlock fix: If user is unverified and backend dispatched a new OTP, show the OTP modal.
-        if (errorMsg.includes('not verified') && errorMsg.includes('dispatched')) {
-          setOtpInput('');
-          setShowRegisterOtpModal(true);
-        }
       } finally {
         setLoading(false);
       }
@@ -161,23 +155,17 @@ export default function LoginPage() {
         return;
       }
       try {
-        const response = await api.post('/auth/register', { 
-          name: registerName, 
-          email, 
-          password, 
-          phone: registerPhone, 
-          role: activePortal 
+        const response = await api.post('/auth/register', {
+          name: registerName,
+          email,
+          password,
+          phone: registerPhone,
+          role: activePortal
         });
-        if (response.data.success) {
-          if (response.data.token) {
-            // Role upgrade case: User provided correct password for existing verified account
-            executeLogin(response.data.user, response.data.token);
-          } else {
-            setOtpInput('');
-            setShowRegisterOtpModal(true);
-          }
+        if (response.data.success && response.data.token) {
+          executeLogin(response.data.user, response.data.token);
         } else {
-          setError('Registration failed.');
+          setError(response.data.error || 'Registration failed.');
         }
       } catch (err: any) {
         setError(err.response?.data?.error || 'Registration failed. Email might already be taken.');
@@ -370,7 +358,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="max-w-md w-full space-y-6">
-        
+
         {/* Logo/Header */}
         <div className="text-center">
           <div className="flex justify-center mb-2">
@@ -383,7 +371,7 @@ export default function LoginPage() {
 
         {/* Outer Login Box */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 p-8 rounded-[32px] shadow-xl dark:shadow-2xl/30 relative overflow-hidden transition-all duration-300">
-          
+
           {/* Decorative Corner Glow */}
           <div className={`absolute -top-12 -right-12 w-24 h-24 rounded-full blur-2xl opacity-10 bg-${activeConf.color}-500 transition-all duration-500`} />
 
@@ -455,7 +443,7 @@ export default function LoginPage() {
           {/* Form */}
           <form className="space-y-4" onSubmit={handleAuthSubmit}>
             <div className="space-y-4">
-              
+
               {!isLoginMode && (
                 <>
                   <div>
@@ -514,7 +502,7 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     required
                     className="w-full pl-4 pr-12 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-medium"
-                    placeholder="••••••••"
+                    placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -600,10 +588,10 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1 text-center">
                     {t('enter_6_digit_otp_code')}</label>
-                  <OTPInput 
-                    length={6} 
-                    onComplete={(code) => setOtpInput(code)} 
-                    disabled={loading} 
+                  <OTPInput
+                    length={6}
+                    onComplete={(code) => setOtpInput(code)}
+                    disabled={loading}
                   />
                 </div>
                 <button
@@ -719,10 +707,10 @@ export default function LoginPage() {
                       <div>
                         <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1 text-center">
                           {t('verify_6_digit_otp_code')}</label>
-                        <OTPInput 
-                          length={6} 
-                          onComplete={(code) => setOtpInput(code)} 
-                          disabled={loading} 
+                        <OTPInput
+                          length={6}
+                          onComplete={(code) => setOtpInput(code)}
+                          disabled={loading}
                         />
                       </div>
                       <button
@@ -788,7 +776,7 @@ export default function LoginPage() {
       {/* Multi-Role Portal Mode Selection Modal */}
       {showRoleSelectModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-3xl max-w-md w-full shadow-2xl text-center space-y-6"

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/localization/app_localizations.dart';
 
 final guidesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final client = ApiClient();
@@ -32,6 +33,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(languageProvider);
     final kbAsync = ref.watch(guidesProvider);
 
     return DefaultTabController(
@@ -39,20 +41,20 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
       child: Scaffold(
         backgroundColor: AppTheme.background,
         appBar: AppBar(
-          title: const Text('Knowledge Base', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
+          title: Text('knowledge_base'.tr(lang), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
           centerTitle: false,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             labelColor: AppTheme.primaryGreen,
             unselectedLabelColor: Colors.grey,
             indicatorColor: AppTheme.primaryGreen,
             indicatorWeight: 3,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             tabs: [
-              Tab(text: 'Crop Guides'),
-              Tab(text: 'Modern Techniques'),
+              Tab(text: 'crop_guides'.tr(lang)),
+              Tab(text: 'modern_techniques'.tr(lang)),
             ],
           ),
         ),
@@ -63,7 +65,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search articles...',
+                  hintText: 'search_articles'.tr(lang),
                   hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
                   prefixIcon: const Icon(Icons.search, color: Colors.grey),
                   suffixIcon: _searchQuery.isNotEmpty ? IconButton(
@@ -90,8 +92,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                     children: [
                       const Icon(Icons.error_outline, color: Colors.red, size: 48),
                       const SizedBox(height: 16),
-                      Text('Failed to load: $err', textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textDark)),
-                      TextButton(onPressed: () => ref.refresh(guidesProvider), child: const Text('Retry', style: TextStyle(color: AppTheme.primaryGreen))),
+                      Text('${'failed_to_load'.tr(lang)}: $err', textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textDark)),
+                      TextButton(onPressed: () => ref.refresh(guidesProvider), child: Text('retry'.tr(lang), style: const TextStyle(color: AppTheme.primaryGreen))),
                     ],
                   ),
                 ),
@@ -104,8 +106,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
 
                   return TabBarView(
                     children: [
-                      _buildGrid(context, filteredCrops, isCrop: true, rawData: crops),
-                      _buildGrid(context, filteredTechniques, isCrop: false, rawData: techniques),
+                      _buildGrid(context, filteredCrops, isCrop: true, rawData: crops, lang: lang),
+                      _buildGrid(context, filteredTechniques, isCrop: false, rawData: techniques, lang: lang),
                     ],
                   );
                 },
@@ -117,7 +119,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
     );
   }
 
-  Widget _buildGrid(BuildContext context, List<String> items, {required bool isCrop, required dynamic rawData}) {
+  Widget _buildGrid(BuildContext context, List<String> items, {required bool isCrop, required dynamic rawData, required String lang}) {
     if (items.isEmpty) {
       return Center(
         child: Column(
@@ -125,7 +127,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
           children: [
             Icon(Icons.menu_book, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 16),
-            const Text('No articles found.', style: TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('no_articles_found'.tr(lang), style: const TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
       );
@@ -149,7 +151,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
             side: BorderSide(color: Colors.grey.shade200),
           ),
           child: InkWell(
-            onTap: () => _showDetailSheet(context, title, isCrop, rawData),
+            onTap: () => _showDetailSheet(context, title, isCrop, rawData, lang),
             borderRadius: BorderRadius.circular(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -172,10 +174,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isCrop ? 'CROP GUIDE' : 'TECHNIQUE',
+                        isCrop ? 'crop_guide'.tr(lang).toUpperCase() : 'technique'.tr(lang).toUpperCase(),
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1),
                       ),
                       const SizedBox(height: 4),
@@ -196,13 +198,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
     );
   }
 
-  void _showDetailSheet(BuildContext context, String title, bool isCrop, dynamic rawData) {
+  void _showDetailSheet(BuildContext context, String title, bool isCrop, dynamic rawData, String lang) {
     List<Widget> contentWidgets = [];
-    
+
     if (isCrop) {
       final steps = rawData[title] as List;
       for (var i = 0; i < steps.length; i++) {
         final step = steps[i];
+
+        final imageUrl = step['imageUrl'] as String?;
+        final smartTip = step['smartTip'] as String?;
+        final equipment = step['recommendedEquipment'] as String?;
+
         contentWidgets.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 24.0),
@@ -212,12 +219,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                 Container(
                   width: 32,
                   height: 32,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppTheme.primaryGreen,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    child: Text('${step['stepOrder'] ?? i + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -225,9 +232,80 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(step['stepTitle'] ?? '', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.textDark)),
+                      Text(step['stepTitle'] ?? 'no_information_available'.tr(lang), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.textDark)),
                       const SizedBox(height: 8),
-                      Text(step['description'] ?? '', style: const TextStyle(color: AppTheme.textLight, fontSize: 14, height: 1.5)),
+                      Text(step['description'] ?? 'no_information_available'.tr(lang), style: const TextStyle(color: AppTheme.textLight, fontSize: 14, height: 1.5)),
+
+                      if (imageUrl != null && imageUrl.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12.0),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              imageUrl,
+                              width: double.infinity,
+                              height: 160,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey.shade100, height: 160, child: const Icon(Icons.image_not_supported, color: Colors.grey)),
+                            ),
+                          ),
+                        ),
+
+                      if (smartTip != null && smartTip.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.lightbulb, color: Color(0xFFD97706), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('smart_tip'.tr(lang), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF92400E))),
+                                    const SizedBox(height: 4),
+                                    Text(smartTip, style: const TextStyle(fontSize: 13, color: Color(0xFF92400E), height: 1.4)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      if (equipment != null && equipment.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.agriculture, color: Color(0xFF16A34A), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('recommended_equipment'.tr(lang), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF166534))),
+                                    const SizedBox(height: 4),
+                                    Text(equipment, style: const TextStyle(fontSize: 13, color: Color(0xFF166534), height: 1.4)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 )
@@ -239,7 +317,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
     } else {
       final tech = rawData.firstWhere((t) => t['title'] == title);
       contentWidgets.add(
-        Text(tech['description'] ?? 'No description available', style: const TextStyle(color: AppTheme.textLight, fontSize: 15, height: 1.6))
+        Text(tech['description'] ?? 'no_information_available'.tr(lang), style: const TextStyle(color: AppTheme.textLight, fontSize: 15, height: 1.6))
       );
     }
 
@@ -281,7 +359,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(isCrop ? 'Crop Guide' : 'Modern Technique', style: const TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
+                        Text(isCrop ? 'crop_guide'.tr(lang).toUpperCase() : 'technique'.tr(lang).toUpperCase(), style: const TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
                         Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
                       ],
                     ),
@@ -312,7 +390,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('Close Article', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text('close_article'.tr(lang), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             )

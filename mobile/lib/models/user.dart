@@ -2,7 +2,7 @@ class User {
   final String id;
   final String name;
   final String email;
-  final String role; // FARMER, OWNER, ADMIN
+  final String role; // FARMER, OWNER, ADMIN, ENTREPRENEUR
   final String? phone;
   final String? profileImage;
   final String preferredLanguage;
@@ -17,15 +17,33 @@ class User {
     required this.preferredLanguage,
   });
 
-  factory User.fromJson(Map<String, dynamic> json) {
+  factory User.fromJson(dynamic raw) {
+    if (raw is! Map) {
+      return User(
+        id: '',
+        name: '',
+        email: '',
+        role: '',
+        preferredLanguage: 'en',
+      );
+    }
+    final rawMap = Map<String, dynamic>.from(raw);
+    final json = (rawMap['data'] is Map)
+        ? Map<String, dynamic>.from(rawMap['data'] as Map)
+        : ((rawMap['user'] is Map)
+            ? Map<String, dynamic>.from(rawMap['user'] as Map)
+            : rawMap);
+
+    final rawRole = json['role']?.toString().trim().toUpperCase() ?? '';
+
     return User(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      role: json['role'] ?? 'FARMER',
-      phone: json['phone'],
-      profileImage: json['profileImage'],
-      preferredLanguage: json['preferredLanguage'] ?? 'en',
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      role: rawRole,
+      phone: json['phone']?.toString(),
+      profileImage: json['profileImage']?.toString(),
+      preferredLanguage: json['preferredLanguage']?.toString() ?? 'en',
     );
   }
 

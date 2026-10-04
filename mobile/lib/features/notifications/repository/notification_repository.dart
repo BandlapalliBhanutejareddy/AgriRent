@@ -19,11 +19,13 @@ class Notification {
 
   factory Notification.fromJson(Map<String, dynamic> json) {
     return Notification(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      message: json['message'] ?? '',
-      read: json['read'] ?? false,
-      createdAt: DateTime.parse(json['createdAt']),
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+      read: json['read'] == true,
+      createdAt: json['createdAt'] != null
+          ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
     );
   }
 }
@@ -34,8 +36,16 @@ class NotificationRepository {
   Future<List<Notification>> fetchNotifications() async {
     try {
       final response = await _apiClient.dio.get(ApiConstants.notifications);
-      final List<dynamic> data = response.data;
-      return data.map((e) => Notification.fromJson(e)).toList();
+      final dynamic raw = response.data;
+      final List<dynamic> data = raw is List
+          ? raw
+          : (raw is Map && raw['data'] is List
+              ? raw['data']
+              : (raw is Map && raw['notifications'] is List ? raw['notifications'] : []));
+      return data
+          .whereType<Map>()
+          .map((e) => Notification.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }

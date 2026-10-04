@@ -1,25 +1,81 @@
+# Dependencies
 node_modules/
+/.pnp
+.pnp.*
+/.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Environment and Secrets (Never commit credentials)
 .env
 .env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
-scratch/
-playwright-report/
-test-results/
+
+# Next.js and Web Build
 .next/
+out/
+.vercel
+/src/generated/prisma
+
+# Build outputs and artifacts
 dist/
 build/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Flutter & Dart
 .dart_tool/
 .pub-cache/
+.pub/
 .flutter-plugins
 .flutter-plugins-dependencies
 android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
-qa/web-selenium/evidence/*.png
+ios/.symlinks/
+ios/Pods/
+ios/Podfile.lock
+.widget_preview/
+
+# Binaries & Archives
+*.apk
+*.aab
+*.ipa
+*.exe
+*.zip
+*.tar
+*.gz
 postgres.zip
 pg/
 pgdata/
+
+# Logs & Temporary Files
 *.log
 npm-debug.log*
-*.exe
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+logcat.txt
+*.tmp
+*.bak
+*.swp
+scratch/
+
+# IDE and OS Junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.iml
+*.ipr
+*.iws
+.idea/
+.refact/

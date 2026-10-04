@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useStore } from '@/store/useStore';
 import { useNotificationStore } from '@/store/notificationStore';
-import { 
-  Bell, 
-  Check, 
-  Trash2, 
-  Clock, 
-  Info, 
-  Tractor, 
-  CheckCircle2, 
+import {
+  Bell,
+  Check,
+  Trash2,
+  Clock,
+  Info,
+  Tractor,
+  CheckCircle2,
   AlertTriangle,
   MailOpen,
   Sparkles,
@@ -29,20 +29,26 @@ export default function NotificationsPage() {
   const { showToast } = useToast();
   const [localNotifications, setLocalNotifications] = useState<any[]>([]);
 
+  const [error, setError] = useState<string | null>(null);
+
   const role = user?.role || 'OWNER';
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    if (user?.id) {
+      fetchNotifications();
+    }
+  }, [user?.id]);
 
   async function fetchNotifications() {
     try {
+      setError(null);
       const response = await api.get('/notifications');
-      setNotifications(response.data || []);
-      setLocalNotifications(response.data || []);
+      const list = Array.isArray(response.data) ? response.data : [];
+      setNotifications(list);
+      setLocalNotifications(list);
     } catch (error) {
       console.error('Failed to load notifications', error);
-      showToast('Unable to load notifications. Please try again.', 'error');
+      setError('Unable to load notifications. Please try again.');
       setLocalNotifications([]);
       setNotifications([]);
     }
@@ -106,7 +112,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+
       {/* Dynamic Greeting Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 p-8 rounded-[32px] text-white shadow-xl border border-slate-800 relative overflow-hidden">
         <div className="absolute -top-16 -right-16 w-36 h-36 rounded-full blur-3xl bg-emerald-500/10" />
@@ -118,9 +124,9 @@ export default function NotificationsPage() {
             {unreadCount > 0 ? `You have ${unreadCount} unread system messages.` : 'Your platform inbox is completely up-to-date.'}
           </p>
         </div>
-        
+
         {unreadCount > 0 && (
-          <button 
+          <button
             onClick={handleMarkAllAsRead}
             className="relative z-10 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-3 rounded-2xl transition-all shadow-md active:scale-95 shrink-0 self-start sm:self-center"
           >
@@ -128,13 +134,25 @@ export default function NotificationsPage() {
         )}
       </div>
 
+      {error && (
+        <div className="p-6 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-2xl flex items-center justify-between">
+          <p className="text-sm font-bold text-red-600 dark:text-red-400">{error}</p>
+          <button
+            onClick={fetchNotifications}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200/80 dark:border-slate-850/80 shadow-sm overflow-hidden p-6 md:p-8">
         <div className="space-y-4">
           <AnimatePresence initial={false}>
             {localNotifications.length === 0 ? (
-              
+
               /* Illustrated Fallback State */
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="py-16 text-center flex flex-col items-center justify-center space-y-5"
@@ -148,7 +166,7 @@ export default function NotificationsPage() {
                   <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed font-semibold">
                     {t('you_have_zero_pending_notifications_we_w')}</p>
                 </div>
-                <button 
+                <button
                   onClick={fetchNotifications}
                   className="px-6 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-colors"
                 >
@@ -157,14 +175,14 @@ export default function NotificationsPage() {
               </motion.div>
             ) : (
               localNotifications.map((notif) => (
-                <motion.div 
+                <motion.div
                   key={notif.id}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                   className={`flex gap-4 p-5 rounded-2xl border transition-all duration-350 ${
-                    notif.read 
-                      ? 'bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 opacity-70' 
+                    notif.read
+                      ? 'bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 opacity-70'
                       : 'bg-slate-50/70 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800/80 shadow-sm relative'
                   }`}
                 >
@@ -189,7 +207,7 @@ export default function NotificationsPage() {
                     <p className={`text-xs font-medium leading-relaxed ${notif.read ? 'text-slate-405 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'}`}>
                       {notif.message || notif.description}
                     </p>
-                    
+
                     <div className="flex gap-2 pt-2">
                       {!notif.read && (
                         <button
@@ -198,7 +216,7 @@ export default function NotificationsPage() {
                         >
                           <Check size={12} /> {t('mark_read')}</button>
                       )}
-                      
+
                       <button
                         onClick={() => handleDelete(notif.id)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/25 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"

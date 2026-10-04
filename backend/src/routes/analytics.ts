@@ -4,6 +4,9 @@ import { prisma } from '../lib/prisma';
 
 const router = Router();
 
+// Define standard revenue-generating statuses globally for the file
+const REVENUE_GENERATING_STATUSES = ['COMPLETED', 'ACTIVE', 'RETURN_PENDING', 'RETURN_IN_PROGRESS', 'RETURNED', 'INSPECTION_PENDING', 'ACCEPTED'];
+
 // Owner Analytics
 router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -19,14 +22,19 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
 
     const totalBookings = bookings.length;
     const pendingBookings = bookings.filter(b => b.status === 'PENDING').length;
+
+    // According to new unified definition, active rentals are ACCEPTED + ACTIVE
+    const activeRentals = bookings.filter(b => b.status === 'ACCEPTED' || b.status === 'ACTIVE').length;
+
+    // Completed is just COMPLETED
     const completedBookings = bookings.filter(b => b.status === 'COMPLETED').length;
-    const acceptedBookings = bookings.filter(b => b.status === 'ACCEPTED').length;
 
-    const totalRevenue = bookings
-      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
-      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    // Rental value generated MUST be exactly the sum of totalPrice for REVENUE_GENERATING_STATUSES
+    const validPaidBookings = bookings.filter(b => REVENUE_GENERATING_STATUSES.includes(b.status));
+    const totalRevenue = validPaidBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    const pendingValue = bookings.filter(b => b.status === 'PENDING').reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
-    const topEquipmentMap = bookings.reduce((acc: Record<string, { title: string; bookings: number; revenue: number }>, b) => {
+    const topEquipmentMap = validPaidBookings.reduce((acc: Record<string, { title: string; bookings: number; revenue: number }>, b) => {
       const title = b.equipment?.title || 'Unknown Equipment';
       if (!acc[title]) acc[title] = { title, bookings: 0, revenue: 0 };
       acc[title].bookings += 1;
@@ -44,13 +52,11 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
       return date.toLocaleString('default', { month: 'short' });
     });
 
-    const revenueByMonth = bookings
-      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
-      .reduce((acc: Record<string, number>, b) => {
-        const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
-        acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
-        return acc;
-      }, {});
+    const revenueByMonth = validPaidBookings.reduce((acc: Record<string, number>, b) => {
+      const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
+      acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
+      return acc;
+    }, {});
 
     const monthlyRevenue = monthLabels.map(month => ({
       month,
@@ -61,7 +67,7 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
       where: { ownerId },
       select: { id: true }
     });
-    
+
     const ownerFeedback = await prisma.feedback.findMany({
       where: {
         category: 'Equipment',
@@ -69,23 +75,50 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
       }
     });
 
-    const avgRating = ownerFeedback.length > 0 
-      ? ownerFeedback.reduce((sum, f) => sum + f.rating, 0) / ownerFeedback.length 
+    const avgRating = ownerFeedback.length > 0
+      ? ownerFeedback.reduce((sum, f) => sum + f.rating, 0) / ownerFeedback.length
       : 0;
 
     res.json({
       totalRevenue: totalRevenue || 0,
+      completedRevenue: validPaidBookings.filter(b => b.status === 'COMPLETED').reduce((sum, b) => sum + (b.totalPrice || 0), 0),
       totalBookings,
       pendingBookings,
       completedBookings,
+      activeRentals,
+      pendingValue,
       averageRating: parseFloat(avgRating.toFixed(1)),
       topEquipment,
       monthlyRevenue,
-      utilization: totalBookings > 0 ? Math.round(((acceptedBookings + completedBookings) / totalBookings) * 100) : 0
+      utilization: totalBookings > 0 ? Math.round(((activeRentals + completedBookings) / totalBookings) * 100) : 0
     });
   } catch (error) {
     console.error('Owner Analytics Error:', error);
     res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// Owner Analytics Drilldown - Bookings
+router.get('/owner/bookings', requireAuth, requireRole('OWNER'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const ownerId = String(req.prismaUser.id);
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+
+    const bookings = await prisma.booking.findMany({
+      where: {
+        equipment: { ownerId }
+      },
+      include: {
+        equipment: { select: { title: true } },
+        farmer: { select: { name: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+    res.json(bookings);
+  } catch (error) {
+    console.error('Owner Bookings Drilldown Error:', error);
+    res.status(500).json({ error: 'Failed to fetch detailed bookings' });
   }
 });
 
@@ -96,7 +129,7 @@ router.get('/admin', requireAuth, requireRole('ADMIN'), async (req: AuthRequest,
     const totalFarmers = await prisma.user.count({ where: { role: 'FARMER' } });
     const totalOwners = await prisma.user.count({ where: { role: 'OWNER' } });
     const totalAdmins = await prisma.user.count({ where: { role: 'ADMIN' } });
-    
+
     const totalEquipment = await prisma.equipment.count();
     const availableEquipment = await prisma.equipment.count({ where: { available: true } });
 
@@ -120,7 +153,7 @@ router.get('/admin', requireAuth, requireRole('ADMIN'), async (req: AuthRequest,
     const recentBookings = await prisma.booking.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
-      include: { 
+      include: {
         equipment: { select: { title: true } },
         farmer: { select: { name: true } }
       }
@@ -128,10 +161,7 @@ router.get('/admin', requireAuth, requireRole('ADMIN'), async (req: AuthRequest,
 
     const allBookings = await prisma.booking.findMany({
       where: {
-        OR: [
-          { status: 'COMPLETED' },
-          { paymentStatus: 'PAID' }
-        ]
+        status: { in: ['COMPLETED', 'ACTIVE', 'RETURN_PENDING', 'RETURN_IN_PROGRESS', 'RETURNED', 'INSPECTION_PENDING'] }
       }
     });
 
@@ -176,20 +206,94 @@ router.get('/admin', requireAuth, requireRole('ADMIN'), async (req: AuthRequest,
 router.get('/farmer', requireAuth, requireRole('FARMER'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const farmerId = String(req.prismaUser.id);
+    const selectedFarmId = req.query.farmId ? String(req.query.farmId) : undefined;
+    const selectedCropId = req.query.cropId ? String(req.query.cropId) : undefined;
+
     const bookings = await prisma.booking.findMany({
       where: { farmerId },
-      include: { equipment: true }
+      include: {
+        equipment: {
+          include: { owner: { select: { name: true, phone: true } } }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
+    const validSpendingStatuses = ['COMPLETED', 'ACTIVE', 'RETURN_PENDING', 'RETURN_IN_PROGRESS', 'RETURNED', 'INSPECTION_PENDING', 'ACCEPTED'];
     const totalSpent = bookings
-      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
+      .filter(b => validSpendingStatuses.includes(b.status))
       .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
-    const activeRentals = bookings.filter(b => b.status === 'ACCEPTED').length;
+    const activeRentals = bookings.filter(b => b.status === 'ACCEPTED' || b.status === 'ACTIVE').length;
     const completedRentals = bookings.filter(b => b.status === 'COMPLETED').length;
+    const pendingRequests = bookings.filter(b => b.status === 'PENDING').length;
+
+    // Fetch Farmer's Farm & Operations analytics with optional farmId / cropId filtering
+    const farms = await prisma.farm.findMany({
+      where: {
+        ownerId: farmerId,
+        ...(selectedFarmId ? { id: selectedFarmId } : {})
+      },
+      include: {
+        budgets: true,
+        crops: {
+          where: selectedCropId ? { id: selectedCropId } : undefined,
+          include: {
+            operations: {
+              include: { tasks: true }
+            }
+          }
+        }
+      }
+    });
+
+    let totalBudget = 0;
+    let totalOperations = 0;
+    let completedOperations = 0;
+    let pendingOperations = 0;
+    let activeOperations = 0;
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    farms.forEach(f => {
+      const bgt = f.budgets && f.budgets[0] ? Number(f.budgets[0].totalBudget) : Number((f as any).totalBudget || (f as any).budget || 50000);
+      totalBudget += bgt;
+      f.crops.forEach(c => {
+        c.operations.forEach(op => {
+          totalOperations++;
+          if (op.status === 'COMPLETED') completedOperations++;
+          else if (op.status === 'IN_PROGRESS' || op.status === 'ACTIVE' || op.status === 'PLANNED') {
+            pendingOperations++;
+            activeOperations++;
+          } else {
+            pendingOperations++;
+          }
+
+          op.tasks.forEach(t => {
+            totalTasks++;
+            if (t.status === 'COMPLETED') completedTasks++;
+          });
+        });
+      });
+    });
+
+    // Also get manual expenses for the farm
+    const farmActivities = selectedFarmId ? await prisma.farmActivity.findMany({
+      where: { farmId: selectedFarmId, type: 'EXPENSE' }
+    }) : [];
+
+    const otherExpenses = farmActivities.reduce((sum, act) => {
+      let meta: any = {};
+      try { if (act.metadata) meta = JSON.parse(act.metadata); } catch (_) {}
+      return sum + (meta.amount ? Number(meta.amount) : 0);
+    }, 0);
+
+    const totalSpending = totalSpent + otherExpenses;
+    const remainingBudget = Math.max(0, (totalBudget || 50000) - totalSpending);
+
 
     const spendingByMonth = bookings
-      .filter(b => b.status === 'COMPLETED' || b.paymentStatus === 'PAID')
+      .filter(b => validSpendingStatuses.includes(b.status))
       .reduce((acc: any, b) => {
         const month = new Date(b.createdAt).toLocaleString('default', { month: 'short' });
         acc[month] = (acc[month] || 0) + (b.totalPrice || 0);
@@ -199,14 +303,54 @@ router.get('/farmer', requireAuth, requireRole('FARMER'), async (req: AuthReques
     const spendingGraph = Object.entries(spendingByMonth).map(([name, total]) => ({ name, total }));
 
     res.json({
-      totalSpent: totalSpent || 0,
+      totalSpending: totalSpending || 0,
+      totalSpent: totalSpending || 0,
+      rentalSpending: totalSpent || 0,
+      otherExpenses: otherExpenses || 0,
       activeRentals,
       completedRentals,
-      spendingGraph
+      pendingRequests,
+      totalBudget: totalBudget || 50000,
+      remainingBudget: remainingBudget || 0,
+      totalOperations,
+      activeOperations: activeOperations || (totalOperations - completedOperations),
+      completedOperations,
+      pendingOperations,
+      totalTasks,
+      completedTasks,
+      operationProgress: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+      spendingGraph,
+      recentBookings: bookings.slice(0, 10)
     });
   } catch (error) {
     console.error('Farmer Analytics Error:', error);
     res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// Farmer Analytics Drilldown - Bookings
+router.get('/farmer/bookings', requireAuth, requireRole('FARMER'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmerId = String(req.prismaUser.id);
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+
+    const bookings = await prisma.booking.findMany({
+      where: { farmerId },
+      include: {
+        equipment: {
+          select: {
+            title: true,
+            owner: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+    res.json(bookings);
+  } catch (error) {
+    console.error('Farmer Bookings Drilldown Error:', error);
+    res.status(500).json({ error: 'Failed to fetch detailed bookings' });
   }
 });
 
@@ -307,6 +451,147 @@ router.delete('/admin/equipment/:id', requireAuth, requireRole('ADMIN'), async (
   } catch (error) {
     console.error('Admin Equipment Delete Error:', error);
     res.status(500).json({ error: 'Failed to delete equipment' });
+  }
+});
+
+
+
+// Farmer Analytics
+router.get('/farmer', requireAuth, requireRole('FARMER'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmerId = String(req.prismaUser.id);
+    const bookings = await prisma.booking.findMany({
+      where: { farmerId },
+      include: {
+        equipment: {
+          include: { owner: { select: { name: true } } }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const activeRentals = bookings.filter(b => b.status === 'ACCEPTED' || b.status === 'ACTIVE').length;
+    const pendingBookings = bookings.filter(b => b.status === 'PENDING').length;
+    const completedRentals = bookings.filter(b => b.status === 'COMPLETED').length;
+    const totalRentals = bookings.length;
+    const totalSpending = bookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+    // Get operations and tasks for farmer's farms
+    const farmerFarms = await prisma.farm.findMany({
+      where: { ownerId: farmerId },
+      include: {
+        crops: {
+          include: {
+            operations: {
+              include: { tasks: true }
+            }
+          }
+        }
+      }
+    });
+
+    let totalOperations = 0;
+    let completedOperations = 0;
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    for (const farm of farmerFarms) {
+      for (const crop of farm.crops) {
+        for (const op of crop.operations) {
+          totalOperations++;
+          if (op.status === 'COMPLETED') completedOperations++;
+          for (const task of op.tasks) {
+            totalTasks++;
+            if (task.status === 'COMPLETED') completedTasks++;
+          }
+        }
+      }
+    }
+
+    const activeOperations = totalOperations - completedOperations;
+    const pendingTasks = totalTasks - completedTasks;
+
+    // Category breakdown
+    const categoryMap: Record<string, number> = {};
+    for (const b of bookings) {
+      const cat = b.equipment?.category || 'OTHER';
+      categoryMap[cat] = (categoryMap[cat] || 0) + (b.totalPrice || 0);
+    }
+
+    // Monthly breakdown (last 6 months)
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const monthlySpending: { month: string; amount: number; year: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mName = monthNames[d.getMonth()];
+      const yr = d.getFullYear();
+      const monthBookings = bookings.filter(b => {
+        const bDate = new Date(b.createdAt);
+        return bDate.getMonth() === d.getMonth() && bDate.getFullYear() === yr;
+      });
+      const monthSum = monthBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+      monthlySpending.push({ month: mName, amount: monthSum, year: yr });
+    }
+
+    // Recent activity list
+    const recentActivities: { id: string; title: string; type: string; timestamp: Date }[] = [];
+    for (const b of bookings.slice(0, 5)) {
+      recentActivities.push({
+        id: b.id,
+        title: `${b.equipment?.title || 'Equipment'} booked for rental`,
+        type: 'RENTAL',
+        timestamp: b.createdAt
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        activeRentals,
+        pendingBookings,
+        completedRentals,
+        totalRentals,
+        totalSpending,
+        totalSpent: totalSpending,
+        totalOperations,
+        completedOperations,
+        activeOperations,
+        totalTasks,
+        completedTasks,
+        pendingTasks,
+        categoryBreakdown: categoryMap,
+        monthlySpending,
+        recentBookings: bookings.slice(0, 15),
+        recentActivities
+      }
+    });
+  } catch (error) {
+    console.error('Farmer Analytics Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch farmer analytics' });
+  }
+});
+
+router.get('/farmer/bookings', requireAuth, requireRole('FARMER'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmerId = String(req.prismaUser.id);
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+
+    const bookings = await prisma.booking.findMany({
+      where: { farmerId },
+      include: {
+        equipment: {
+          include: { owner: { select: { name: true } } }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+    res.json(bookings);
+  } catch (error) {
+    console.error('Farmer Bookings Drilldown Error:', error);
+    res.status(500).json({ error: 'Failed to fetch detailed bookings' });
   }
 });
 

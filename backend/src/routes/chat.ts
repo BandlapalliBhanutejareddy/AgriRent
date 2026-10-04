@@ -5,17 +5,77 @@ import { emitToUser } from '../lib/socket';
 
 const router = Router();
 
+// Get unread messages count for logged-in user
+router.get('/unread-count', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = String(req.prismaUser.id);
+    const count = await prisma.message.count({
+      where: {
+        read: false,
+        senderId: { not: userId },
+        booking: {
+          OR: [
+            { farmerId: userId },
+            { equipment: { ownerId: userId } }
+          ]
+        }
+      }
+    });
+    res.json({ unreadCount: count });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch unread chat count' });
+  }
+});
+
+// Mark messages in a booking as read
+router.put('/read/:bookingId', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const bookingId = String(req.params.bookingId);
+    const userId = String(req.prismaUser.id);
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { equipment: true }
+    });
+
+    if (!booking) {
+      res.status(404).json({ error: 'Booking not found' });
+      return;
+    }
+
+    const isFarmer = booking.farmerId === userId;
+    const isOwner = booking.equipment.ownerId === userId;
+
+    if (!isFarmer && !isOwner) {
+      res.status(403).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    await prisma.message.updateMany({
+      where: {
+        bookingId,
+        senderId: { not: userId },
+        read: false
+      },
+      data: { read: true }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to mark messages as read' });
+  }
+});
+
 // Get chat history for a specific booking
 router.get('/booking/:bookingId', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const bookingId = String(req.params.bookingId);
 
-    // Verify user is part of this booking
-    const booking = await prisma.booking.findUnique({ 
+    const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: { equipment: true }
     });
-    
+
     if (!booking) {
       res.status(404).json({ error: 'Booking not found' });
       return;
@@ -25,15 +85,25 @@ router.get('/booking/:bookingId', requireAuth, async (req: AuthRequest, res: Res
     const isFarmer = booking.farmerId === userId;
     const isOwner = booking.equipment.ownerId === userId;
 
-    if (!isFarmer && !isOwner) {
+    if (!isFarmer && !isOwner && req.prismaUser.role !== 'ADMIN') {
       res.status(403).json({ error: 'You are not a participant in this booking' });
       return;
     }
 
+    // Auto mark received messages as read
+    await prisma.message.updateMany({
+      where: {
+        bookingId,
+        senderId: { not: userId },
+        read: false
+      },
+      data: { read: true }
+    });
+
     const messages = await prisma.message.findMany({
       where: { bookingId },
       include: {
-        sender: { select: { id: true, name: true, role: true } },
+        sender: { select: { id: true, name: true, role: true, profileImage: true } },
       },
       orderBy: { createdAt: 'asc' }
     });
@@ -58,8 +128,7 @@ router.post('/booking/:bookingId', requireAuth, async (req: AuthRequest, res: Re
 
     const userId = String(req.prismaUser.id);
 
-    // Verify user is part of this booking
-    const booking = await prisma.booking.findUnique({ 
+    const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: { equipment: true }
     });
@@ -72,37 +141,35 @@ router.post('/booking/:bookingId', requireAuth, async (req: AuthRequest, res: Re
     const isFarmer = booking.farmerId === userId;
     const isOwner = booking.equipment.ownerId === userId;
 
-    if (!isFarmer && !isOwner) {
+    if (!isFarmer && !isOwner && req.prismaUser.role !== 'ADMIN') {
       res.status(403).json({ error: 'You are not a participant in this booking' });
       return;
     }
 
-    // Determine receiver
     const receiverId = isFarmer ? booking.equipment.ownerId : booking.farmerId;
 
     const chatMessage = await prisma.message.create({
       data: {
         bookingId,
         senderId: userId,
-        text: String(text)
+        text: String(text).trim(),
+        read: false
       },
       include: {
-        sender: { select: { id: true, name: true, role: true } }
+        sender: { select: { id: true, name: true, role: true, profileImage: true } }
       }
     });
 
-    // Create a notification for the receiver
     await prisma.notification.create({
       data: {
         userId: receiverId,
-        title: 'New Message',
-        message: `You have a new message from ${req.prismaUser.name} regarding your booking.`,
+        title: 'New Message Ã°Å¸â€™Â¬',
+        message: `${req.prismaUser.name}: "${String(text).trim().slice(0, 50)}${text.length > 50 ? '...' : ''}"`,
         type: 'CHAT_MESSAGE',
         relatedId: bookingId
       }
     });
 
-    // Emit realtime event
     emitToUser(receiverId, 'new_message', chatMessage);
 
     res.status(201).json(chatMessage);

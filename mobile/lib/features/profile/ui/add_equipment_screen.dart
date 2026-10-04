@@ -1,9 +1,13 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../core/api/api_client.dart';
+import '../../../core/localization/app_localizations.dart';
+import '../../../shared/theme/app_theme.dart';
 import '../providers/owner_provider.dart';
-import '../../../shared/widgets/custom_text_field.dart';
-import '../../../core/theme/app_theme.dart';
 
 class AddEquipmentScreen extends ConsumerStatefulWidget {
   const AddEquipmentScreen({super.key});
@@ -13,140 +17,609 @@ class AddEquipmentScreen extends ConsumerStatefulWidget {
 }
 
 class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
   final _locationController = TextEditingController();
-  final _imageUrlController = TextEditingController();
-  String _selectedCategory = 'Tractor';
+  String _selectedCategory = 'TRACTOR';
+  File? _selectedImageFile;
+  bool _isSubmitting = false;
 
   final List<String> _categories = [
-    'Tractor', 'Harvester', 'Seeder', 'Plough', 'Cultivator', 'Sprayer', 'Other'
+    'TRACTOR',
+    'HARVESTER',
+    'SEEDER',
+    'PLOUGH',
+    'CULTIVATOR',
+    'SPRAYER',
+    'OTHER'
   ];
 
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        final lang = ref.read(languageProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${'failed_to_upload_image'.tr(lang)}: $e'),
+            backgroundColor: const Color(0xFFC62828),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showImageSourceDialog(String lang, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'add_equipment_photo'.tr(lang),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE8F5E9),
+                  child: Icon(Icons.photo_library_rounded, color: AppTheme.primaryGreen),
+                ),
+                title: Text(
+                  'choose_from_gallery'.tr(lang),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE8F5E9),
+                  child: Icon(Icons.camera_alt_rounded, color: AppTheme.primaryGreen),
+                ),
+                title: Text(
+                  'take_photo'.tr(lang),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
-    if (_titleController.text.isEmpty || _priceController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+    final lang = ref.read(languageProvider);
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final data = {
+    final price = double.tryParse(_priceController.text.trim());
+    if (price == null || price <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('fill_required_fields'.tr(lang)),
+          backgroundColor: const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    String? uploadedImageUrl;
+
+    // 1. If an image file was selected, upload it to Supabase Storage via backend /upload endpoint
+    if (_selectedImageFile != null) {
+      try {
+        final fileName = _selectedImageFile!.path.split(Platform.pathSeparator).last;
+        final formData = FormData.fromMap({
+          'image': await MultipartFile.fromFile(
+            _selectedImageFile!.path,
+            filename: fileName,
+          ),
+          'bucket': 'equipment-images',
+        });
+
+        final uploadResponse = await ApiClient().dio.post(
+          'upload',
+          data: formData,
+          options: Options(
+            headers: {'Content-Type': 'multipart/form-data'},
+          ),
+        );
+
+        final dynamic resData = uploadResponse.data;
+        if (resData is Map) {
+          uploadedImageUrl = resData['url'] ?? resData['data']?['url'];
+        }
+      } catch (uploadError) {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${'failed_to_upload_image'.tr(lang)}: $uploadError'),
+              backgroundColor: const Color(0xFFC62828),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    // 2. Create Equipment in DB
+    final data = <String, dynamic>{
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
-      'pricePerDay': double.tryParse(_priceController.text.trim()) ?? 0.0,
-      'category': _selectedCategory,
+      'pricePerDay': price,
+      'category': _selectedCategory.toUpperCase(),
       'location': _locationController.text.trim(),
-      'imageUrl': _imageUrlController.text.trim().isNotEmpty ? _imageUrlController.text.trim() : 'https://images.unsplash.com/photo-1592982537447-6f296d3f23a5?auto=format&fit=crop&w=800&q=80',
+      if (uploadedImageUrl != null && uploadedImageUrl.isNotEmpty)
+        'imageUrl': uploadedImageUrl,
     };
 
     final success = await ref.read(ownerProvider.notifier).createEquipment(data);
-    
+    setState(() => _isSubmitting = false);
+
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Equipment added successfully!', style: TextStyle(color: Colors.white)), backgroundColor: AppTheme.primaryGreen));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'equipment_added_success'.tr(lang),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: AppTheme.primaryGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
       context.pop();
+    } else if (!success && mounted) {
+      final err = ref.read(ownerProvider).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            err ?? 'unable_to_load_messages'.tr(lang),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(ownerProvider);
+    final lang = ref.watch(languageProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
       appBar: AppBar(
-        title: const Text('Add Equipment', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-        centerTitle: false,
-        backgroundColor: Colors.white,
+        title: Text(
+          'add_equipment'.tr(lang),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: isDark ? Colors.white : AppTheme.textDarkNavy,
+          ),
+        ),
+        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 1,
         surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: isDark ? Colors.white : AppTheme.textDarkNavy,
+          ),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Equipment Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textDark)),
-                  const SizedBox(height: 24),
-                  if (state.error != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
-                      child: Text(state.error!, style: TextStyle(color: Colors.red.shade700)),
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'equipment_details'.tr(lang),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Machine Title Field
+                    _buildTextField(
+                      controller: _titleController,
+                      label: '${'title'.tr(lang)} *',
+                      hint: 'e.g. John Deere 5050D 4WD',
+                      isDark: isDark,
+                      validator: (val) => (val == null || val.trim().isEmpty)
+                          ? 'fill_required_fields'.tr(lang)
+                          : null,
                     ),
                     const SizedBox(height: 16),
-                  ],
-                  CustomTextField(
-                    label: 'Title *',
-                    controller: _titleController,
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    label: 'Description',
-                    controller: _descriptionController,
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedCategory,
-                    decoration: InputDecoration(
-                      labelText: 'Category *',
-                      labelStyle: const TextStyle(color: Colors.grey),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2)),
+
+                    // Category Dropdown
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedCategory,
+                      dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'category'.tr(lang),
+                        labelStyle: TextStyle(
+                          color: isDark ? Colors.white60 : AppTheme.textMutedGray,
+                          fontSize: 13,
+                        ),
+                        filled: true,
+                        fillColor: isDark
+                            ? AppTheme.darkBackground
+                            : const Color(0xFFF7F9F8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white10 : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white10 : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppTheme.primaryGreen,
+                            width: 1.8,
+                          ),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      items: _categories
+                          .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedCategory = val);
+                      },
                     ),
-                    items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontWeight: FontWeight.w500)))).toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _selectedCategory = val);
-                    },
+                    const SizedBox(height: 16),
+
+                    // Daily Rental Rate
+                    _buildTextField(
+                      controller: _priceController,
+                      label: '${'rental_rate'.tr(lang)} (Ã¢â€šÂ¹ / ${'day'.tr(lang)}) *',
+                      hint: 'e.g. 2500',
+                      isDark: isDark,
+                      keyboardType: TextInputType.number,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'fill_required_fields'.tr(lang);
+                        }
+                        final num = double.tryParse(val.trim());
+                        if (num == null || num <= 0) {
+                          return 'fill_required_fields'.tr(lang);
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Location
+                    _buildTextField(
+                      controller: _locationController,
+                      label: 'location'.tr(lang),
+                      hint: 'e.g. Guntur, Andhra Pradesh',
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Real Device Image / Photo Picker UI
+                    _buildPhotoPickerSection(lang, isDark),
+                    const SizedBox(height: 16),
+
+                    // Description
+                    _buildTextField(
+                      controller: _descriptionController,
+                      label: 'description'.tr(lang),
+                      hint: 'Provide details about power, attachments, condition...',
+                      isDark: isDark,
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Submit Button
+              ElevatedButton(
+                onPressed: _isSubmitting ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryGreen,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.6),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    label: 'Price per Day (₹) *',
-                    controller: _priceController,
-                    keyboardType: TextInputType.number,
+                  elevation: 0,
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.2,
+                        ),
+                      )
+                    : Text(
+                        'save_equipment'.tr(lang),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoPickerSection(String lang, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'add_equipment_photo'.tr(lang),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white70 : AppTheme.textDarkNavy,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_selectedImageFile != null)
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? Colors.white24 : AppTheme.primaryGreen.withValues(alpha: 0.3),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Stack(
+                alignment: Alignment.topRight,
+                children: [
+                  Image.file(
+                    _selectedImageFile!,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
                   ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    label: 'Location',
-                    controller: _locationController,
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    label: 'Image URL (Optional)',
-                    controller: _imageUrlController,
+                  Container(
+                    margin: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                          onPressed: () => _showImageSourceDialog(lang, isDark),
+                          tooltip: 'change_photo'.tr(lang),
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          padding: EdgeInsets.zero,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                          onPressed: () => setState(() => _selectedImageFile = null),
+                          tooltip: 'remove_photo'.tr(lang),
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: state.isLoading ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryGreen,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
+          )
+        else
+          InkWell(
+            onTap: () => _showImageSourceDialog(lang, isDark),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkBackground : const Color(0xFFF7F9F8),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white12 : Colors.grey.shade300,
+                  style: BorderStyle.solid,
+                ),
               ),
-              child: state.isLoading
-                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Save Equipment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_a_photo_outlined,
+                      color: AppTheme.primaryGreen,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'add_equipment_photo'.tr(lang),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'tap_to_select_photo'.tr(lang),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white54 : AppTheme.textMutedGray,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required bool isDark,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      style: TextStyle(
+        fontSize: 14.5,
+        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+      ),
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: isDark ? Colors.white60 : AppTheme.textMutedGray,
+          fontSize: 13,
         ),
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: isDark ? Colors.white24 : Colors.grey.shade400,
+          fontSize: 13,
+        ),
+        filled: true,
+        fillColor: isDark ? AppTheme.darkBackground : const Color(0xFFF7F9F8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: isDark ? Colors.white10 : const Color(0xFFE0E0E0),
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: isDark ? Colors.white10 : const Color(0xFFE0E0E0),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: AppTheme.primaryGreen,
+            width: 1.8,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/localization/app_localizations.dart';
-import 'farmer_dashboard_screen.dart';
-import 'farmer_home_screen.dart'; // This is actually the marketplace
+import '../../../shared/theme/app_theme.dart';
+import 'farmer_home_screen.dart';
+import 'farmer_marketplace_screen.dart';
 import 'my_rentals_screen.dart';
-import 'crop_advisor_screen.dart';
+import '../../farm/ui/my_farm_screen.dart';
 import '../../profile/ui/profile_screen.dart';
 
 class FarmerMainScreen extends ConsumerStatefulWidget {
@@ -16,38 +16,85 @@ class FarmerMainScreen extends ConsumerStatefulWidget {
 
 class _FarmerMainScreenState extends ConsumerState<FarmerMainScreen> {
   int _currentIndex = 0;
+  late final List<Widget> _screens;
 
-  final List<Widget> _screens = [
-    const FarmerDashboardScreen(),
-    const FarmerHomeScreen(), // Marketplace
-    const MyRentalsScreen(),
-    const CropAdvisorScreen(), // AI Advisor
-    const ProfileScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      FarmerHomeScreen(
+        key: const ValueKey('farmer_home_tab'),
+        onTabSelected: (index) {
+          if (mounted) setState(() => _currentIndex = index);
+        },
+      ),
+      const MyFarmScreen(key: ValueKey('farmer_farm_tab')),
+      const FarmerMarketplaceScreen(key: ValueKey('farmer_marketplace_tab')),
+      const MyRentalsScreen(key: ValueKey('farmer_rentals_tab')),
+      const ProfileScreen(key: ValueKey('farmer_profile_tab')),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
-    final lang = ref.watch(languageProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
           setState(() {
-            _currentIndex = index;
+            _currentIndex = 0;
           });
-        },
-        destinations: [
-          NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard), label: 'home'.tr(lang)),
-          NavigationDestination(icon: const Icon(Icons.storefront_outlined), selectedIcon: const Icon(Icons.storefront), label: 'marketplace'.tr(lang)),
-          NavigationDestination(icon: const Icon(Icons.receipt_long_outlined), selectedIcon: const Icon(Icons.receipt_long), label: 'my_rentals'.tr(lang)),
-          NavigationDestination(icon: const Icon(Icons.auto_awesome_outlined), selectedIcon: const Icon(Icons.auto_awesome), label: 'ai_advisor'.tr(lang)),
-          NavigationDestination(icon: const Icon(Icons.person_outline), selectedIcon: const Icon(Icons.person), label: 'profile'.tr(lang)),
-        ],
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _currentIndex,
+          backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+          indicatorColor: isDark
+              ? AppTheme.primaryGreen.withValues(alpha: 0.3)
+              : AppTheme.primaryGreen.withValues(alpha: 0.15),
+          elevation: 8,
+          surfaceTintColor: Colors.transparent,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          onDestinationSelected: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded, color: AppTheme.primaryGreen),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.agriculture_outlined),
+              selectedIcon: Icon(Icons.agriculture_rounded, color: AppTheme.primaryGreen),
+              label: 'Farm',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.storefront_outlined),
+              selectedIcon: Icon(Icons.storefront_rounded, color: AppTheme.primaryGreen),
+              label: 'Market',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
+              label: 'Bookings',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.menu_outlined),
+              selectedIcon: Icon(Icons.menu_rounded, color: AppTheme.primaryGreen),
+              label: 'More',
+            ),
+          ],
+        ),
       ),
     );
   }

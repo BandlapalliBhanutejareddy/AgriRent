@@ -69,6 +69,27 @@ export const createBookingSchema = z.object({
 
 export const updateBookingStatusSchema = z.object({
   body: z.object({
-    status: z.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED', 'ACTIVE', 'COMPLETED']),
+    status: z.enum([
+      'PENDING',
+      'PAYMENT_SUCCESSFUL',
+      'ACCEPTED',
+      'CONFIRMED',
+      'DISPATCHED',
+      'OUT_FOR_DELIVERY',
+      'IN_TRANSIT',
+      'DELIVERED',
+      'ACTIVE',
+      'RETURN_PENDING',
+      'RETURN_IN_PROGRESS',
+      'RETURNED',
+      'INSPECTION_PENDING',
+      'COMPLETED',
+      'REJECTED',
+      'CANCELLED',
+      'REFUND_PROCESSING',
+      'REFUNDED',
+      'DISPUTED'
+    ]),
+    note: z.string().optional(),
   }),
 });

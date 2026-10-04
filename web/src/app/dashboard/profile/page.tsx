@@ -4,15 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore, useThemeStore } from '@/store/useStore';
 import { api } from '@/lib/api';
-import { 
-  User as UserIcon, 
-  Phone, 
-  MapPin, 
-  Shield, 
-  Camera, 
-  Check, 
-  Bell, 
-  Globe, 
+import {
+  User as UserIcon,
+  Phone,
+  MapPin,
+  Shield,
+  Camera,
+  Check,
+  Bell,
+  Globe,
   Lock,
   Sprout,
   Tractor,
@@ -24,7 +24,7 @@ import { useToast } from '@/components/ToastProvider';
 import { motion } from 'framer-motion';
 
 export default function ProfilePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, setUser } = useStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
   const { showToast } = useToast();
@@ -94,6 +94,7 @@ export default function ProfilePage() {
           profileImage: fresh.profileImage
         };
         setUser(updatedUser);
+        i18n.changeLanguage(fresh.preferredLanguage || 'en');
         showToast('Profile updated and saved to database successfully!', 'success');
       } else {
         showToast('Failed to update profile details', 'warning');
@@ -103,6 +104,7 @@ export default function ProfilePage() {
       // Local fallback for offline/persistence display
       if (user) {
         setUser({ ...user, name: name.trim(), phone: phone.trim(), preferredLanguage, profileImage: avatar });
+        i18n.changeLanguage(preferredLanguage);
       }
       showToast(err.response?.data?.error || 'Profile saved locally', 'success');
     }
@@ -113,20 +115,20 @@ export default function ProfilePage() {
       case 'ADMIN':
         return {
           gradient: 'from-purple-600 via-purple-750 to-slate-900 border-purple-500/20',
-          title: 'System Administrator 🛡️',
+          title: 'System Administrator Ã°Å¸â€ºÂ¡Ã¯Â¸Â',
           badge: 'Security Level: Root Access'
         };
       case 'FARMER':
         return {
           gradient: 'from-emerald-600 via-teal-650 to-emerald-700 border-emerald-500/20',
-          title: 'Premium Member Farmer 🌾',
+          title: 'Premium Member Farmer Ã°Å¸Å’Â¾',
           badge: 'Crop Producer Account'
         };
       case 'OWNER':
       default:
         return {
           gradient: 'from-indigo-600 via-indigo-750 to-slate-900 border-indigo-500/20',
-          title: 'Fleet Partner Owner 🚜',
+          title: 'Fleet Partner Owner Ã°Å¸Å¡Å“',
           badge: 'AgroRent Logistics Partner'
         };
     }
@@ -136,11 +138,11 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+
       {/* Premium Gradient Header Block */}
       <div className={`flex flex-col md:flex-row md:items-center gap-6 bg-gradient-to-r ${roleConfig.gradient} p-8 rounded-[32px] text-white shadow-xl border relative overflow-hidden`}>
         <div className="absolute -top-16 -right-16 w-36 h-36 rounded-full blur-3xl bg-white/10" />
-        
+
         {/* Avatar Frame with Upload Trigger */}
         <div className="relative shrink-0 self-center md:self-auto group cursor-pointer" onClick={handleAvatarClick}>
           <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-slate-200 to-white dark:from-slate-700 dark:to-slate-800 border-4 border-white dark:border-slate-900 overflow-hidden shadow-2xl relative flex items-center justify-center">
@@ -151,7 +153,7 @@ export default function ProfilePage() {
                 {name.charAt(0) || user?.role?.charAt(0) || 'U'}
               </span>
             )}
-            
+
             {/* Upload Overlay */}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white">
               <Camera size={20} />
@@ -160,12 +162,12 @@ export default function ProfilePage() {
           <button className="absolute -bottom-2 -right-2 p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-lg border-2 border-white dark:border-slate-900 transition-all hover:scale-115">
             <Camera size={12} />
           </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept="image/*" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            accept="image/*"
           />
         </div>
 
@@ -178,12 +180,12 @@ export default function ProfilePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
+
         {/* Left Column Settings Tabs Navigation */}
         <div className="md:col-span-1 space-y-6">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/85 dark:border-slate-850/85 shadow-sm space-y-4">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">{t('account_overview', { defaultValue: 'Account Overview' })}</h3>
-            
+
             <div className="space-y-3.5">
               <div className="flex items-center gap-3 text-xs font-bold text-slate-500 dark:text-slate-400">
                 <UserIcon size={16} className="text-slate-400" />
@@ -211,7 +213,7 @@ export default function ProfilePage() {
               {t('account_synced_desc', { defaultValue: 'Your account details have been successfully synchronized with the backend system directory.' })}
             </p>
             <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl w-fit text-[9px] font-black uppercase tracking-wider">
-              ● {t('active_status', { defaultValue: 'Active Status' })}
+              Ã¢â€”Â {t('active_status', { defaultValue: 'Active Status' })}
             </div>
           </div>
         </div>
@@ -220,15 +222,15 @@ export default function ProfilePage() {
         <div className="md:col-span-2 space-y-6">
           <form onSubmit={handleSaveChanges} className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/85 dark:border-slate-850/85 shadow-sm space-y-6">
             <h3 className="text-lg font-black text-slate-850 dark:text-white">{t('personal_information', { defaultValue: 'Personal Information' })}</h3>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('full_name', { defaultValue: 'Full Name' })}</label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  placeholder={t('enter_full_name', { defaultValue: 'Enter your full name' })} 
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder={t('enter_full_name', { defaultValue: 'Enter your full name' })}
                   className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-sm font-medium transition-all text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400"
                   required
                 />
@@ -236,11 +238,11 @@ export default function ProfilePage() {
 
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('phone_number')}</label>
-                <input 
-                  type="text" 
-                  value={phone} 
-                  onChange={e => setPhone(e.target.value)} 
-                  placeholder={t('enter_phone_number')} 
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder={t('enter_phone_number')}
                   className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-sm font-medium transition-all text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400"
                 />
               </div>
@@ -249,11 +251,11 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('linked_email', { defaultValue: 'Linked Email Address' })}</label>
-                <input 
-                  type="email" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)} 
-                  placeholder={t('enter_email', { defaultValue: 'Enter email address' })} 
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder={t('enter_email', { defaultValue: 'Enter email address' })}
                   className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-sm font-medium transition-all text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400"
                   required
                 />
@@ -266,21 +268,21 @@ export default function ProfilePage() {
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
               <h3 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-wider flex items-center gap-2">
                 <Bell size={16} className="text-slate-400" /> {t('notifications_theme_settings')}</h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-850 rounded-2xl cursor-pointer">
                   <div className="text-xs w-full">
                     <span className="block font-bold text-slate-850 dark:text-white">Preferred Language</span>
-                    <select 
-                      value={preferredLanguage} 
+                    <select
+                      value={preferredLanguage}
                       onChange={e => setPreferredLanguage(e.target.value)}
                       className="mt-2 w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs font-medium text-slate-900 dark:text-slate-50"
                     >
                       <option value="en">English</option>
-                      <option value="hi">हिंदी</option>
-                      <option value="te">తెలుగు</option>
-                      <option value="ta">தமிழ்</option>
-                      <option value="kn">ಕನ್ನಡ</option>
+                      <option value="hi">Ã Â¤Â¹Ã Â¤Â¿Ã Â¤â€šÃ Â¤Â¦Ã Â¥â‚¬</option>
+                      <option value="te">Ã Â°Â¤Ã Â±â€ Ã Â°Â²Ã Â±ÂÃ Â°â€”Ã Â±Â</option>
+                      <option value="ta">Ã Â®Â¤Ã Â®Â®Ã Â®Â¿Ã Â®Â´Ã Â¯Â</option>
+                      <option value="kn">Ã Â²â€¢Ã Â²Â¨Ã Â³ÂÃ Â²Â¨Ã Â²Â¡</option>
                     </select>
                   </div>
                 </label>
@@ -290,19 +292,19 @@ export default function ProfilePage() {
                     <span className="block font-bold text-slate-850 dark:text-white">{t('global_dark_theme', { defaultValue: 'Global Dark Theme' })}</span>
                     <span className="text-slate-400 font-medium">{t('dark_mode_desc', { defaultValue: 'Activate full dark mode.' })}</span>
                   </div>
-                  <input 
-                    type="checkbox" 
-                    checked={isDarkMode} 
+                  <input
+                    type="checkbox"
+                    checked={isDarkMode}
                     onChange={toggleTheme}
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0" 
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0"
                   />
                 </label>
               </div>
             </div>
 
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 data-testid="profile-save settings-save"
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-3.5 rounded-2xl transition-all shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >

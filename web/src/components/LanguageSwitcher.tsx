@@ -3,17 +3,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
+import { useStore } from '@/store/useStore';
 
 const languages = [
   { code: 'en', name: 'English' },
-  { code: 'te', name: 'తెలుగు' },
-  { code: 'hi', name: 'हिन्दी' },
-  { code: 'ta', name: 'தமிழ்' },
-  { code: 'kn', name: 'ಕನ್ನಡ' }
+  { code: 'te', name: 'Ã Â°Â¤Ã Â±â€ Ã Â°Â²Ã Â±ÂÃ Â°â€”Ã Â±Â' },
+  { code: 'hi', name: 'Ã Â¤Â¹Ã Â¤Â¿Ã Â¤Â¨Ã Â¥ÂÃ Â¤Â¦Ã Â¥â‚¬' },
+  { code: 'ta', name: 'Ã Â®Â¤Ã Â®Â®Ã Â®Â¿Ã Â®Â´Ã Â¯Â' },
+  { code: 'kn', name: 'Ã Â²â€¢Ã Â²Â¨Ã Â³ÂÃ Â²Â¨Ã Â²Â¡' }
 ];
 
 export default function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
+  const { user, setUser } = useStore();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -30,7 +32,11 @@ export default function LanguageSwitcher() {
   const changeLanguage = async (lng: string) => {
     i18n.changeLanguage(lng);
     setIsOpen(false);
-    
+
+    if (user) {
+      setUser({ ...user, preferredLanguage: lng });
+    }
+
     // Optionally sync with backend
     try {
       const token = localStorage.getItem('agrorent_dev_session');
@@ -53,7 +59,7 @@ export default function LanguageSwitcher() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button 
+      <button
         data-testid="language-switcher"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-1 p-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700 rounded-2xl transition-all"
@@ -71,8 +77,8 @@ export default function LanguageSwitcher() {
               data-testid="language-select"
               onClick={() => changeLanguage(lang.code)}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                i18n.language === lang.code 
-                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-bold' 
+                i18n.language === lang.code
+                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-bold'
                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >

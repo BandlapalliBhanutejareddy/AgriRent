@@ -1,43 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
+import { supabase } from '../lib/supabase';
 import { requireAuth } from '../middlewares/authMiddleware';
-import { validate } from '../middlewares/validate';
-import { forgotPasswordSchema, resetPasswordSchema } from '../schemas';
-import { EmailService } from '../services/email/email.service';
-
-const emailService = new EmailService();
 
 const router = Router();
 
-const generateTokens = async (userId: string, req: Request) => {
-  const secret = process.env.JWT_SECRET || 'fallback_secret';
-  
-  // 15 minute access token
-  const accessToken = jwt.sign({ userId }, secret, { expiresIn: '15m' });
-  
-  // 30 day refresh token
-  const refreshToken = crypto.randomBytes(40).toString('hex');
-  const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  
-  // Store session
-  await prisma.session.create({
-    data: {
-      userId,
-      refreshTokenHash,
-      expiresAt,
-      ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent']
-    }
-  });
-
-  return { accessToken, refreshToken };
-};
-
-// Password validation check utility
+// Utility for password validation
 function validatePasswordStrength(password: string): boolean {
   if (password.length < 8) return false;
   const hasUppercase = /[A-Z]/.test(password);
@@ -46,18 +14,13 @@ function validatePasswordStrength(password: string): boolean {
   return hasUppercase && hasLowercase && hasNumber;
 }
 
-// 1. Traditional User Registration
+// 1. Register User via Supabase Auth & Link Application User
 router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, password, role, phone } = req.body;
 
-    if (!name || !email || !password || !role || !phone) {
-      res.status(400).json({ success: false, error: 'Name, email, password, role, and phone number are required' });
-      return;
-    }
-
-    if (phone.length < 10) {
-      res.status(400).json({ success: false, error: 'Valid phone number is required' });
+    if (!name || !email || !password || !role) {
+      res.status(400).json({ success: false, error: 'Name, email, password, and role are required' });
       return;
     }
 
@@ -66,43 +29,67 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Email existing account check (multi-role capability support)
+    if (!validatePasswordStrength(String(password))) {
+      res.status(400).json({
+        success: false,
+        error: 'Password does not meet requirements: Minimum 8 characters, 1 uppercase, 1 lowercase, 1 number'
+      });
+      return;
+    }
+
+    // Check if user profile already exists in Prisma DB
     const existingUser = await prisma.user.findUnique({
-      where: { email: String(email) }
+      where: { email: String(email).toLowerCase() }
     });
 
     if (existingUser) {
-      // Removed legacy isVerified check since native authentication relies on the password check below.
-
-      // Verify password for adding role to existing account
-      const isMatch = await bcrypt.compare(String(password), existingUser.password) || existingUser.password === String(password);
-      if (!isMatch) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'An account with this email address already exists. Please enter your valid password to add the new role capability.' 
-        });
-        return;
-      }
-
       if (existingUser.role === role || existingUser.role === 'BOTH') {
-        res.status(400).json({ 
-          success: false, 
-          error: `This account already has ${role === 'BOTH' ? 'Farmer and Owner' : role} capability. Please sign in directly.` 
+        res.status(400).json({
+          success: false,
+          error: `An account with this email address already exists as ${existingUser.role}. Please log in.`
         });
         return;
       }
 
-      // Upgrade existing account to multi-role BOTH
+      // Upgrade account role to BOTH
       const updatedUser = await prisma.user.update({
         where: { id: existingUser.id },
         data: { role: 'BOTH' }
       });
 
-      const tokens = await generateTokens(updatedUser.id, req);
+      // Sign in via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: String(email).toLowerCase(),
+        password: String(password)
+      });
+
+      let token = authData?.session?.access_token;
+
+      if (authError || !token) {
+        // Create user in Supabase Auth if missing
+        const { data: newUserAuth, error: createError } = await supabase.auth.admin.createUser({
+          email: String(email).toLowerCase(),
+          password: String(password),
+          email_confirm: true,
+          user_metadata: { name: updatedUser.name, role: updatedUser.role }
+        });
+
+        if (!createError && newUserAuth.user) {
+          await prisma.user.update({
+            where: { id: updatedUser.id },
+            data: { authId: newUserAuth.user.id }
+          });
+          const { data: reloginData } = await supabase.auth.signInWithPassword({
+            email: String(email).toLowerCase(),
+            password: String(password)
+          });
+          token = reloginData?.session?.access_token;
+        }
+      }
 
       res.json({
         success: true,
-        message: `Role capability successfully added! You can now use AgroRent as both Farmer and Owner.`,
+        message: `Role capability successfully updated to BOTH!`,
         user: {
           id: updatedUser.id,
           email: updatedUser.email,
@@ -111,41 +98,49 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
           phone: updatedUser.phone,
           preferredLanguage: updatedUser.preferredLanguage
         },
-        token: tokens.accessToken,
-        refreshToken: tokens.refreshToken
+        token: token,
+        session: authData?.session
       });
       return;
     }
 
-    // Password strength check
-    if (!validatePasswordStrength(String(password))) {
-      res.status(400).json({ 
-        success: false, 
-        error: 'Password does not meet requirements: Minimum 8 characters, 1 uppercase, 1 lowercase, 1 number' 
-      });
+    // Create user identity in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: String(email).toLowerCase(),
+      password: String(password),
+      email_confirm: true,
+      user_metadata: { name, role, phone }
+    });
+
+    if (authError && !authError.message.includes('already registered')) {
+      res.status(400).json({ success: false, error: authError.message });
       return;
     }
 
-    // Hashing password
-    const hashedPassword = await bcrypt.hash(String(password), 10);
+    const supabaseUserId = authData?.user?.id;
 
-    // Create auto-verified user
+    // Create application User record in Prisma PostgreSQL
     const newUser = await prisma.user.create({
       data: {
         name: String(name),
-        email: String(email),
-        password: hashedPassword,
+        email: String(email).toLowerCase(),
+        password: 'SUPABASE_AUTH_MANAGED',
         role: role as 'FARMER' | 'OWNER',
         phone: phone ? String(phone) : '',
-        isVerified: true // Native authentication bypasses fragile email OTP dependency
+        authId: supabaseUserId,
+        isVerified: true
       }
     });
 
-    const tokens = await generateTokens(newUser.id, req);
+    // Authenticate with Supabase to obtain session tokens
+    const { data: sessionData } = await supabase.auth.signInWithPassword({
+      email: String(email).toLowerCase(),
+      password: String(password)
+    });
 
     res.json({
       success: true,
-      message: 'Account created successfully!',
+      message: 'Account created successfully with Supabase Auth!',
       user: {
         id: newUser.id,
         email: newUser.email,
@@ -153,475 +148,137 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         role: newUser.role,
         preferredLanguage: newUser.preferredLanguage
       },
-      token: tokens.accessToken,
-      refreshToken: tokens.refreshToken
+      token: sessionData?.session?.access_token,
+      session: sessionData?.session
     });
 
     await prisma.auditLog.create({
       data: {
         actorId: newUser.id,
         actorRole: newUser.role,
-        action: 'REGISTER',
+        action: 'REGISTER_SUPABASE_AUTH',
         resource: 'User',
         resourceId: newUser.id,
         ip: req.ip || req.connection.remoteAddress,
         userAgent: req.headers['user-agent']
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to complete registration' });
+    res.status(500).json({ success: false, error: error.message || 'Failed to complete registration' });
   }
 });
 
-// 2. Verify 6-Digit Email OTP
-router.post('/verify-otp', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, otp, purpose } = req.body;
-
-    if (!email || !otp || !purpose) {
-      res.status(400).json({ success: false, error: 'Email, OTP code, and purpose are required' });
-      return;
-    }
-
-    // Query direct OTP verification table using Prisma method
-    const otps = await prisma.oTPVerification.findMany({
-      where: {
-        email: String(email),
-        purpose: String(purpose)
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 1
-    });
-
-    if (otps.length === 0) {
-      res.status(400).json({ success: false, error: 'Invalid OTP verification code' });
-      return;
-    }
-
-    const isMatch = await bcrypt.compare(String(otp), otps[0].otp);
-    if (!isMatch) {
-      res.status(400).json({ success: false, error: 'Invalid OTP verification code' });
-      return;
-    }
-
-    if (new Date(otps[0].expiresAt).getTime() < Date.now()) {
-      res.status(400).json({ success: false, error: 'Expired OTP verification code' });
-      return;
-    }
-
-    // For FORGOT_PASSWORD: issue a secure reset authorization token and invalidate the OTP
-    if (String(purpose) === 'FORGOT_PASSWORD') {
-      await prisma.oTPVerification.deleteMany({
-        where: { email: String(email), purpose: String(purpose) }
-      });
-      
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = await bcrypt.hash(rawToken, 10);
-      
-      await prisma.oTPVerification.create({
-        data: {
-          id: 'reset-token-' + Date.now(),
-          email: String(email),
-          otp: hashedToken,
-          purpose: 'PASSWORD_RESET_TOKEN',
-          expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-        }
-      });
-      
-      res.json({
-        success: true,
-        message: 'OTP verified. You may now reset your password.',
-        resetToken: rawToken
-      });
-      return;
-    }
-
-    // Mark user as verified (REGISTER only)
-    const updatedUser = await prisma.user.update({
-      where: { email: String(email) },
-      data: { isVerified: true }
-    });
-
-    // Delete utilized verification code
-    await prisma.oTPVerification.deleteMany({
-      where: {
-        email: String(email),
-        purpose: String(purpose)
-      }
-    });
-
-    const tokens = await generateTokens(updatedUser.id, req);
-
-    res.json({
-      success: true,
-      message: 'Email OTP validation successful! Account activated.',
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        name: updatedUser.name,
-        role: updatedUser.role,
-        phone: updatedUser.phone,
-        preferredLanguage: updatedUser.preferredLanguage
-      },
-      token: tokens.accessToken,
-      refreshToken: tokens.refreshToken
-    });
-  } catch (error) {
-    console.error('OTP Verification Error:', error);
-    res.status(500).json({ success: false, error: 'Verification failed' });
-  }
-});
-
-// 2b. Resend OTP
-router.post('/resend-otp', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, purpose } = req.body;
-    if (!email || !purpose) {
-      res.status(400).json({ success: false, error: 'Email and purpose are required' });
-      return;
-    }
-
-    const user = await prisma.user.findUnique({ where: { email: String(email) } });
-    if (!user) {
-      res.json({ success: true, message: 'If an account exists, a new OTP has been sent.' });
-      return;
-    }
-
-    if (purpose === 'REGISTER' && user.isVerified) {
-      res.status(400).json({ success: false, error: 'Account is already verified. Please log in.' });
-      return;
-    }
-
-    // Cooldown check (60 seconds)
-    const recentOtp = await prisma.oTPVerification.findFirst({
-      where: { email: String(email), purpose: String(purpose) },
-      orderBy: { createdAt: 'desc' }
-    });
-    
-    if (recentOtp && (Date.now() - new Date(recentOtp.createdAt).getTime() < 60000)) {
-      res.status(429).json({ success: false, error: 'Please wait 60 seconds before requesting a new OTP' });
-      return;
-    }
-
-    // Invalidate previous OTPs for this purpose
-    await prisma.oTPVerification.deleteMany({
-      where: {
-        email: String(email),
-        purpose: String(purpose)
-      }
-    });
-
-    const otp = crypto.randomInt(100000, 999999).toString();
-    const hashedOtp = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
-
-    await prisma.oTPVerification.create({
-      data: {
-        id: 'otp-' + Date.now() + '-' + crypto.randomInt(1000, 9999).toString(),
-        email: user.email,
-        otp: hashedOtp,
-        purpose: String(purpose),
-        expiresAt: expiresAt
-      }
-    });
-
-    const emailSent = await emailService.sendOtp(user.email, otp, String(purpose));
-    if (!emailSent) {
-      await prisma.oTPVerification.deleteMany({
-        where: { email: user.email, purpose: String(purpose) }
-      });
-      res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
-      return;
-    }
-
-    res.json({ success: true, message: 'If an account exists, a new OTP has been sent.' });
-  } catch (err) {
-    console.error('Resend OTP Error:', err);
-    res.status(500).json({ success: false, error: 'Failed to resend OTP' });
-  }
-});
-
-
-// 3. Request Password Recovery OTP
-router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      res.status(400).json({ success: false, error: 'Email address is required' });
-      return;
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: String(email) }
-    });
-
-    if (!user) {
-      res.json({
-        success: true,
-        message: 'If an account exists, a security recovery OTP has been dispatched to your email.'
-      });
-      return;
-    }
-
-    // Invalidate old tokens
-    await prisma.oTPVerification.deleteMany({
-      where: {
-        email: String(email),
-        purpose: 'FORGOT_PASSWORD'
-      }
-    });
-
-    // Cooldown check (60 seconds)
-    const recentOtp = await prisma.oTPVerification.findFirst({
-      where: { email: String(email), purpose: 'FORGOT_PASSWORD' },
-      orderBy: { createdAt: 'desc' }
-    });
-    
-    if (recentOtp && (Date.now() - new Date(recentOtp.createdAt).getTime() < 60000)) {
-      res.status(429).json({ success: false, error: 'Please wait 60 seconds before requesting a new OTP' });
-      return;
-    }
-
-    const otp = crypto.randomInt(100000, 999999).toString();
-    const hashedOtp = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins expiry for reset
-
-    await prisma.oTPVerification.create({
-      data: {
-        id: 'pwd-reset-' + Date.now() + '-' + crypto.randomInt(1000, 9999).toString(),
-        email: String(email),
-        otp: hashedOtp,
-        purpose: 'FORGOT_PASSWORD',
-        expiresAt: expiresAt
-      }
-    });
-
-    // Send real recovery OTP email via Resend
-    const emailSent = await emailService.sendOtp(String(email), otp, 'FORGOT_PASSWORD');
-    if (!emailSent) {
-      await prisma.oTPVerification.deleteMany({
-        where: { email: String(email), purpose: 'FORGOT_PASSWORD' }
-      });
-      res.status(500).json({ success: false, error: 'Unable to send verification email. Please try again later.' });
-      return;
-    }
-
-    res.json({
-      success: true,
-      message: 'If an account exists, a security recovery OTP has been dispatched to your email.'
-    });
-  } catch (error) {
-    console.error('Forgot Password Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to process forgot password' });
-  }
-});
-
-// 4. Complete Password Reset using Secure Token
-router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, resetToken, newPassword } = req.body;
-
-    if (!email || !resetToken || !newPassword) {
-      res.status(400).json({ success: false, error: 'Email, reset token, and new password are required' });
-      return;
-    }
-
-    if (!validatePasswordStrength(String(newPassword))) {
-      res.status(400).json({ 
-        success: false, 
-        error: 'New password must be at least 8 characters, with 1 uppercase, 1 lowercase, 1 number' 
-      });
-      return;
-    }
-
-    // Validate Reset Token securely against the database
-    const tokenRecords = await prisma.oTPVerification.findMany({
-      where: {
-        email: String(email),
-        purpose: 'PASSWORD_RESET_TOKEN',
-        expiresAt: { gt: new Date() }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    if (tokenRecords.length === 0) {
-      res.status(400).json({ success: false, error: 'Invalid or expired reset authorization. Please request a new OTP.' });
-      return;
-    }
-
-    const latestToken = tokenRecords[0];
-    const isTokenValid = await bcrypt.compare(String(resetToken), latestToken.otp);
-
-    if (!isTokenValid) {
-      res.status(400).json({ success: false, error: 'Invalid or expired reset authorization. Please request a new OTP.' });
-      return;
-    }
-
-    // Update user password hashed
-    const hashedPassword = await bcrypt.hash(String(newPassword), 10);
-    const user = await prisma.user.update({
-      where: { email: String(email) },
-      data: { 
-        password: hashedPassword,
-        isVerified: true // Auto-verify if they recover their account
-      }
-    });
-
-    // Invalidate all existing sessions
-    await prisma.session.updateMany({
-      where: { userId: user.id, revokedAt: null },
-      data: { revokedAt: new Date() }
-    });
-
-    // Delete utilized reset token
-    await prisma.oTPVerification.deleteMany({
-      where: { email: String(email), purpose: 'PASSWORD_RESET_TOKEN' }
-    });
-
-    res.json({
-      success: true,
-      message: 'Password reset and saved successfully!'
-    });
-  } catch (error) {
-    console.error('Reset Password Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to reset password' });
-  }
-});
-
-// 5. Change Password (Profile Page)
-router.post('/change-password', requireAuth, async (req: any, res: Response): Promise<void> => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      res.status(400).json({ success: false, error: 'Current password and new password are required' });
-      return;
-    }
-
-    if (!validatePasswordStrength(String(newPassword))) {
-      res.status(400).json({ 
-        success: false, 
-        error: 'New password must be at least 8 characters, with 1 uppercase, 1 lowercase, 1 number' 
-      });
-      return;
-    }
-
-    const userId = req.prismaUser.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!user) {
-      res.status(404).json({ success: false, error: 'User account not found' });
-      return;
-    }
-
-    // Check current password
-    const isMatch = await bcrypt.compare(String(currentPassword), user.password);
-    if (!isMatch) {
-      // Direct comparison as seeding fallback
-      if (user.password !== String(currentPassword)) {
-        res.status(400).json({ success: false, error: 'Incorrect current password' });
-        return;
-      }
-    }
-
-    // Hash and update
-    const hashedPassword = await bcrypt.hash(String(newPassword), 10);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword }
-    });
-
-    res.json({
-      success: true,
-      message: 'Password updated successfully!'
-    });
-  } catch (error) {
-    console.error('Change Password Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to update password' });
-  }
-});
-
-// 6. Traditional login (with verified checks)
+// 2. Login User via Supabase Auth
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password, role } = req.body;
 
     if (!email || !password) {
-      res.status(400).json({ success: false, error: 'Email and password required' });
+      res.status(400).json({ success: false, error: 'Email and password are required' });
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: String(email) }
+    const cleanEmail = String(email).toLowerCase();
+
+    // 1. Authenticate against Supabase Auth
+    let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password: String(password)
+    });
+
+    // Handle legacy seed account auto-provisioning into Supabase Auth
+    if (authError) {
+      const dbUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
+      if (dbUser) {
+        // Attempt creating or updating user in Supabase Auth for smooth transition
+        const { data: createdAuth, error: createError } = await supabase.auth.admin.createUser({
+          email: cleanEmail,
+          password: String(password),
+          email_confirm: true,
+          user_metadata: { name: dbUser.name, role: dbUser.role }
+        });
+
+        let targetAuthId = createdAuth?.user?.id;
+
+        if (createError && (createError.message.includes('already registered') || createError.message.includes('email_exists'))) {
+          // Find existing user across pages in Supabase and sync password
+          let page = 1;
+          while (page <= 5) {
+            const { data: listData } = await supabase.auth.admin.listUsers({ page, perPage: 100 });
+            if (!listData || !listData.users || listData.users.length === 0) break;
+            const match = listData.users.find(u => u.email?.toLowerCase() === cleanEmail);
+            if (match) {
+              targetAuthId = match.id;
+              await supabase.auth.admin.updateUserById(match.id, {
+                password: String(password),
+                email_confirm: true,
+                user_metadata: { name: dbUser.name, role: dbUser.role }
+              });
+              break;
+            }
+            if (listData.users.length < 100) break;
+            page++;
+          }
+        }
+
+        if (targetAuthId) {
+          await prisma.user.update({
+            where: { id: dbUser.id },
+            data: { authId: targetAuthId }
+          });
+
+          // Retry login
+          const retryAuth = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: String(password)
+          });
+          authData = retryAuth.data;
+          authError = retryAuth.error;
+        }
+      }
+    }
+
+    if (authError || !authData.session || !authData.user) {
+      res.status(401).json({ success: false, error: 'Invalid email or password credentials' });
+      return;
+    }
+
+    // 2. Lookup application User profile from Prisma PostgreSQL
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { authId: authData.user.id },
+          { email: cleanEmail }
+        ]
+      }
     });
 
     if (!user) {
-      await prisma.auditLog.create({
-        data: {
-          actorId: 'anonymous',
-          actorRole: 'UNKNOWN',
-          action: 'FAILED_LOGIN',
-          resource: 'Auth',
-          metadata: JSON.stringify({ reason: 'Invalid email', email }),
-          ip: req.ip || req.connection.remoteAddress,
-          userAgent: req.headers['user-agent']
-        }
-      });
-      res.status(401).json({ success: false, error: 'Invalid credentials' });
+      res.status(404).json({ success: false, error: 'Application profile not found' });
       return;
     }
 
-    if (user.isSuspended) {
-      await prisma.auditLog.create({
-        data: {
-          actorId: user.id,
-          actorRole: user.role,
-          action: 'FAILED_LOGIN',
-          resource: 'Auth',
-          metadata: JSON.stringify({ reason: 'Account suspended' }),
-          ip: req.ip || req.connection.remoteAddress,
-          userAgent: req.headers['user-agent']
-        }
+    // Link authId if missing
+    if (!user.authId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { authId: authData.user.id }
       });
+    }
+
+    if (user.isSuspended) {
       res.status(403).json({ success: false, error: 'Account suspended by administrator' });
       return;
     }
 
-    // Use bcrypt to compare password
-    const isMatch = await bcrypt.compare(String(password), user.password);
-
-    if (!isMatch) {
-      // Temporary fallback for plain text passwords from seeding
-      if (user.password === String(password)) {
-        console.warn(`Plain text password match for ${email}.`);
-      } else {
-        await prisma.auditLog.create({
-          data: {
-            actorId: user.id,
-            actorRole: user.role,
-            action: 'FAILED_LOGIN',
-            resource: 'Auth',
-            metadata: JSON.stringify({ reason: 'Invalid password' }),
-            ip: req.ip || req.connection.remoteAddress,
-            userAgent: req.headers['user-agent']
-          }
-        });
-        res.status(401).json({ success: false, error: 'Invalid credentials' });
-        return;
-      }
-    }
-
-    // Role Verification
+    // 3. Verify Portal Role Match
     if (role) {
       if (user.role === 'ADMIN' && role !== 'ADMIN') {
         res.status(403).json({
           success: false,
           error: 'ROLE_MISMATCH',
-          message: 'These credentials belong to an Admin. Please use the Admin login.'
+          message: 'These credentials belong to an Admin. Please use the Admin portal.'
         });
         return;
       }
@@ -640,7 +297,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
           res.status(403).json({
             success: false,
             error: 'ROLE_MISMATCH',
-            message: 'These credentials belong to an Equipment Owner. Please select Equipment Owner.'
+            message: 'These credentials belong to an Equipment Owner. Please select Owner portal.'
           });
           return;
         }
@@ -649,63 +306,69 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
           res.status(403).json({
             success: false,
             error: 'ROLE_MISMATCH',
-            message: 'These credentials belong to a Farmer. Please select Farmer.'
+            message: 'These credentials belong to a Farmer. Please select Farmer portal.'
           });
           return;
         }
       }
     }
 
-    // If the user was previously unverified (legacy), auto-verify them now since they have authenticated natively
-    if (!user.isVerified) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { isVerified: true }
-      });
-      user.isVerified = true;
-    }
-
-    let authenticatedUser = user;
-    if (req.body.pushToken && typeof req.body.pushToken === 'string') {
-      authenticatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: { pushToken: req.body.pushToken }
-      });
-    }
-
-    const tokens = await generateTokens(authenticatedUser.id, req);
-
     res.json({
       success: true,
       user: {
-        id: authenticatedUser.id,
-        email: authenticatedUser.email,
-        name: authenticatedUser.name,
-        role: authenticatedUser.role,
-        phone: authenticatedUser.phone,
-        preferredLanguage: authenticatedUser.preferredLanguage
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        phone: user.phone,
+        preferredLanguage: user.preferredLanguage,
+        authId: user.authId
       },
-      token: tokens.accessToken,
-      refreshToken: tokens.refreshToken
+      token: authData.session.access_token,
+      session: authData.session
     });
 
     await prisma.auditLog.create({
       data: {
-        actorId: authenticatedUser.id,
-        actorRole: authenticatedUser.role,
-        action: 'LOGIN',
+        actorId: user.id,
+        actorRole: user.role,
+        action: 'LOGIN_SUPABASE_AUTH',
         resource: 'Auth',
         ip: req.ip || req.connection.remoteAddress,
         userAgent: req.headers['user-agent']
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login Route Error:', error);
-    res.status(500).json({ success: false, error: 'Database connection failed' });
+    res.status(500).json({ success: false, error: 'Authentication failed' });
   }
 });
 
-// Get current user profile
+// 3. Request Password Reset via Supabase Auth
+router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ success: false, error: 'Email address is required' });
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(String(email).toLowerCase());
+    if (error) {
+      console.warn('Supabase reset password info:', error.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'If an account exists with this email, password recovery instructions have been initiated via Supabase Auth.'
+    });
+  } catch (error) {
+    console.error('Forgot Password Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to process forgot password' });
+  }
+});
+
+// 4. Get Current Authenticated Profile
 router.get('/me', requireAuth, async (req: any, res: Response): Promise<void> => {
   try {
     if (!req.prismaUser) {
@@ -718,7 +381,7 @@ router.get('/me', requireAuth, async (req: any, res: Response): Promise<void> =>
   }
 });
 
-// Update current user profile
+// 5. Update Current Profile
 router.put('/me', requireAuth, async (req: any, res: Response): Promise<void> => {
   try {
     if (!req.prismaUser) {
@@ -765,112 +428,65 @@ router.put('/me', requireAuth, async (req: any, res: Response): Promise<void> =>
   }
 });
 
-// 8. Refresh Token Endpoint
-router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) {
-      res.status(400).json({ error: 'Refresh token required' });
-      return;
-    }
-
-    // Find all active sessions, we have to check hashes
-    const activeSessions = await prisma.session.findMany({
-      where: {
-        revokedAt: null,
-        expiresAt: { gt: new Date() }
-      }
-    });
-
-    let validSession = null;
-    for (const session of activeSessions) {
-      const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
-      if (isMatch) {
-        validSession = session;
-        break;
-      }
-    }
-
-    if (!validSession) {
-      res.status(401).json({ error: 'Invalid or expired refresh token' });
-      return;
-    }
-
-    // Revoke the old session (Token Rotation)
-    await prisma.session.update({
-      where: { id: validSession.id },
-      data: { revokedAt: new Date() }
-    });
-
-    // Generate new tokens
-    const tokens = await generateTokens(validSession.userId, req);
-
-    res.json({
-      success: true,
-      token: tokens.accessToken,
-      refreshToken: tokens.refreshToken
-    });
-  } catch (error) {
-    console.error('Refresh Token Error:', error);
-    res.status(500).json({ error: 'Failed to refresh token' });
-  }
-});
-
-// 9. Logout Endpoint
-router.post('/logout', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { refreshToken } = req.body;
-    if (refreshToken) {
-      const activeSessions = await prisma.session.findMany({
-        where: { revokedAt: null }
-      });
-      for (const session of activeSessions) {
-        if (await bcrypt.compare(refreshToken, session.refreshTokenHash)) {
-          await prisma.session.update({
-            where: { id: session.id },
-            data: { revokedAt: new Date() }
-          });
-          
-          const user = await prisma.user.findUnique({ where: { id: session.userId } });
-          if (user) {
-            await prisma.auditLog.create({
-              data: {
-                actorId: user.id,
-                actorRole: user.role,
-                action: 'LOGOUT',
-                resource: 'Auth',
-                ip: req.ip || req.connection.remoteAddress,
-                userAgent: req.headers['user-agent']
-              }
-            });
-          }
-          break;
-        }
-      }
-    }
-    res.json({ success: true, message: 'Logged out successfully' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to logout' });
-  }
-});
-
-// Update preferred language
+// 6. Update Language Preference
 router.put('/language', requireAuth, async (req: any, res: Response): Promise<void> => {
   try {
     const { language } = req.body;
     if (!language) {
-      res.status(400).json({ error: 'Language is required' });
+      res.status(400).json({ success: false, error: 'Language parameter required' });
       return;
     }
-    
     const updatedUser = await prisma.user.update({
       where: { id: req.prismaUser.id },
-      data: { preferredLanguage: language }
+      data: { preferredLanguage: String(language) }
     });
-    
     res.json({ success: true, preferredLanguage: updatedUser.preferredLanguage });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update preferred language' });
+    res.status(500).json({ success: false, error: 'Failed to update language' });
+  }
+});
+
+// 8. Change Password via Supabase Auth & Prisma DB
+router.post('/change-password', requireAuth, async (req: any, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || String(newPassword).length < 8) {
+      res.status(400).json({ success: false, error: 'New password must be at least 8 characters long.' });
+      return;
+    }
+
+    const email = req.prismaUser.email;
+    if (currentPassword) {
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: String(currentPassword)
+      });
+      if (verifyError) {
+        res.status(400).json({ success: false, error: 'Current password is incorrect.' });
+        return;
+      }
+    }
+
+    if (req.prismaUser.authId) {
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        req.prismaUser.authId,
+        { password: String(newPassword) }
+      );
+      if (updateError) {
+        res.status(400).json({ success: false, error: updateError.message });
+        return;
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: req.prismaUser.id },
+      data: { password: String(newPassword) }
+    });
+
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (error: any) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to update password' });
   }
 });
 

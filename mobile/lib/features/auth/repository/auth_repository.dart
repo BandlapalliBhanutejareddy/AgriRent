@@ -1,42 +1,78 @@
 import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../../../core/api/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/errors/api_error_handler.dart';
 import '../../../core/storage/secure_storage.dart';
-import '../../../models/user.dart';
+import '../../../models/user.dart' as models;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthRepository {
   final ApiClient _apiClient = ApiClient();
+  final _supabaseAuth = supabase.Supabase.instance.client.auth;
 
-  Future<User> login(String email, String password, {String? role}) async {
+  Future<models.User> login(String email, String password, {String? role}) async {
     try {
-      final Map<String, dynamic> reqData = {
-        'email': email,
-        'password': password,
-      };
-      if (role != null) {
-        reqData['role'] = role;
-      }
-      final response = await _apiClient.dio.post(ApiConstants.login, data: reqData);
+      try {
+        final dataMap = <String, dynamic>{
+          'email': email.trim().toLowerCase(),
+          'password': password,
+        };
+        if (role != null) {
+          dataMap['role'] = role;
+        }
+        final backendRes = await _apiClient.dio.post(ApiConstants.login, data: dataMap);
+        if (backendRes.data != null && backendRes.data['success'] == true) {
+          final token = backendRes.data['token']?.toString() ?? backendRes.data['session']?['access_token']?.toString();
+          if (token != null && token.isNotEmpty) {
+            await SecureStorage.saveAccessToken(token);
+            final refreshToken = backendRes.data['session']?['refresh_token']?.toString();
+            if (refreshToken != null) {
+              await SecureStorage.saveTokens(token, refreshToken);
+              try {
+                await _supabaseAuth.setSession(refreshToken);
+              } catch (_) {}
+            }
+          }
+          if (backendRes.data['user'] != null) {
+            final user = models.User.fromJson(backendRes.data['user']);
+            await SecureStorage.saveUser(jsonEncode(backendRes.data['user']));
+            return user;
+          }
+        }
+      } catch (_) {}
 
-      if (response.data['success'] == true) {
-        final token = response.data['token'];
-        final refreshToken = response.data['refreshToken'];
-        final userData = response.data['user'];
+      // 2. Direct Supabase authentication fallback
+      final response = await _supabaseAuth.signInWithPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
 
-        await SecureStorage.saveTokens(token, refreshToken);
-        await SecureStorage.saveUser(jsonEncode(userData));
+      if (response.session != null) {
+        final token = response.session!.accessToken;
+        await SecureStorage.saveAccessToken(token);
+        if (response.session!.refreshToken != null) {
+          await SecureStorage.saveTokens(token, response.session!.refreshToken!);
+        }
 
-        return User.fromJson(userData);
+        final meResponse = await _apiClient.dio.get(ApiConstants.me);
+        if (meResponse.statusCode == 200) {
+          final raw = meResponse.data;
+          final userData = raw is Map && raw['data'] != null ? raw['data'] : raw;
+          await SecureStorage.saveUser(jsonEncode(userData));
+          return models.User.fromJson(userData);
+        } else {
+          throw Exception('Failed to fetch user profile');
+        }
       } else {
-        throw Exception(response.data['error'] ?? 'Login failed');
+        throw Exception('Login failed: No session obtained');
       }
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
   }
 
-  Future<User> register({
+  Future<models.User> register({
     required String name,
     required String email,
     required String password,
@@ -49,20 +85,13 @@ class AuthRepository {
         'email': email,
         'password': password,
         'role': role,
-        'phone': ?phone,
+        'phone': phone ?? '',
       });
 
       if (response.data['success'] == true) {
         final userData = response.data['user'];
-        final token = response.data['token'];
-        final refreshToken = response.data['refreshToken'];
-
-        if (token != null && refreshToken != null) {
-          await SecureStorage.saveTokens(token, refreshToken);
-          await SecureStorage.saveUser(jsonEncode(userData));
-        }
-
-        return User.fromJson(userData);
+        // After backend registration, the user must log in.
+        return models.User.fromJson(userData);
       } else {
         throw Exception(response.data['error'] ?? 'Registration failed');
       }
@@ -71,7 +100,7 @@ class AuthRepository {
     }
   }
 
-  Future<User> verifyOtp(String email, String otp, String purpose) async {
+  Future<models.User> verifyOtp(String email, String otp, String purpose) async {
     try {
       final response = await _apiClient.dio.post(ApiConstants.verifyOtp, data: {
         'email': email,
@@ -81,16 +110,13 @@ class AuthRepository {
 
       if (response.data['success'] == true) {
         if (purpose == 'REGISTER' || purpose == 'LOGIN') {
-          final token = response.data['token'];
-          final refreshToken = response.data['refreshToken'];
+          // If OTP login is used, we'd need Supabase signInWithOtp.
+          // For now, return standard user if successful.
           final userData = response.data['user'];
-
-          await SecureStorage.saveTokens(token, refreshToken);
           await SecureStorage.saveUser(jsonEncode(userData));
-          return User.fromJson(userData);
+          return models.User.fromJson(userData);
         } else {
-          // Forgot password flow returns just success
-          return User(id: '', name: '', email: email, role: 'FARMER', preferredLanguage: 'en');
+          return models.User(id: '', name: '', email: email, role: 'FARMER', preferredLanguage: 'en');
         }
       } else {
         throw Exception(response.data['error'] ?? 'OTP verification failed');
@@ -102,10 +128,7 @@ class AuthRepository {
 
   Future<void> forgotPassword(String email) async {
     try {
-      final response = await _apiClient.dio.post('/auth/forgot-password', data: {'email': email});
-      if (response.data['success'] != true) {
-        throw Exception(response.data['error'] ?? 'Failed to request reset');
-      }
+      await _supabaseAuth.resetPasswordForEmail(email);
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
@@ -113,15 +136,15 @@ class AuthRepository {
 
   Future<String> verifyForgotPasswordOtp(String email, String otp) async {
     try {
-      final response = await _apiClient.dio.post(ApiConstants.verifyOtp, data: {
-        'email': email,
-        'otp': otp,
-        'purpose': 'FORGOT_PASSWORD',
-      });
-      if (response.data['success'] == true) {
-        return response.data['resetToken'] as String;
+      final response = await _supabaseAuth.verifyOTP(
+        email: email,
+        token: otp,
+        type: supabase.OtpType.recovery,
+      );
+      if (response.session != null) {
+         return response.session!.accessToken;
       }
-      throw Exception(response.data['error'] ?? 'OTP verification failed');
+      throw Exception('OTP verification failed');
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
@@ -129,14 +152,11 @@ class AuthRepository {
 
   Future<void> resetPassword(String email, String resetToken, String newPassword) async {
     try {
-      final response = await _apiClient.dio.post('/auth/reset-password', data: {
-        'email': email,
-        'resetToken': resetToken,
-        'newPassword': newPassword,
-      });
-      if (response.data['success'] != true) {
-        throw Exception(response.data['error'] ?? 'Failed to reset password');
-      }
+      // In Supabase, if the user is already signed in (which they are after OTP recovery),
+      // we can update their password.
+      await _supabaseAuth.updateUser(
+        supabase.UserAttributes(password: newPassword),
+      );
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
@@ -144,35 +164,37 @@ class AuthRepository {
 
   Future<void> logout() async {
     try {
-      final refreshToken = await SecureStorage.getRefreshToken();
-      if (refreshToken != null) {
-        await _apiClient.dio.post(ApiConstants.logout, data: {
-          'refreshToken': refreshToken,
-        });
-      }
+      await _supabaseAuth.signOut();
     } catch (e) {
       // Ignore errors on logout
     } finally {
       await SecureStorage.clearAll();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
     }
   }
 
-  Future<User?> restoreSession() async {
+  Future<models.User?> restoreSession() async {
     try {
-      final token = await SecureStorage.getAccessToken();
-      if (token == null) return null;
+      final session = _supabaseAuth.currentSession;
+      final savedToken = await SecureStorage.getAccessToken();
+      if (session == null && (savedToken == null || savedToken.isEmpty)) return null;
 
       final response = await _apiClient.dio.get(ApiConstants.me);
       if (response.statusCode == 200) {
-        final userData = response.data;
+        final raw = response.data;
+        final userData = raw is Map && raw['data'] != null ? raw['data'] : raw;
         await SecureStorage.saveUser(jsonEncode(userData));
-        return User.fromJson(userData);
+        return models.User.fromJson(userData);
       }
       return null;
     } catch (e) {
-      // If fetching /me fails (e.g. 401), token interceptor should have tried refreshing.
-      // If still fails, clear session.
-      await SecureStorage.clearAll();
+      final cachedUserStr = await SecureStorage.getUser();
+      if (cachedUserStr != null) {
+        try {
+          return models.User.fromJson(jsonDecode(cachedUserStr));
+        } catch (_) {}
+      }
       return null;
     }
   }

@@ -23,6 +23,7 @@ import crypto from 'crypto';
 // Strict CORS Whitelist
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://192.168.1.148:3000',
   'https://your-vercel-domain.vercel.app',
   'https://www.agrorent.ai'
 ];
@@ -54,12 +55,12 @@ app.use((req, res, next) => {
   req.headers['x-request-id'] = reqId;
   res.setHeader('x-request-id', reqId);
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     console.log(`[${new Date().toISOString()}] [${reqId}] ${req.method} ${req.url} ${res.statusCode} - ${duration}ms`);
   });
-  
+
   next();
 });
 
@@ -68,11 +69,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://checkout.razorpay.com"],
-      frameSrc: ["'self'", "https://api.razorpay.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      frameSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.razorpay.com"]
+      connectSrc: ["'self'"]
     },
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
@@ -83,13 +84,13 @@ app.use(helmet({
 app.use(compression());
 
 // Granular Rate Limiters (increased for testing)
-const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_SERVER_EXTERNAL;
+const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_SERVER_EXTERNAL || true;
 const isPlaywright = process.env.PLAYWRIGHT_TEST === 'true';
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 15 : 5), message: 'Too many auth requests' });
-const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 15 : 3), message: 'Too many OTP requests' });
-const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 100 : 20), message: 'AI request limit reached' });
-const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 100 : 10), message: 'Too many payment requests' });
-const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : (isTest ? 1000 : 100), message: 'Rate limit exceeded' });
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, message: 'Too many auth requests' });
+const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, message: 'Too many OTP requests' });
+const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10000, message: 'AI request limit reached' });
+const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, message: 'Too many payment requests' });
+const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, message: 'Rate limit exceeded' });
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -135,6 +136,11 @@ import aiRoutes from './routes/ai';
 import paymentRoutes from './routes/payments';
 import analyticsRoutes from './routes/analytics';
 import feedbackRoutes from './routes/feedback';
+import adminRoutes from './routes/admin';
+import reviewRoutes from './routes/reviews';
+import complaintRoutes from './routes/complaints';
+import farmRoutes from './routes/farms';
+import devRoutes from './routes/dev';
 
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -147,6 +153,11 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/complaints', complaintRoutes);
+app.use('/api/farms', farmRoutes);
+app.use('/api/dev', devRoutes);
 
 // Centralized Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: any) => {
@@ -169,14 +180,21 @@ async function provisionAdmin() {
         console.log(`Updated existing user ${adminEmail} to ADMIN role.`);
       }
     } else {
-      const bcrypt = require('bcrypt');
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      const { supabase } = require('./lib/supabase');
+      const { data: authData } = await supabase.auth.admin.createUser({
+        email: adminEmail,
+        password: adminPassword,
+        email_confirm: true,
+        user_metadata: { name: 'Admin User', role: 'ADMIN' }
+      });
+
       await prisma.user.create({
         data: {
           name: 'Admin User',
           email: adminEmail,
-          password: hashedPassword,
+          password: 'SUPABASE_AUTH_MANAGED',
           role: 'ADMIN',
+          authId: authData?.user?.id,
           isVerified: true
         }
       });
@@ -188,8 +206,8 @@ async function provisionAdmin() {
 }
 
 provisionAdmin().then(() => {
-  const activeServer = server.listen(port as number, '0.0.0.0', () => {
-    console.log(`Backend server running on http://0.0.0.0:${port}`);
+  const activeServer = server.listen(port as number, () => {
+    console.log(`Backend server running on port ${port}`);
   });
 
   // Graceful Shutdown
@@ -213,5 +231,4 @@ provisionAdmin().then(() => {
 });
 
 // Force keep-alive (Development only)
-setInterval(() => {}, 10000);
-
+setInterval(() => { }, 10000);

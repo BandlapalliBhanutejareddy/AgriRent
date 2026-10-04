@@ -1,10 +1,9 @@
 import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcrypt'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Starting database seeding...');
+  console.log('Ã°Å¸Å’Â± Starting database seeding...');
 
   // Delete all existing equipment, bookings, and saved items as requested
   await prisma.paymentTransaction.deleteMany();
@@ -12,14 +11,14 @@ async function main() {
   await prisma.savedEquipment.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.equipment.deleteMany();
-  console.log('🗑️  Deleted all existing equipment, bookings, and saved equipment.');
+  console.log('Ã°Å¸â€”â€˜Ã¯Â¸Â  Deleted all existing equipment, bookings, and saved equipment.');
 
-  // 1. Create Demo Users with hashed passwords and verified status
+  // 1. Create Demo Users with verified status
   const users = [
     {
       name: "Owner Demo",
       email: "owner.demo@agrorent.ai",
-      password: await bcrypt.hash("Owner@123", 10),
+      password: "SUPABASE_AUTH_MANAGED",
       role: "OWNER",
       phone: "+919876543001",
       isVerified: true
@@ -27,7 +26,7 @@ async function main() {
     {
       name: "Farmer Demo",
       email: "farmer.demo@agrorent.ai",
-      password: await bcrypt.hash("Farmer@123", 10),
+      password: "SUPABASE_AUTH_MANAGED",
       role: "FARMER",
       phone: "+919876543002",
       isVerified: true
@@ -35,7 +34,7 @@ async function main() {
     {
       name: "Admin Demo",
       email: "admin.demo@agrorent.ai",
-      password: await bcrypt.hash("Admin@123", 10),
+      password: "SUPABASE_AUTH_MANAGED",
       role: "ADMIN",
       phone: "+919876543003",
       isVerified: true
@@ -48,15 +47,15 @@ async function main() {
       update: u,
       create: u,
     });
-    console.log(`ACCOUNT: ${u.name} | EMAIL: ${u.email} | ROLE: ${u.role} | PASSWORD: ${u.role.charAt(0) + u.role.slice(1).toLowerCase()}@123 | VERIFIED STATUS: ${u.isVerified}`);
+    console.log(`ACCOUNT: ${u.name} | EMAIL: ${u.email} | ROLE: ${u.role} | VERIFIED STATUS: ${u.isVerified}`);
   }
 
-  console.log('✅ Database seeded with Secure Demo Users and all old equipment removed.');
+  console.log('Ã¢Å“â€¦ Database seeded with Secure Demo Users and all old equipment removed.');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error during seeding:', e);
+    console.error('Ã¢ÂÅ’ Error during seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

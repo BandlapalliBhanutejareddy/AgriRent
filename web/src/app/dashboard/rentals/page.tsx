@@ -2,18 +2,60 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { 
-  Tractor
+import ChatModal from '@/components/ChatModal';
+import BookingTrackingTimeline from '@/components/BookingTrackingTimeline';
+import ReviewModal from '@/components/ReviewModal';
+import ComplaintModal from '@/components/ComplaintModal';
+import {
+  Tractor,
+  Phone,
+  MessageSquare,
+  Truck,
+  Star,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Download
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ToastProvider';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/formatters';
 
 export default function MyRentalsPage() {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+
+  const [chatModal, setChatModal] = useState<{ isOpen: boolean; bookingId: string | null; recipientName: string }>({
+    isOpen: false,
+    bookingId: null,
+    recipientName: ''
+  });
+
+  const [reviewModal, setReviewModal] = useState<{
+    isOpen: boolean;
+    bookingId: string;
+    equipmentId: string;
+    ownerId?: string;
+    targetName: string;
+  }>({
+    isOpen: false,
+    bookingId: '',
+    equipmentId: '',
+    targetName: ''
+  });
+
+  const [complaintModal, setComplaintModal] = useState<{
+    isOpen: boolean;
+    bookingId?: string;
+    equipmentId?: string;
+    targetUserId?: string;
+  }>({
+    isOpen: false
+  });
 
   useEffect(() => {
     fetchData();
@@ -21,6 +63,7 @@ export default function MyRentalsPage() {
 
   async function fetchData() {
     try {
+      setLoading(true);
       const bookingsRes = await api.get('/bookings?role=FARMER');
       setBookings(bookingsRes.data);
     } catch (error) {
@@ -33,24 +76,22 @@ export default function MyRentalsPage() {
 
   async function handleCancelBooking(id: string) {
     try {
+      if (!confirm('Cancel this booking request? Your payment will be refunded immediately.')) return;
       await api.put(`/bookings/${id}/status`, { status: 'CANCELLED' });
-      setBookings(prev => 
-        prev.map(b => b.id === id ? { ...b, status: 'CANCELLED' } : b)
-      );
+      showToast('Booking cancelled & full refund issued.', 'success');
+      fetchData();
     } catch (error) {
-      console.error('Failed to cancel booking', error);
+      showToast('Failed to cancel booking', 'warning');
     }
   }
 
-  async function handleRefundBooking(id: string) {
+  async function handleRequestReturn(bookingId: string) {
     try {
-      if (!confirm('Are you sure you want to cancel and request a refund?')) return;
-      await api.post(`/payments/${id}/refund`);
-      showToast('Refund initiated successfully', 'success');
-      fetchData(); // Refresh to get updated status
-    } catch (error) {
-      console.error('Failed to initiate refund', error);
-      showToast('Failed to initiate refund', 'warning');
+      await api.put(`/bookings/${bookingId}/status`, { status: 'RETURN_PENDING' });
+      showToast('Return request submitted to owner!', 'success');
+      fetchData();
+    } catch (err) {
+      showToast('Failed to submit return request', 'warning');
     }
   }
 
@@ -63,126 +104,230 @@ export default function MyRentalsPage() {
   }
 
   return (
-    <div className="animate-in fade-in duration-700">
-      <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[32px] shadow-sm border border-slate-200/50 dark:border-slate-800/50 overflow-hidden">
-        <div className="p-6 md:p-8 border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center bg-slate-50/30 dark:bg-slate-800/10">
-          <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{t('my_rentals', { defaultValue: 'My Rentals' })}</h3>
-            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mt-1">{t('track_orders', { defaultValue: 'Track and manage your orders' })}</p>
-          </div>
+    <div className="space-y-6 animate-in fade-in duration-700">
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            {t('my_rentals', { defaultValue: 'My Equipment Rentals' })}
+          </h1>
+          <p className="text-xs text-slate-500 font-semibold mt-1">
+            Track rental stages, request equipment returns, download tax invoices & rate owner service.
+          </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30">
-                <th className="p-6 font-black">{t('machinery', { defaultValue: 'Machinery' })}</th>
-                <th className="p-6 font-black">{t('owner_detail', { defaultValue: 'Owner Detail' })}</th>
-                <th className="p-6 font-black">{t('dates', { defaultValue: 'Dates' })}</th>
-                <th className="p-6 font-black">{t('pricing', { defaultValue: 'Pricing' })}</th>
-                <th className="p-6 font-black">{t('payment', { defaultValue: 'Payment' })}</th>
-                <th className="p-6 font-black">{t('status', { defaultValue: 'Status' })}</th>
-                <th className="p-6 font-black text-right">{t('actions', { defaultValue: 'Actions' })}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30">
-              {bookings.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-16 text-center">
-                    <div className="flex flex-col items-center justify-center space-y-4 max-w-sm mx-auto">
-                      <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 rounded-full shadow-sm">
-                        <Tractor size={32} />
-                      </div>
-                      <div>
-                        <h4 className="font-black text-slate-800 dark:text-white text-lg">{t('no_rentals', { defaultValue: 'No rentals yet' })}</h4>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
-                          {t('no_rentals_desc', { defaultValue: 'You haven\'t requested any machinery rentals yet. Connect with verified fleet owners to lease top-tier machinery.' })}
-                        </p>
-                      </div>
-                      <Link 
-                        href="/dashboard/marketplace" 
-                        className="mt-4 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/20 hover:-translate-y-0.5"
-                      >
-                        {t('explore_marketplace', { defaultValue: 'Explore Marketplace' })}
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                bookings.map((booking) => (
-                  <tr key={booking.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="p-6">
-                       <div className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight">{booking.equipment?.title}</div>
-                       <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{booking.equipment?.category}</div>
-                    </td>
-                    <td className="p-6">
-                       <div className="font-bold text-slate-700 dark:text-slate-300 text-sm">{booking.owner?.name}</div>
-                       <div className="text-[10px] text-slate-400 font-black tracking-widest mt-1">{booking.owner?.phone}</div>
-                    </td>
-                    <td className="p-6 text-slate-600 dark:text-slate-400 font-medium text-xs">
-                       {new Date(booking.startDate).toLocaleDateString()} - {new Date(booking.endDate).toLocaleDateString()}
-                    </td>
-                    <td className="p-6 font-black text-slate-900 dark:text-white">₹{booking.totalPrice?.toLocaleString()}</td>
-                    <td className="p-6">
-                      {booking.paymentStatus === 'PAID' ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 w-fit">
-                            PAID
-                          </span>
-                          <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/payments/${booking.id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-600 hover:underline flex items-center gap-1 font-bold">
-                            Download Invoice
-                          </a>
-                        </div>
-                      ) : booking.paymentStatus === 'REFUNDED' ? (
-                        <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 w-fit">
-                          REFUNDED
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 w-fit">
-                          {booking.paymentStatus || 'PENDING'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-6">
-                      <span className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm
-                        ${booking.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50' : 
-                          booking.status === 'ACCEPTED' || booking.status === 'ACTIVE' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' : 
-                          booking.status === 'REJECTED' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/50' : 
-                          'bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700/50'}`}
-                      >
-                        {booking.status}
-                      </span>
-                    </td>
-                    <td className="p-6 text-right">
-                      {booking.status === 'PENDING' ? (
-                        <button 
-                          onClick={() => handleCancelBooking(booking.id)}
-                          className="px-4 py-2 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
-                        >
-                          {t('cancel')}
-                        </button>
-                      ) : booking.paymentStatus === 'PAID' && (booking.status === 'CONFIRMED' || booking.status === 'ACCEPTED') ? (
-                        <button 
-                          onClick={() => handleRefundBooking(booking.id)}
-                          className="px-4 py-2 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
-                        >
-                          Request Refund
-                        </button>
-                      ) : booking.status === 'COMPLETED' ? (
-                        <Link 
-                          href={`/dashboard/feedback?type=equipment&id=${booking.equipment?.id}`}
-                          className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 hover:text-indigo-700 border border-indigo-200 dark:border-indigo-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm inline-block"
-                        >
-                          Rate Equipment
-                        </Link>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Link
+          href="/dashboard/marketplace"
+          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-600/20 text-center shrink-0"
+        >
+          + Rent More Machinery
+        </Link>
       </div>
+
+      {/* Rentals List */}
+      <div className="space-y-4">
+        {bookings.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-16 text-center border border-slate-200/50 dark:border-slate-800/50 shadow-sm">
+            <div className="flex flex-col items-center justify-center space-y-4 max-w-sm mx-auto">
+              <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 rounded-full">
+                <Tractor size={36} />
+              </div>
+              <div>
+                <h4 className="font-black text-slate-800 dark:text-white text-lg">No active or past rentals</h4>
+                <p className="text-xs text-slate-500 font-medium mt-1">
+                  Lease verified tractors, rotavators, and harvesters from nearby equipment owners with zero hidden fees.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/marketplace"
+                className="mt-4 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
+              >
+                Browse Machinery Marketplace
+              </Link>
+            </div>
+          </div>
+        ) : (
+          bookings.map((booking) => {
+            const isExpanded = expandedBookingId === booking.id;
+            const isCompleted = booking.status === 'COMPLETED';
+            const isPending = booking.status === 'PENDING';
+            const isActive = booking.status === 'ACTIVE' || booking.status === 'ACCEPTED' || booking.status === 'CONFIRMED' || booking.status === 'DISPATCHED';
+
+            return (
+              <div
+                key={booking.id}
+                className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200/80 dark:border-slate-800/80 p-5 md:p-6 shadow-sm hover:shadow-md transition-all space-y-4"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+
+                  {/* Equipment & Owner Info */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden shrink-0">
+                      <img
+                        src={booking.equipment?.imageUrl || '/equipment/tractor.jpg'}
+                        alt={booking.equipment?.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-black text-slate-900 dark:text-white text-base">
+                          {booking.equipment?.title}
+                        </h3>
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                          booking.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                          booking.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                          booking.status === 'REJECTED' || booking.status === 'CANCELLED' ? 'bg-red-50 text-red-600 border-red-200' :
+                          'bg-blue-50 text-blue-600 border-blue-200'
+                        }`}>
+                          {booking.status === 'PENDING' ? 'Ã¢ÂÂ³ Pending Approval' : booking.status}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
+                        <span>Owner: <strong className="text-slate-700 dark:text-slate-300">{booking.equipment?.owner?.name || 'Verified Owner'}</strong></span>
+                        <span>Ã¢â‚¬Â¢</span>
+                        <span>Dates: <strong className="text-indigo-600 dark:text-indigo-400">{new Date(booking.startDate).toLocaleDateString()} &rarr; {new Date(booking.endDate).toLocaleDateString()}</strong></span>
+                      </p>
+
+                      <div className="flex items-center gap-3 mt-2 text-xs font-bold">
+                        <span className="text-emerald-600 dark:text-emerald-400">Total: {formatCurrency(booking.totalPrice)}</span>
+                        {booking.securityDeposit > 0 && (
+                          <span className="text-slate-400">Deposit: Ã¢â€šÂ¹{booking.securityDeposit}</span>
+                        )}
+                        <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-md text-[9px] uppercase tracking-wider font-black">
+                          {booking.paymentStatus}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Toolbar */}
+                  <div className="flex flex-wrap items-center gap-2 justify-end">
+
+                    {/* Chat button */}
+                    <button
+                      onClick={() => setChatModal({ isOpen: true, bookingId: booking.id, recipientName: booking.equipment?.owner?.name || 'Owner' })}
+                      className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
+                    >
+                      <MessageSquare size={14} className="text-emerald-500" /> Chat Owner
+                    </button>
+
+                    {/* Phone button */}
+                    {booking.equipment?.owner?.phone && (
+                      <a
+                        href={`tel:${booking.equipment.owner.phone}`}
+                        className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
+                      >
+                        <Phone size={14} className="text-blue-500" /> Call
+                      </a>
+                    )}
+
+                    {/* Tracking Timeline Drawer Toggle */}
+                    <button
+                      onClick={() => setExpandedBookingId(isExpanded ? null : booking.id)}
+                      className="px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
+                    >
+                      <Truck size={14} />
+                      Tracking {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+
+                    {/* Context Actions */}
+                    {isPending && (
+                      <button
+                        onClick={() => handleCancelBooking(booking.id)}
+                        className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+
+                    {isActive && (
+                      <button
+                        onClick={() => handleRequestReturn(booking.id)}
+                        className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
+                      >
+                        Request Return
+                      </button>
+                    )}
+
+                    {booking.status === 'RETURN_PENDING' && (
+                      <span className="px-3 py-2 bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold italic">
+                        Return Pending Owner Inspection
+                      </span>
+                    )}
+
+                    {isCompleted && (
+                      <button
+                        onClick={() => setReviewModal({
+                          isOpen: true,
+                          bookingId: booking.id,
+                          equipmentId: booking.equipmentId,
+                          ownerId: booking.equipment?.ownerId,
+                          targetName: booking.equipment?.owner?.name || 'Owner'
+                        })}
+                        className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                      >
+                        <Star size={14} className="fill-amber-400" /> Rate Experience
+                      </button>
+                    )}
+
+                    {/* Report Dispute button */}
+                    <button
+                      onClick={() => setComplaintModal({ isOpen: true, bookingId: booking.id, equipmentId: booking.equipmentId, targetUserId: booking.equipment?.ownerId })}
+                      className="p-2.5 text-slate-400 hover:text-red-500 rounded-xl transition-colors"
+                      title="File Dispute / Report Issue"
+                    >
+                      <AlertTriangle size={16} />
+                    </button>
+
+                  </div>
+                </div>
+
+                {/* Collapsible Tracking Timeline */}
+                {isExpanded && (
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                    <BookingTrackingTimeline
+                      status={booking.status}
+                      statusHistory={booking.statusHistory}
+                      startDate={booking.startDate}
+                      endDate={booking.endDate}
+                      returnInspection={booking.returnInspection}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <ChatModal
+        bookingId={chatModal.bookingId}
+        isOpen={chatModal.isOpen}
+        onClose={() => setChatModal({ isOpen: false, bookingId: null, recipientName: '' })}
+        title="Equipment Owner Chat"
+        recipientName={chatModal.recipientName}
+      />
+
+      <ReviewModal
+        isOpen={reviewModal.isOpen}
+        onClose={() => setReviewModal(prev => ({ ...prev, isOpen: false }))}
+        bookingId={reviewModal.bookingId}
+        equipmentId={reviewModal.equipmentId}
+        targetName={reviewModal.targetName}
+        type="FARMER_RATING"
+        onSuccess={fetchData}
+      />
+
+      <ComplaintModal
+        isOpen={complaintModal.isOpen}
+        onClose={() => setComplaintModal({ isOpen: false })}
+        bookingId={complaintModal.bookingId}
+        equipmentId={complaintModal.equipmentId}
+        targetUserId={complaintModal.targetUserId}
+      />
+
     </div>
   );
 }

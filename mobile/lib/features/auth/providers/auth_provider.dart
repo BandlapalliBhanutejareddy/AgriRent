@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/user.dart';
 import '../repository/auth_repository.dart';
+import '../../../core/localization/app_localizations.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository();
@@ -32,14 +33,22 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
+  final Ref _ref;
 
-  AuthNotifier(this._repository) : super(AuthState(isLoading: true)) {
+  AuthNotifier(this._repository, this._ref) : super(AuthState(isLoading: true)) {
     _init();
+  }
+
+  void _syncLanguage(User? user) {
+    if (user != null && user.preferredLanguage.isNotEmpty) {
+      _ref.read(languageProvider.notifier).setLanguage(user.preferredLanguage, syncBackend: false);
+    }
   }
 
   Future<void> _init() async {
     try {
       final user = await _repository.restoreSession();
+      _syncLanguage(user);
       state = state.copyWith(user: user, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false);
@@ -54,6 +63,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final user = await _repository.login(email, password, role: role);
+      _syncLanguage(user);
       state = state.copyWith(user: user, isLoading: false);
       return true;
     } catch (e) {
@@ -72,8 +82,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final user = await _repository.register(name: name, email: email, password: password, role: role, phone: phone);
+      _syncLanguage(user);
       state = state.copyWith(user: user, isLoading: false);
-      return true; // Successfully registered and logged in
+      return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       return false;
@@ -85,6 +96,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final user = await _repository.verifyOtp(email, otp, purpose);
       if (purpose == 'REGISTER' || purpose == 'LOGIN') {
+        _syncLanguage(user);
         state = state.copyWith(user: user, isLoading: false);
       } else {
         state = state.copyWith(isLoading: false);
@@ -149,5 +161,5 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(repository);
+  return AuthNotifier(repository, ref);
 });

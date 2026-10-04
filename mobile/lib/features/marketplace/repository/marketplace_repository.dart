@@ -16,27 +16,41 @@ class MarketplaceRepository {
     String? sort,
   }) async {
     try {
-      final queryParams = {
+      final queryParams = <String, dynamic>{
         'page': page,
         'limit': limit,
         'available': 'true',
-        if (category != null && category.isNotEmpty) 'category': category,
-        if (search != null && search.isNotEmpty) 'search': search,
-        'minPrice': ?minPrice,
-        'maxPrice': ?maxPrice,
-        'sort': ?sort,
       };
+      if (category != null && category.isNotEmpty) queryParams['category'] = category;
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
+      if (minPrice != null) queryParams['minPrice'] = minPrice;
+      if (maxPrice != null) queryParams['maxPrice'] = maxPrice;
+      if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
 
       final response = await _apiClient.dio.get(
         ApiConstants.equipment,
         queryParameters: queryParams,
       );
 
-      // The response is wrapped by responseMiddleware, so it looks like { success: true, data: { data: [...], pagination: {...} } }
-      final Map<String, dynamic> payload = response.data['data'] ?? {};
-      final List<dynamic> rawData = payload['data'] is List ? payload['data'] : (payload is List ? payload : []);
-      final List<Equipment> equipment = rawData.map((e) => Equipment.fromJson(e)).toList();
-      final pagination = payload['pagination'] ?? {};
+      final dynamic resData = response.data;
+      final List<dynamic> rawList = (resData is Map && resData['data'] is List)
+          ? resData['data']
+          : (resData is List
+              ? resData
+              : (resData is Map && resData['data'] is Map && resData['data']['data'] is List
+                  ? resData['data']['data']
+                  : (resData is Map && resData['equipment'] is List ? resData['equipment'] : [])));
+
+      final List<Equipment> equipment = rawList
+          .whereType<Map>()
+          .map((e) => Equipment.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+
+      final Map<String, dynamic> pagination = (resData is Map && resData['pagination'] is Map)
+          ? Map<String, dynamic>.from(resData['pagination'] as Map)
+          : ((resData is Map && resData['data'] is Map && resData['data']['pagination'] is Map)
+              ? Map<String, dynamic>.from(resData['data']['pagination'] as Map)
+              : {'totalPages': 1, 'page': page, 'total': equipment.length});
 
       return {
         'equipment': equipment,

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import i18n from '@/lib/i18n';
 
 interface User {
   id: string;
@@ -42,10 +43,21 @@ export const useStore = create<AppState>()(
           else if (user.role === 'ADMIN') defaultActive = 'ADMIN';
           else if (user.role === 'BOTH') defaultActive = defaultActive || null;
         }
+
+        // Sync language to global i18n instance instantly
+        if (user.preferredLanguage) {
+          if (i18n.language !== user.preferredLanguage) {
+            i18n.changeLanguage(user.preferredLanguage);
+          }
+        }
+
         return { user, activeRole: defaultActive };
       }),
       setActiveRole: (activeRole) => set({ activeRole }),
-      logout: () => set({ session: null, user: null, activeRole: null }),
+      logout: () => {
+        i18n.changeLanguage('en'); // prevent language leak to next user session
+        set({ session: null, user: null, activeRole: null });
+      },
     }),
     {
       name: 'agrorent-storage',

@@ -3,25 +3,26 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  Tractor, 
-  LogOut, 
-  Bell, 
-  BookOpen, 
-  Sparkles, 
-  Menu, 
-  X, 
-  Search, 
-  Sun, 
-  Moon, 
-  User, 
-  ShieldAlert, 
-  Settings, 
-  ClipboardList, 
-  PlusCircle, 
-  Users, 
-  Activity, 
+import {
+  LayoutDashboard,
+  Tractor,
+  LogOut,
+  Bell,
+  BookOpen,
+  Sparkles,
+  Menu,
+  X,
+  Search,
+  Sun,
+  Moon,
+  User,
+  ShieldAlert,
+  Settings,
+  ClipboardList,
+  PlusCircle,
+  Users,
+  Activity,
+  CheckCircle,
   BarChart3,
   CalendarDays,
   CreditCard,
@@ -59,7 +60,7 @@ export default function DashboardLayout({
   // Strict Role Guards to prevent role leakage
   useEffect(() => {
     if (!user) return;
-    
+
     if (pathname === '/dashboard/role-select') {
       if (user.role !== 'BOTH' || storedActive) {
         window.location.href = storedActive === 'FARMER' ? '/dashboard/farmer' : '/dashboard';
@@ -68,12 +69,12 @@ export default function DashboardLayout({
     }
 
     const role = currentRole;
-    
+
     if (role === 'ROLE_SELECT') {
       window.location.href = '/dashboard/role-select';
       return;
     }
-    
+
     if (role === 'FARMER') {
       if (pathname === '/dashboard' || pathname.startsWith('/dashboard/equipment') || pathname.startsWith('/dashboard/admin')) {
         window.location.href = '/dashboard/farmer';
@@ -129,11 +130,11 @@ export default function DashboardLayout({
   const NavLink = ({ href, icon: Icon, label, exact = false }: { href: string, icon: any, label: string, exact?: boolean }) => {
     const isActive = exact ? pathname === href : pathname.startsWith(href) && (href !== '/dashboard' || pathname === '/dashboard');
     return (
-      <Link 
+      <Link
         href={href}
         className={`flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all duration-300 ${
-          isActive 
-            ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 dark:from-emerald-500/20 dark:to-teal-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/20 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)]' 
+          isActive
+            ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 dark:from-emerald-500/20 dark:to-teal-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/20 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)]'
             : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200'
         }`}
         onClick={() => setIsMobileMenuOpen(false)}
@@ -148,14 +149,12 @@ export default function DashboardLayout({
     if (role === 'ADMIN') {
       return (
         <>
-          <NavLink href="/dashboard/admin" icon={LayoutDashboard} label={t('overview')} exact />
-          <NavLink href="/dashboard/admin#users" icon={Users} label={t('users')} />
-          <NavLink href="/dashboard/admin#moderation" icon={ShieldAlert} label={t('equipment_moderation')} />
-          <NavLink href="/dashboard/admin#bookings" icon={ClipboardList} label={t('bookings')} />
-          <NavLink href="/dashboard/admin#revenue" icon={BarChart3} label={t('revenue')} />
-          <NavLink href="/dashboard/admin#health" icon={Activity} label={t('system_health')} />
-          <NavLink href="/dashboard/admin#audit" icon={History} label={t('audit_logs')} />
-          <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
+          <NavLink href="/dashboard/admin" icon={LayoutDashboard} label="Dashboard" exact />
+          <NavLink href="/dashboard/admin/operations" icon={Activity} label="Operations Monitor" />
+          <NavLink href="/dashboard/admin/alerts" icon={Bell} label="Alerts & Notifications" />
+          <NavLink href="/dashboard/admin/health" icon={ShieldAlert} label="System Health" />
+          <NavLink href="/dashboard/admin/quality" icon={CheckCircle} label="Data Quality" />
+          <NavLink href="/dashboard/profile" icon={Settings} label="Profile Settings" />
         </>
       );
     }
@@ -169,6 +168,7 @@ export default function DashboardLayout({
           <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides')} />
           <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label={t('ai_advisor')} />
           <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
+          <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
         </>
       );
     }
@@ -179,13 +179,37 @@ export default function DashboardLayout({
         <NavLink href="/dashboard/equipment" icon={Tractor} label={t('fleet_management')} exact />
         <NavLink href="/dashboard/equipment/new" icon={PlusCircle} label={t('add_equipment')} />
         <NavLink href="/dashboard/bookings" icon={ClipboardList} label={t('booking_requests')} />
-        <NavLink href="/dashboard/analytics" icon={BarChart3} label={t('analytics')} />
-        <NavLink href="/dashboard/analytics" icon={CreditCard} label={t('revenue')} />
         <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
         <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
       </>
     );
   };
+
+  const [unreadNotif, setUnreadNotif] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const checkNotifications = async () => {
+      try {
+        const { api } = await import('@/lib/api');
+        const [notifRes, chatRes] = await Promise.all([
+          api.get('/notifications').catch(() => ({ data: [] })),
+          api.get('/chat/unread-count').catch(() => ({ data: { unreadCount: 0 } }))
+        ]);
+
+        const list = Array.isArray(notifRes.data) ? notifRes.data : notifRes.data.data || [];
+        const hasUnreadNotif = list.some((n: any) => !n.read);
+        const hasUnreadChat = (chatRes.data?.unreadCount || 0) > 0;
+
+        setUnreadNotif(hasUnreadNotif || hasUnreadChat);
+      } catch (err) {
+        setUnreadNotif(false);
+      }
+    };
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   if (currentRole === 'ROLE_SELECT') {
     return (
@@ -197,7 +221,7 @@ export default function DashboardLayout({
           </Link>
           <div className="flex items-center space-x-3 md:space-x-5">
             <LanguageSwitcher />
-            <button 
+            <button
               onClick={toggleTheme}
               className="p-2.5 text-slate-500 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 rounded-2xl transition-all"
             >
@@ -217,9 +241,9 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 font-sans selection:bg-emerald-500/30">
-      
+
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -233,24 +257,24 @@ export default function DashboardLayout({
             <span className="text-2xl font-black bg-gradient-to-r from-emerald-500 to-blue-600 bg-clip-text text-transparent tracking-tight">
               {t('agrorent_ai')}</span>
             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mt-0.5">
-              {role === 'ADMIN' ? 'Admin Portal' : role === 'FARMER' ? 'Farmer Portal' : 'Owner Portal'}
+              {role === 'ADMIN' ? t('admin_portal', {defaultValue: 'Admin Portal'}) : role === 'FARMER' ? t('farmer_portal', {defaultValue: 'Farmer Portal'}) : t('owner_portal', {defaultValue: 'Owner Portal'})}
             </span>
           </Link>
-          <button 
+          <button
             className="md:hidden p-2 text-slate-400 hover:text-slate-700 bg-slate-100 dark:bg-slate-800 rounded-xl transition-all"
             onClick={() => setIsMobileMenuOpen(false)}
           >
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-4 space-y-1.5 custom-scrollbar">
           {renderSidebarLinks()}
         </div>
 
         <div className="p-4 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
           <NavLink href="/dashboard/profile" icon={Settings} label={t('profile_settings')} exact />
-          <button 
+          <button
             onClick={handleLogout}
             data-testid="logout-button-mobile"
             className="p-2.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 bg-slate-50 dark:bg-slate-800/50 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all md:hidden"
@@ -263,9 +287,9 @@ export default function DashboardLayout({
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <header className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl h-20 flex items-center justify-between px-6 md:px-10 z-30 border-b border-slate-200/50 dark:border-slate-800/50 transition-colors duration-300">
-          
+
           <div className="flex items-center space-x-4">
-            <button 
+            <button
               className="md:hidden p-2.5 text-slate-500 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 rounded-xl transition-all"
               onClick={() => setIsMobileMenuOpen(true)}
             >
@@ -289,23 +313,25 @@ export default function DashboardLayout({
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-3 md:space-x-5">
             <LanguageSwitcher />
-            
-            <button 
+
+            <button
               onClick={toggleTheme}
               className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700 rounded-2xl transition-all"
             >
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            <Link 
+            <Link
               href="/dashboard/notifications"
               className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700 rounded-2xl transition-all relative"
             >
               <Bell size={18} />
-              <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full"></span>
+              {unreadNotif && (
+                <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full animate-pulse" />
+              )}
             </Link>
 
             <div className="flex items-center space-x-3 md:border-l md:pl-5 border-slate-200 dark:border-slate-700">
@@ -324,7 +350,7 @@ export default function DashboardLayout({
                   user?.name?.charAt(0) || role.charAt(0)
                 )}
               </Link>
-              <button 
+              <button
                 onClick={handleLogout}
                 data-testid="logout-button"
                 className="hidden md:flex p-2.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all ml-2"

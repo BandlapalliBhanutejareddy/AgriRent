@@ -1,399 +1,397 @@
-'use client';
+"use client";
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { 
-  Users, 
-  Tractor, 
-  CalendarCheck, 
-  IndianRupee, 
-  Activity, 
-  UserX, 
-  UserCheck, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Users,
+  Tractor,
+  CalendarCheck,
+  IndianRupee,
+  Activity,
+  ShieldAlert,
+  UserCheck,
   Search,
-  TrendingUp,
-  Brain
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  CheckCircle,
+  XCircle,
+  AlertTriangle
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useToast } from '@/components/ToastProvider';
 import { useTranslation } from "react-i18next";
+import { formatCurrency } from '@/lib/formatters';
 
 export default function AdminDashboard() {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
   const { showToast } = useToast();
-  const [stats, setStats] = useState<any>({
-    totalUsers: 0,
-    totalFarmers: 0,
-    totalOwners: 0,
-    totalEquipment: 0,
-    activeRentals: 0,
-    platformRevenue: 0,
-    revenueGraph: [],
-    totalAdmins: 0,
-    availableEquipment: 0,
-    pendingBookings: 0,
-    completedRentals: 0,
-    cancelledRentals: 0,
-    recentUsers: [],
-    recentEquipment: [],
-    recentBookings: []
-  });
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'USERS' | 'EQUIPMENT' | 'BOOKINGS' | 'COMPLAINTS' | 'AUDIT'>('OVERVIEW');
+
+  // Stats
+  const [stats, setStats] = useState<any>({
+    users: { total: 0, farmers: 0, owners: 0, admins: 0, suspended: 0, pendingVerification: 0 },
+    equipment: { total: 0, available: 0, rented: 0, pendingModeration: 0 },
+    bookings: { total: 0, pending: 0, confirmed: 0, active: 0, completed: 0, cancelled: 0, rejected: 0 },
+    financial: { gmv: 0, platformRevenue: 0, ownerRevenue: 0, refunds: 0 },
+    moderation: { openComplaints: 0, totalFeedback: 0 }
+  });
+
+  // Table Data & Pagination State
   const [users, setUsers] = useState<any[]>([]);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [bookingsList, setBookingsList] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [complaintsData, setComplaintsData] = useState<{ feedbacks: any[]; complaints: any[]; equipmentReviews: any[]; userReviews: any[]; }>({ feedbacks: [], complaints: [], equipmentReviews: [], userReviews: [] });
 
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterRole, setFilterRole] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [apiError, setApiError] = useState(false);
+
+  // Detail Modals
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<any>(null);
 
   useEffect(() => {
-    fetchAdminData();
+    const syncHash = () => {
+      const hash = window.location.hash.replace('#', '').toUpperCase();
+      if (['USERS', 'EQUIPMENT', 'BOOKINGS', 'COMPLAINTS', 'AUDIT'].includes(hash)) {
+        setActiveTab(hash as any);
+      } else {
+        setActiveTab('OVERVIEW');
+      }
+      setPage(1); // Reset page on tab change
+    };
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
   }, []);
 
-  async function fetchAdminData() {
+  useEffect(() => {
+    fetchData();
+  }, [activeTab, page, limit, searchQuery, filterRole, filterStatus]);
+
+  async function fetchData() {
     try {
-      const response = await api.get('/analytics/admin');
-      if (response.data) {
-        setStats({
-          totalUsers: response.data.totalUsers || 0,
-          totalFarmers: response.data.totalFarmers || 0,
-          totalOwners: response.data.totalOwners || 0,
-          totalEquipment: response.data.totalEquipment || 0,
-          activeRentals: response.data.activeRentals || 0,
-          platformRevenue: (response.data.totalEquipment * 12500) || 0, // In a real app this would be actual calculated platform fee
-          revenueGraph: response.data.revenueGraph || [],
-          totalAdmins: response.data.totalAdmins || 0,
-          availableEquipment: response.data.availableEquipment || 0,
-          pendingBookings: response.data.pendingBookings || 0,
-          completedRentals: response.data.completedRentals || 0,
-          cancelledRentals: response.data.cancelledRentals || 0,
-          recentUsers: response.data.recentUsers || [],
-          recentEquipment: response.data.recentEquipment || [],
-          recentBookings: response.data.recentBookings || []
-        });
-        
-        if (response.data.platformActivity) {
-          setActivityLogs(response.data.platformActivity.map((log: any) => ({
-            time: new Date(log.createdAt).toLocaleString(),
-            message: `[${log.action}] ${log.actorRole} on ${log.resource}`,
-            type: 'SYSTEM'
-          })));
-        }
-      }
-
-      const usersRes = await api.get('/analytics/admin/users');
-      if (usersRes.data) {
-        setUsers(usersRes.data.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role,
-          status: u.isSuspended ? 'SUSPENDED' : 'ACTIVE',
-          phone: u.phone || 'AgroRent User'
-        })));
-      }
-
-      const eqRes = await api.get('/analytics/admin/equipment');
-      if (eqRes.data) {
-        setEquipmentList(eqRes.data.map((eq: any) => ({
-          id: eq.id,
-          title: eq.title,
-          category: eq.category,
-          owner: eq.owner?.name || 'Agro Partner',
-          price: eq.pricePerDay,
-          status: eq.available ? 'APPROVED' : 'PENDING',
-          location: eq.location || 'Punjab, India'
-        })));
-      }
-
-      const txRes = await api.get('/payments/admin/payments');
-      if (txRes.data) {
-        setTransactions(txRes.data);
+      setLoading(true);
+      setApiError(false);
+      if (activeTab === 'OVERVIEW') {
+        const res = await api.get('/admin/stats');
+        setStats(res.data);
+      } else if (activeTab === 'USERS') {
+        const res = await api.get(`/admin/users?page=${page}&limit=${limit}&search=${searchQuery}&role=${filterRole}&status=${filterStatus}`);
+        setUsers(res.data.data || []);
+        setTotalItems(res.data.total || 0);
+      } else if (activeTab === 'EQUIPMENT') {
+        const res = await api.get(`/admin/equipment?page=${page}&limit=${limit}&search=${searchQuery}&status=${filterStatus}`);
+        setEquipmentList(res.data.data || []);
+        setTotalItems(res.data.total || 0);
+      } else if (activeTab === 'BOOKINGS') {
+        const res = await api.get(`/admin/bookings?page=${page}&limit=${limit}&search=${searchQuery}&status=${filterStatus}`);
+        setBookingsList(res.data.data || []);
+        setTotalItems(res.data.total || 0);
+      } else if (activeTab === 'COMPLAINTS') {
+        const res = await api.get('/admin/feedback-complaints');
+        setComplaintsData(res.data || { feedbacks: [], complaints: [], equipmentReviews: [], userReviews: [] });
+      } else if (activeTab === 'AUDIT') {
+        const res = await api.get(`/admin/audit-logs?page=${page}&limit=${limit}`);
+        setAuditLogs(res.data.data || []);
+        setTotalItems(res.data.total || 0);
       }
     } catch (error) {
-      console.error('Failed to load admin dataset:', error);
+      console.error('Failed to load admin data:', error);
+      showToast('Failed to load live admin data', 'warning');
+      setApiError(true);
+      setTotalItems(0);
+      setBookingsList([]);
+      setUsers([]);
+      setEquipmentList([]);
+      setAuditLogs([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  async function handleToggleUserStatus(id: string, currentStatus: string) {
-    try {
-      const response = await api.put(`/analytics/admin/users/${id}/suspend`);
-      if (response.data) {
-        const nextStatus = response.data.isSuspended ? 'SUSPENDED' : 'ACTIVE';
-        setUsers(prev => prev.map(u => u.id === id ? { ...u, status: nextStatus } : u));
-        
-        if (nextStatus === 'SUSPENDED') {
-          showToast('User account successfully suspended.', 'warning');
-          setActivityLogs(prev => [
-            { time: 'Just now', message: `Administrator suspended user ID ${id.substring(0,6)}...`, type: 'SYSTEM' },
-            ...prev
-          ]);
-        } else {
-          showToast('User account successfully activated.', 'success');
-        }
-      }
-    } catch (err) {
-      showToast('Failed to modify user status.', 'warning');
-    }
-  };
-
-  async function handleDeleteUser(id: string, name: string) {
-    if (confirm(`Are you sure you want to permanently delete user ${name}?`)) {
-      try {
-        await api.delete(`/analytics/admin/users/${id}`);
-        setUsers(prev => prev.filter(u => u.id !== id));
-        showToast('User account permanently deleted.', 'success');
-      } catch (err) {
-        showToast('Failed to delete user account.', 'warning');
-      }
-    }
-  };
-
-  async function handleApproveEquipment(id: string, title: string) {
-    try {
-      await api.put(`/analytics/admin/equipment/${id}/toggle`);
-      setEquipmentList(prev => prev.map(eq => eq.id === id ? { ...eq, status: 'APPROVED' } : eq));
-      showToast(`Approved listing: ${title}`, 'success');
-    } catch (err) {
-      showToast('Failed to update equipment moderation.', 'warning');
-    }
-  };
-
-  async function handleRejectEquipment(id: string, title: string) {
-    try {
-      await api.put(`/analytics/admin/equipment/${id}/toggle`);
-      setEquipmentList(prev => prev.map(eq => eq.id === id ? { ...eq, status: 'PENDING' } : eq));
-      showToast(`Flagged listing: ${title}`, 'warning');
-    } catch (err) {
-      showToast('Failed to flag equipment.', 'warning');
-    }
-  };
-
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="space-y-8 animate-pulse">
-        <div className="h-44 bg-slate-200 dark:bg-slate-800 rounded-[32px]" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-32 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
-          ))}
-        </div>
-        <div className="h-96 bg-slate-200 dark:bg-slate-800 rounded-[32px]" />
-      </div>
-    );
   }
 
+  const navigateTo = (tab: string) => {
+    window.location.hash = tab.toLowerCase();
+  };
+
+  async function handleToggleUserStatus(userId: string, isSuspended: boolean) {
+    try {
+      await api.put(`/admin/users/${userId}/suspend`, { isSuspended: !isSuspended });
+      showToast(isSuspended ? 'User un-suspended successfully' : 'User suspended', 'success');
+      fetchData();
+    } catch (err) {
+      showToast('Failed to update user status', 'warning');
+    }
+  }
+
+  async function handleVerifyOwner(userId: string, isVerified: boolean) {
+    try {
+      await api.put(`/admin/users/${userId}/verify`, { isVerified: !isVerified });
+      showToast(isVerified ? 'Owner verification revoked' : 'Owner verified successfully!', 'success');
+      fetchData();
+    } catch (err) {
+      showToast('Failed to verify owner', 'warning');
+    }
+  }
+
+  async function handleEquipmentModeration(equipmentId: string, available: boolean) {
+    try {
+      await api.put(`/admin/equipment/${equipmentId}/moderation`, { available: !available });
+      showToast(available ? 'Equipment listing disabled' : 'Equipment listing approved!', 'success');
+      fetchData();
+    } catch (err) {
+      showToast('Failed to update equipment status', 'warning');
+    }
+  }
+
+  async function handleUpdateComplaintStatus(complaintId: string, status: string) {
+    try {
+      await api.put(`/admin/complaints/${complaintId}/status`, { status });
+      showToast(`Complaint status updated to ${status}`, 'success');
+      fetchData();
+    } catch (err) {
+      showToast('Failed to update complaint status', 'warning');
+    }
+  }
+
+  async function openUserDetails(userId: string) {
+    try {
+      const res = await api.get(`/admin/users/${userId}`);
+      setSelectedUser(res.data);
+    } catch (err) {
+      showToast('Failed to load user details', 'warning');
+    }
+  }
+
+  const PaginationControls = () => {
+    const totalPages = Math.ceil(totalItems / limit) || 1;
+    return (
+      <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-4 mt-4 text-xs font-semibold text-slate-500">
+        <div>
+          Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems}
+        </div>
+        <div className="flex gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <span>Rows per page:</span>
+            <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="bg-slate-100 dark:bg-slate-800 rounded p-1">
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="p-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-50"><ChevronLeft size={16} /></button>
+            <span className="p-1">Page {page} of {totalPages}</span>
+            <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="p-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-50"><ChevronRight size={16} /></button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 p-8 md:p-10 rounded-[32px] text-white shadow-2xl shadow-purple-900/20 border border-purple-500/30 relative overflow-hidden backdrop-blur-xl">
-        <div className="absolute -top-20 -left-20 w-64 h-64 rounded-full blur-[80px] bg-purple-500/30" />
-        <div className="absolute bottom-10 right-10 w-40 h-40 rounded-full blur-[60px] bg-indigo-500/20" />
-        
-        <div className="relative z-10 space-y-3">
-          <span className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest bg-white/10 backdrop-blur-md text-purple-300 rounded-xl border border-white/20 shadow-sm inline-flex items-center gap-1.5">
-            <Activity size={12} /> {t('platform_command_center')}</span>
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-2">{t('platform_control_panel')}</h1>
-          <p className="text-purple-100/80 mt-1.5 text-sm max-w-xl font-medium leading-relaxed">
-            {t('monitor_real_time_rental_transactions_mo')}</p>
-        </div>
-        <div className="relative z-10 flex gap-4 shrink-0">
-          {/* Removed hardcoded fake health stats */}
+    <div className="space-y-8 animate-in fade-in duration-700 pb-12">
+      {/* Banner */}
+      <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 p-8 md:p-10 rounded-[32px] text-white shadow-2xl border border-emerald-500/30 relative overflow-hidden backdrop-blur-xl space-y-6">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <span className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-400/30 inline-flex items-center gap-1.5">
+              <Activity size={12} /> AgroRent Control Center
+            </span>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-2">Platform Administration</h1>
+          </div>
+
+          <div className="flex flex-wrap gap-2 bg-white/10 p-1.5 rounded-2xl backdrop-blur-md border border-white/15">
+            {[
+              { key: 'OVERVIEW', label: 'Overview' },
+              { key: 'USERS', label: 'Users' },
+              { key: 'EQUIPMENT', label: 'Equipment' },
+              { key: 'BOOKINGS', label: 'Bookings' },
+              { key: 'COMPLAINTS', label: 'Disputes' },
+              { key: 'AUDIT', label: 'Audit Logs' }
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => navigateTo(tab.key)}
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                  activeTab === tab.key
+                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Metric Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-300">
-          <div className="flex justify-between items-start mb-6">
-            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-110 transition-transform">
-              <Users size={24} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('total_users')}</span>
-            <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{stats.totalUsers}</h3>
-            <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1 mt-1">
-              Farmers: {stats.totalFarmers} | Owners: {stats.totalOwners} | Admins: {stats.totalAdmins}
-            </span>
-          </div>
-        </div>
+      {loading && activeTab === 'OVERVIEW' && <div className="h-44 bg-slate-200 dark:bg-slate-800 rounded-[32px] animate-pulse" />}
 
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-emerald-500/50 transition-all duration-300">
-          <div className="flex justify-between items-start mb-6">
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl group-hover:scale-110 transition-transform">
-              <Tractor size={24} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('platform_machinery')}</span>
-            <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{stats.totalEquipment}</h3>
-            <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1"><TrendingUp size={12}/> {stats.availableEquipment} Available</span>
-          </div>
-        </div>
+      {/* OVERVIEW */}
+      {!loading && activeTab === 'OVERVIEW' && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-amber-500/50 transition-all duration-300">
-          <div className="flex justify-between items-start mb-6">
-            <div className="p-4 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform">
-              <CalendarCheck size={24} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('active_bookings')}</span>
-            <h3 className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{stats.activeRentals}</h3>
-            <span className="text-[10px] font-bold text-amber-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-              <span>Pending: {stats.pendingBookings}</span>
-              <span>Completed: {stats.completedRentals}</span>
-              <span>Cancelled: {stats.cancelledRentals}</span>
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-purple-500/50 transition-all duration-300">
-          <div className="flex justify-between items-start mb-6">
-            <div className="p-4 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-2xl group-hover:scale-110 transition-transform">
-              <IndianRupee size={24} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('est_gmv')}</span>
-            <h3 className="text-3xl font-black text-purple-600 dark:text-purple-400 mt-1 tracking-tighter">₹{stats.platformRevenue.toLocaleString()}</h3>
-            <span className="text-[10px] font-bold text-purple-500 flex items-center gap-1 mt-1"><TrendingUp size={12}/> {t('gross_volume')}</span>
-          </div>
-        </div>
-
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        <div id="revenue" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm w-full">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">{t('financial_growth')}</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t('platform_revenue_volume_inr')}</p>
-            </div>
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl">
-              <TrendingUp size={20} className="text-emerald-600 dark:text-emerald-400" />
-            </div>
-          </div>
-          <div className="h-[250px]">
-            {stats.revenueGraph?.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.revenueGraph} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorAdminRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.1} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} tickFormatter={(val) => `₹${val}`} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)' }}
-                    itemStyle={{ color: '#10B981', fontWeight: 'bold' }}
-                    labelStyle={{ color: '#64748b', fontWeight: 'bold', fontSize: '10px', textTransform: 'uppercase' }}
-                  />
-                  <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorAdminRev)" activeDot={{ r: 6, strokeWidth: 0, fill: '#10B981' }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 space-y-3 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                <Activity size={32} className="opacity-50" />
-                <span className="text-xs font-bold uppercase tracking-wider">{t('no_revenue_records_found')}</span>
+            <div onClick={() => navigateTo('USERS')} className="cursor-pointer hover:scale-[1.02] transition-transform bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-500 rounded-2xl w-fit">
+                <Users size={24} />
               </div>
-            )}
+              <div>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Total Marketplace Users</span>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white mt-1">{stats.users.total}</h3>
+                <p className="text-xs text-indigo-500 font-bold mt-1">Farmers: {stats.users.farmers} | Owners: {stats.users.owners}</p>
+              </div>
+            </div>
+
+            <div onClick={() => navigateTo('EQUIPMENT')} className="cursor-pointer hover:scale-[1.02] transition-transform bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-2xl w-fit">
+                <Tractor size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Fleet Equipment</span>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white mt-1">{stats.equipment.total}</h3>
+                <p className="text-xs text-emerald-500 font-bold mt-1">Available: {stats.equipment.available} | Rented: {stats.equipment.rented}</p>
+              </div>
+            </div>
+
+            <div onClick={() => navigateTo('BOOKINGS')} className="cursor-pointer hover:scale-[1.02] transition-transform bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-500 rounded-2xl w-fit">
+                <CalendarCheck size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Bookings Volume</span>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white mt-1">{stats.bookings.total}</h3>
+                <p className="text-xs text-amber-500 font-bold mt-1">Active: {stats.bookings.active} | Pending: {stats.bookings.pending}</p>
+              </div>
+            </div>
+
+            <div onClick={() => navigateTo('BOOKINGS')} className="cursor-pointer hover:scale-[1.02] transition-transform bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="p-3 bg-purple-50 dark:bg-purple-950/40 text-purple-500 rounded-2xl w-fit">
+                <IndianRupee size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Gross GMV</span>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white mt-1">{formatCurrency(stats.financial.gmv)}</h3>
+                <p className="text-xs text-purple-500 font-bold mt-1">Platform Fee: {formatCurrency(stats.financial.platformRevenue)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-[28px] p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-amber-100 dark:bg-amber-900/50 text-amber-600 rounded-2xl">
+                  <ShieldAlert size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-amber-900 dark:text-amber-300 text-sm">Open Disputes & Complaints</h4>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{stats.moderation.openComplaints} unresolved cases require admin moderation.</p>
+                </div>
+              </div>
+              <button onClick={() => navigateTo('COMPLAINTS')} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shrink-0">
+                Review Cases
+              </button>
+            </div>
+
+            <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-[28px] p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 rounded-2xl">
+                  <UserCheck size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">Owner Verification Requests</h4>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">{stats.users.pendingVerification} pending owners awaiting identity check.</p>
+                </div>
+              </div>
+              <button onClick={() => navigateTo('USERS')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shrink-0">
+                Manage Users
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* User moderations panel */}
-        <div id="users" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm xl:col-span-2 flex flex-col h-full">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      {/* USERS */}
+      {activeTab === 'USERS' && (
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">{t('platform_users')}</h3>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t('suspend_or_activate_member_accounts')}</p>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">User Accounts Moderation</h3>
             </div>
-            
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder={t('search_users')}
-                className="pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs text-slate-800 dark:text-white font-medium w-full sm:w-64 transition-all"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
+            <div className="flex gap-4 items-center flex-wrap">
+              <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none">
+                <option value="All">All Roles</option>
+                <option value="FARMER">Farmer</option>
+                <option value="OWNER">Owner</option>
+                <option value="BOTH">Both</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none">
+                <option value="All">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Suspended</option>
+              </select>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="text" placeholder="Search user..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
+              </div>
             </div>
           </div>
-
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left text-sm border-collapse">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30">
-                  <th className="p-6 font-black">{t('name')}</th>
-                  <th className="p-6 font-black">{t('role')}</th>
-                  <th className="p-6 font-black">{t('phone')}</th>
-                  <th className="p-6 font-black">{t('status')}</th>
-                  <th className="p-6 font-black text-right">{t('actions')}</th>
+                <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                  <th className="p-4">User ID / Name</th>
+                  <th className="p-4">Role</th>
+                  <th className="p-4">Enrollment</th>
+                  <th className="p-4">Verification</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30">
-                {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-10 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
-                      {t('no_users_found')}</td>
-                  </tr>
-                ) : filteredUsers.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="p-6">
-                      <div className="font-bold text-slate-900 dark:text-slate-100 tracking-tight">{u.name}</div>
-                      <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{u.email}</div>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                {apiError ? <tr><td colSpan={6} className="p-8 text-center text-red-500 text-xs font-bold">Unable to load data. <button onClick={fetchData} className="ml-2 underline">Retry</button></td></tr> : users.length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-bold">No users found.</td></tr> : null}
+                {users.map(u => (
+                  <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <td className="p-4">
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        {u.name || 'User'}
+                        <button onClick={() => openUserDetails(u.id)} className="text-emerald-600 hover:text-emerald-700"><Eye size={14} /></button>
+                      </div>
+                      <div className="text-xs text-slate-400">{u.email} | {u.phone || 'N/A'}</div>
                     </td>
-                    <td className="p-6">
-                      <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${u.role === 'OWNER' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'}`}>
-                        {u.role}
+                    <td className="p-4">
+                      <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{u.role}</span>
+                    </td>
+                    <td className="p-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{new Date(u.createdAt).toLocaleDateString()}</td>
+                    <td className="p-4">
+                      {['OWNER', 'BOTH'].includes(u.role) ? (
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${u.isVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {u.isVerified ? 'Ã¢Å“â€œ Verified' : 'Unverified'}
+                        </span>
+                      ) : <span className="text-xs text-slate-400">-</span>}
+                    </td>
+                    <td className="p-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${u.isSuspended ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {u.isSuspended ? 'SUSPENDED' : 'ACTIVE'}
                       </span>
                     </td>
-                    <td className="p-6 font-bold text-slate-600 dark:text-slate-400 text-xs">{u.phone}</td>
-                    <td className="p-6">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${u.status === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                        ● {u.status}
-                      </span>
-                    </td>
-                    <td className="p-6 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => handleToggleUserStatus(u.id, u.status)}
-                          className={`p-2.5 rounded-xl border transition-all shadow-sm ${
-                            u.status === 'ACTIVE'
-                              ? 'bg-red-50 dark:bg-red-900/20 text-red-600 border-red-200 dark:border-red-800/50 hover:bg-red-100'
-                              : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100'
-                          }`}
-                          title={u.status === 'ACTIVE' ? "Suspend Access" : "Activate Access"}
-                        >
-                          {u.status === 'ACTIVE' ? <UserX size={16} /> : <UserCheck size={16} />}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(u.id, u.name)}
-                          data-testid="admin-delete-user"
-                          className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-500 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm"
-                          title={t('permanently_delete_user')}
-                        >
-                          <XCircle size={16} />
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {['OWNER', 'BOTH'].includes(u.role) && (
+                          <button onClick={() => handleVerifyOwner(u.id, u.isVerified)} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-100">
+                            {u.isVerified ? 'Revoke KYC' : 'Approve KYC'}
+                          </button>
+                        )}
+                        <button onClick={() => handleToggleUserStatus(u.id, u.isSuspended)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${u.isSuspended ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
+                          {u.isSuspended ? 'Unsuspend' : 'Suspend'}
                         </button>
                       </div>
                     </td>
@@ -402,162 +400,225 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+          <PaginationControls />
         </div>
+      )}
 
-        {/* System Activity logs */}
-        <div id="audit" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between h-full">
-          <div>
-            <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight mb-1">{t('system_audit_logs')}</h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6">{t('realtime_event_stream')}</p>
-            
-            <div className="space-y-5">
-              {activityLogs.length === 0 ? (
-                 <div className="text-slate-400 text-center py-8 text-xs font-bold uppercase tracking-widest">{t('no_recent_logs')}</div>
-              ) : (
-                activityLogs.map((log, idx) => (
-                  <div key={idx} className="flex gap-4 text-xs leading-relaxed p-4 bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
-                    <div className="w-2 h-2 rounded-full bg-purple-500 mt-1.5 shrink-0" />
-                    <div>
-                      <p className="text-slate-700 dark:text-slate-300 font-bold">{log.message}</p>
-                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1 block">{log.time}</span>
-                    </div>
-                  </div>
-                ))
-              )}
+      {/* EQUIPMENT */}
+      {activeTab === 'EQUIPMENT' && (
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Equipment Moderation</h3>
             </div>
-          </div>
-          
-          <button 
-            onClick={() => showToast('Logs audited and stored in persistent S3 archives.', 'success')}
-            data-testid="admin-save"
-            className="w-full mt-8 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm"
-          >
-            {t('archive_logs')}</button>
-        </div>
-      </div>
-
-      {/* Equipment moderation list */}
-      <div id="moderation" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm space-y-6">
-        <div>
-          <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">{t('machinery_moderation')}</h3>
-          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t('approve_newly_submitted_equipment_listin')}</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {equipmentList.map(eq => (
-            <div key={eq.id} className="p-6 bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/50 rounded-3xl flex flex-col justify-between gap-4 shadow-sm hover:shadow-md transition-all">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="font-black text-slate-900 dark:text-white text-base tracking-tight leading-tight">{eq.title}</h4>
-                  <span className={`px-2 py-1 rounded-lg text-[9px] font-black tracking-widest uppercase shrink-0 ${eq.status === 'APPROVED' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 border border-emerald-200/50' : eq.status === 'REJECTED' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 border border-red-200/50' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 border border-amber-200/50 animate-pulse'}`}>
-                    {eq.status}
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest flex items-center gap-2">
-                  <span>{eq.owner}</span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">₹{eq.price}{t('day')}</span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-bold">{eq.location}</p>
-              </div>
-
-              <div className="flex gap-2 mt-2 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
-                {eq.status === 'PENDING' ? (
-                  <>
-                    <button
-                      onClick={() => handleApproveEquipment(eq.id, eq.title)}
-                      className="flex-1 flex justify-center items-center gap-1.5 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] uppercase tracking-widest font-black shadow-md transition-all hover:-translate-y-0.5"
-                    >
-                      <CheckCircle size={14} /> {t('approve')}</button>
-                    <button
-                      onClick={() => handleRejectEquipment(eq.id, eq.title)}
-                      className="flex-1 flex justify-center items-center gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] uppercase tracking-widest font-black shadow-sm transition-all"
-                    >
-                      <XCircle size={14} /> {t('flag')}</button>
-                  </>
-                ) : (
-                  <span className="w-full text-center py-2 text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800/50 rounded-xl">
-                    {t('moderated')}</span>
-                )}
+            <div className="flex gap-4 items-center flex-wrap">
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none">
+                <option value="All">All Status</option>
+                <option value="Available">Available / Approved</option>
+                <option value="Disabled">Disabled</option>
+              </select>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="text" placeholder="Search equipment..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
               </div>
             </div>
-          ))}
-          
-          {equipmentList.length === 0 && (
-             <div className="col-span-full text-center py-12 text-slate-400 font-bold uppercase tracking-widest text-xs">
-                {t('no_equipment_awaiting_moderation')}</div>
-          )}
-        </div>
-      </div>
-
-      {/* Financial Transactions */}
-      <div id="transactions" className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[32px] shadow-sm border border-slate-200/50 dark:border-slate-800/50 overflow-hidden mt-8">
-        <div className="p-6 md:p-8 border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center bg-slate-50/30 dark:bg-slate-800/10">
-          <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Financial Transactions</h3>
-            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-1">Platform payment and refund ledger</p>
           </div>
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl">
-            <IndianRupee size={20} className="text-emerald-600 dark:text-emerald-400" />
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead>
-              <tr className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30">
-                <th className="p-6 font-black">Transaction ID</th>
-                <th className="p-6 font-black">Booking / Parties</th>
-                <th className="p-6 font-black">Date</th>
-                <th className="p-6 font-black">Amount</th>
-                <th className="p-6 font-black">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/30">
-              {transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-16 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
-                    No transactions found
-                  </td>
+          <div className="overflow-x-auto">
+             <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                  <th className="p-4">Equipment / ID</th>
+                  <th className="p-4">Owner</th>
+                  <th className="p-4">Price</th>
+                  <th className="p-4">Created Date</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
-              ) : (
-                transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="p-6">
-                      <div className="font-bold text-slate-900 dark:text-slate-100 text-xs tracking-tight break-all">{tx.razorpayOrderId}</div>
-                      <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">{tx.id}</div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                {apiError ? <tr><td colSpan={6} className="p-8 text-center text-red-500 text-xs font-bold">Unable to load data. <button onClick={fetchData} className="ml-2 underline">Retry</button></td></tr> : equipmentList.length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-bold">No equipment found.</td></tr> : null}
+                {equipmentList.map(eq => (
+                  <tr key={eq.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <td className="p-4">
+                      <div className="font-bold text-slate-900 dark:text-white">{eq.title}</div>
+                      <div className="text-[10px] text-slate-400">{eq.category} | ID: {eq.id.slice(-6).toUpperCase()}</div>
                     </td>
-                    <td className="p-6">
-                      <div className="font-bold text-slate-700 dark:text-slate-300 text-xs">{tx.booking?.equipment?.title || 'Unknown Equipment'}</div>
-                      <div className="text-[10px] text-slate-500 font-bold mt-1">
-                        Farmer: {tx.booking?.farmer?.name} | Owner: {tx.booking?.equipment?.owner?.name}
-                      </div>
+                    <td className="p-4 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      {eq.owner?.name || 'Owner'}
+                      <div className="text-[10px] text-slate-400">{eq.owner?.email}</div>
                     </td>
-                    <td className="p-6">
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                        {new Date(tx.createdAt).toLocaleString()}
+                    <td className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300">Ã¢â€šÂ¹{eq.pricePerDay}/day</td>
+                    <td className="p-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{new Date(eq.createdAt).toLocaleDateString()}</td>
+                    <td className="p-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${eq.available ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {eq.available ? 'APPROVED' : 'DISABLED'}
                       </span>
                     </td>
-                    <td className="p-6">
-                      <div className="font-black text-emerald-600 dark:text-emerald-400">₹{tx.amount?.toLocaleString()}</div>
-                    </td>
-                    <td className="p-6">
-                      <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm
-                        ${tx.status === 'PAYMENT_CAPTURED' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 border-emerald-200' : 
-                          tx.status === 'ORDER_CREATED' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 border-amber-200' : 
-                          tx.status === 'FAILED' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 border-red-200' : 
-                          'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 border-indigo-200'}`}
-                      >
-                        {tx.status}
-                      </span>
+                    <td className="p-4 text-right">
+                      <button onClick={() => handleEquipmentModeration(eq.id, eq.available)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${eq.available ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
+                        {eq.available ? 'Disable' : 'Approve'}
+                      </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <PaginationControls />
         </div>
-      </div>
+      )}
 
+      {/* BOOKINGS */}
+      {activeTab === 'BOOKINGS' && (
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Bookings & Revenue Report</h3>
+            </div>
+            <div className="flex gap-4 items-center flex-wrap">
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none">
+                <option value="All">All Status</option>
+                <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="ACTIVE">Active</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="text" placeholder="Search ID, farmer, owner..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+             <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead>
+                <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                  <th className="p-4">Date / Booking ID</th>
+                  <th className="p-4">Equipment</th>
+                  <th className="p-4">Farmer</th>
+                  <th className="p-4">Owner</th>
+                  <th className="p-4">Crop / Operation</th>
+                  <th className="p-4">Amount</th>
+                  <th className="p-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
+                {apiError ? <tr><td colSpan={7} className="p-8 text-center text-red-500 text-xs font-bold">Unable to load booking data. <button onClick={fetchData} className="ml-2 underline">Retry</button></td></tr> : bookingsList.length === 0 ? <tr><td colSpan={7} className="p-8 text-center text-slate-500 text-xs font-bold">No bookings found.</td></tr> : null}
+                {bookingsList.map(b => (
+                  <tr key={b.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <td className="p-4 text-xs">
+                      <div className="font-bold text-slate-900 dark:text-white">{new Date(b.createdAt).toLocaleDateString()}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{b.id.slice(-8).toUpperCase()}</div>
+                    </td>
+                    <td className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300">{b.equipment?.title || 'Unknown'}</td>
+                    <td className="p-4 text-xs">
+                      <div className="font-bold text-slate-700 dark:text-slate-300">{b.farmer?.name || 'Unknown'}</div>
+                      <div className="text-[10px] text-slate-400">{b.farmer?.email}</div>
+                    </td>
+                    <td className="p-4 text-xs">
+                      <div className="font-bold text-slate-700 dark:text-slate-300">{b.owner?.name || 'Unknown'}</div>
+                      <div className="text-[10px] text-slate-400">{b.owner?.email}</div>
+                    </td>
+                    <td className="p-4 text-xs text-slate-500">
+                      {b.crop ? b.crop.name : 'Not available'}
+                    </td>
+                    <td className="p-4">
+                      <div className="font-bold text-emerald-600">{b.payment?.amount ? formatCurrency(b.payment.amount) : '-'}</div>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-widest">{b.payment?.status || 'UNPAID'}</div>
+                    </td>
+                    <td className="p-4">
+                      <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[9px] font-black uppercase tracking-widest">{b.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <PaginationControls />
+        </div>
+      )}
+
+      {/* COMPLAINTS */}
+      {activeTab === 'COMPLAINTS' && (
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Disputes & Complaints</h3>
+          </div>
+          <div className="space-y-4">
+            {complaintsData.complaints.length === 0 ? (
+              <p className="text-center py-12 text-slate-400 font-bold text-xs">No disputes or complaints found.</p>
+            ) : (
+              complaintsData.complaints.map(comp => (
+                <div key={comp.id} className="p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-3xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-[9px] font-black uppercase tracking-wider">{comp.category}</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">{new Date(comp.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{comp.description}</p>
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Status: <strong className="text-amber-600">{comp.status}</strong></span>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleUpdateComplaintStatus(comp.id, 'RESOLVED')} className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-700">Resolve</button>
+                      <button onClick={() => handleUpdateComplaintStatus(comp.id, 'DISMISSED')} className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-slate-300">Dismiss</button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* AUDIT LOGS */}
+      {activeTab === 'AUDIT' && (
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Audit Logs</h3>
+          </div>
+          <div className="space-y-3">
+            {apiError ? <p className="text-center py-12 text-red-500 font-bold text-xs">Unable to load data. <button onClick={fetchData} className="ml-2 underline">Retry</button></p> : auditLogs.length === 0 ? <p className="text-center py-12 text-slate-400 font-bold text-xs">No audit activity recorded.</p> : null}
+            {auditLogs.map((log: any) => (
+              <div key={log.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs flex justify-between items-center">
+                <div>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider me-2">[{log.action}]</span>
+                  <span className="text-slate-700 dark:text-slate-300 font-medium">{log.resource} ({log.resourceId?.slice(0, 8)})</span>
+                  {log.metadata && <p className="text-[10px] text-slate-400 mt-1 font-mono">{log.metadata}</p>}
+                </div>
+                <span className="text-[10px] text-slate-400 shrink-0">{new Date(log.createdAt).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <PaginationControls />
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] max-w-2xl w-full p-8 space-y-6 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-black">User Details</h2>
+              <button onClick={() => setSelectedUser(null)} className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full bg-slate-100 dark:bg-slate-800"><XCircle size={20} /></button>
+            </div>
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div><span className="text-slate-400 font-bold text-xs uppercase tracking-wider block mb-1">Name</span><div className="font-semibold">{selectedUser.name || 'Not provided'}</div></div>
+                <div><span className="text-slate-400 font-bold text-xs uppercase tracking-wider block mb-1">Email</span><div className="font-semibold">{selectedUser.email}</div></div>
+                <div><span className="text-slate-400 font-bold text-xs uppercase tracking-wider block mb-1">Phone</span><div className="font-semibold">{selectedUser.phone || 'Not provided'}</div></div>
+                <div><span className="text-slate-400 font-bold text-xs uppercase tracking-wider block mb-1">Role</span><div className="font-semibold">{selectedUser.role}</div></div>
+                <div><span className="text-slate-400 font-bold text-xs uppercase tracking-wider block mb-1">Created At</span><div className="font-semibold">{new Date(selectedUser.createdAt).toLocaleDateString()}</div></div>
+                <div><span className="text-slate-400 font-bold text-xs uppercase tracking-wider block mb-1">Status</span><div className="font-semibold">{selectedUser.isSuspended ? 'Suspended' : 'Active'}</div></div>
+              </div>
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-400 font-bold text-xs uppercase tracking-wider block mb-1">Activity</span>
+                <p>Bookings: {selectedUser.bookings?.length || 0}</p>
+                <p>Equipment: {selectedUser.equipments?.length || 0}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -43,14 +43,14 @@ class MarketplaceState {
 
 class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
   final MarketplaceRepository _repository;
-  
+
   // Filters
   String? category;
   String? search;
   String? sort;
 
   MarketplaceNotifier(this._repository) : super(MarketplaceState()) {
-    fetchInitial();
+    Future.microtask(() => fetchInitial());
   }
 
   void updateFilters({String? newCategory, String? newSearch, String? newSort}) {
@@ -76,7 +76,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         search: search,
         sort: sort,
       );
-      
+
       final equipment = result['equipment'] as List<Equipment>;
       final totalPages = result['pagination']['totalPages'] as int;
 
@@ -103,7 +103,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         search: search,
         sort: sort,
       );
-      
+
       final newEquipment = result['equipment'] as List<Equipment>;
       final totalPages = result['pagination']['totalPages'] as int;
 

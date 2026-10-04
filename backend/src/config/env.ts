@@ -3,23 +3,17 @@ dotenv.config();
 
 const requiredEnvs = [
   'DATABASE_URL',
-  'JWT_SECRET',
-  'SMTP_HOST',
-  'SMTP_USER',
-  'SMTP_PASSWORD',
-  'RAZORPAY_KEY_ID',
-  'RAZORPAY_KEY_SECRET'
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY'
 ];
 
 export function validateEnv() {
   const missing = requiredEnvs.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
-    console.error('❌ FATAL ERROR: Missing required environment variables:');
-    missing.forEach((key) => console.error(`   - ${key}`));
-    console.error('The server cannot start without these configurations.');
-    process.exit(1);
+    console.warn('Ã¢Å¡Â Ã¯Â¸Â Warning: Some Supabase/Database environment variables are not set:');
+    missing.forEach((key) => console.warn(`   - ${key}`));
+  } else {
+    console.log('Ã¢Å“â€¦ Environment validation passed for Supabase Auth & Database.');
   }
-
-  console.log('✅ Environment validation passed.');
 }

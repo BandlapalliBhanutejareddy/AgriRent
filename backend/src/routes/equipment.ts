@@ -24,7 +24,7 @@ router.get('/', async (req: Request, res: Response, next: any): Promise<void> =>
         isVerified: true
       }
     };
-    
+
     if (available === 'true') {
       where.available = true;
     } else if (available === 'false') {
@@ -36,22 +36,22 @@ router.get('/', async (req: Request, res: Response, next: any): Promise<void> =>
     if (category && category !== 'ALL' && category !== 'All Categories') {
       where.category = String(category).toUpperCase();
     }
-    
+
     if (search) {
       const searchStr = String(search).toLowerCase();
       // Hybrid search: local mapped keyword first
       const dictionary: Record<string, string> = {
-        'ట్రాక్టర్': 'tractor', 'tractor': 'tractor', 'ट्रैक्टर': 'tractor', 'டிராக்டர்': 'tractor', 'ಟ್ರಾಕ್ಟರ್': 'tractor',
-        'harvester': 'harvester', 'హార్వెస్టర్': 'harvester', 'हार्वेस्टर': 'harvester', 'அறுவடை இயந்திரம்': 'harvester', 'ಹಾರ್ವೆಸ್ಟರ್': 'harvester',
-        'cultivator': 'cultivator', 'కల్టివేటర్': 'cultivator', 'कल्टीवेटर': 'cultivator', 'சாகுபடியாளர்': 'cultivator', 'ಕಲ್ಟಿವೇಟರ್': 'cultivator',
-        'rotavator': 'rotavator', 'రోటవేటర్': 'rotavator', 'रोटावेटर': 'rotavator', 'ரோட்டாவேட்டர்': 'rotavator', 'ರೊಟಾವೇಟರ್': 'rotavator',
-        'sprayer': 'sprayer', 'స్ప్రేయర్': 'sprayer', 'स्प्रेयर': 'sprayer', 'தெளிப்பான்': 'sprayer', 'ಸಿಂಪಡಿಸುವವನು': 'sprayer',
-        'thresher': 'thresher', 'థ్రెషర్': 'thresher', 'थ्रेशर': 'thresher', 'கதிர் அடிப்பான்': 'thresher', 'ಥ್ರೆಷರ್': 'thresher',
-        'seed drill': 'seed drill', 'సీడ్ డ్రిల్': 'seed drill', 'सीड ड्रिल': 'seed drill', 'விதை துரப்பணம்': 'seed drill', 'ಬೀಜ ಡ್ರಿಲ್': 'seed drill',
-        'power tiller': 'power tiller', 'పవర్ టిల్లర్': 'power tiller', 'पावर टिलर': 'power tiller', 'பவர் டில்லர்': 'power tiller', 'ಪವರ್ ಟಿಲ್ಲರ್': 'power tiller',
-        'rice transplanter': 'rice transplanter', 'రైస్ ట్రాన్స్‌ప్లాంటర్': 'rice transplanter', 'राइस ट्रांसप्लांटर': 'rice transplanter', 'நெல் நாற்று நடும் இயந்திரம்': 'rice transplanter', 'ಭತ್ತದ ನಾಟಿ ಯಂತ್ರ': 'rice transplanter'
+        'Ã Â°Å¸Ã Â±ÂÃ Â°Â°Ã Â°Â¾Ã Â°â€¢Ã Â±ÂÃ Â°Å¸Ã Â°Â°Ã Â±Â': 'tractor', 'tractor': 'tractor', 'Ã Â¤Å¸Ã Â¥ÂÃ Â¤Â°Ã Â¥Ë†Ã Â¤â€¢Ã Â¥ÂÃ Â¤Å¸Ã Â¤Â°': 'tractor', 'Ã Â®Å¸Ã Â®Â¿Ã Â®Â°Ã Â®Â¾Ã Â®â€¢Ã Â¯ÂÃ Â®Å¸Ã Â®Â°Ã Â¯Â': 'tractor', 'Ã Â²Å¸Ã Â³ÂÃ Â²Â°Ã Â²Â¾Ã Â²â€¢Ã Â³ÂÃ Â²Å¸Ã Â²Â°Ã Â³Â': 'tractor',
+        'harvester': 'harvester', 'Ã Â°Â¹Ã Â°Â¾Ã Â°Â°Ã Â±ÂÃ Â°ÂµÃ Â±â€ Ã Â°Â¸Ã Â±ÂÃ Â°Å¸Ã Â°Â°Ã Â±Â': 'harvester', 'Ã Â¤Â¹Ã Â¤Â¾Ã Â¤Â°Ã Â¥ÂÃ Â¤ÂµÃ Â¥â€¡Ã Â¤Â¸Ã Â¥ÂÃ Â¤Å¸Ã Â¤Â°': 'harvester', 'Ã Â®â€¦Ã Â®Â±Ã Â¯ÂÃ Â®ÂµÃ Â®Å¸Ã Â¯Ë† Ã Â®â€¡Ã Â®Â¯Ã Â®Â¨Ã Â¯ÂÃ Â®Â¤Ã Â®Â¿Ã Â®Â°Ã Â®Â®Ã Â¯Â': 'harvester', 'Ã Â²Â¹Ã Â²Â¾Ã Â²Â°Ã Â³ÂÃ Â²ÂµÃ Â³â€ Ã Â²Â¸Ã Â³ÂÃ Â²Å¸Ã Â²Â°Ã Â³Â': 'harvester',
+        'cultivator': 'cultivator', 'Ã Â°â€¢Ã Â°Â²Ã Â±ÂÃ Â°Å¸Ã Â°Â¿Ã Â°ÂµÃ Â±â€¡Ã Â°Å¸Ã Â°Â°Ã Â±Â': 'cultivator', 'Ã Â¤â€¢Ã Â¤Â²Ã Â¥ÂÃ Â¤Å¸Ã Â¥â‚¬Ã Â¤ÂµÃ Â¥â€¡Ã Â¤Å¸Ã Â¤Â°': 'cultivator', 'Ã Â®Å¡Ã Â®Â¾Ã Â®â€¢Ã Â¯ÂÃ Â®ÂªÃ Â®Å¸Ã Â®Â¿Ã Â®Â¯Ã Â®Â¾Ã Â®Â³Ã Â®Â°Ã Â¯Â': 'cultivator', 'Ã Â²â€¢Ã Â²Â²Ã Â³ÂÃ Â²Å¸Ã Â²Â¿Ã Â²ÂµÃ Â³â€¡Ã Â²Å¸Ã Â²Â°Ã Â³Â': 'cultivator',
+        'rotavator': 'rotavator', 'Ã Â°Â°Ã Â±â€¹Ã Â°Å¸Ã Â°ÂµÃ Â±â€¡Ã Â°Å¸Ã Â°Â°Ã Â±Â': 'rotavator', 'Ã Â¤Â°Ã Â¥â€¹Ã Â¤Å¸Ã Â¤Â¾Ã Â¤ÂµÃ Â¥â€¡Ã Â¤Å¸Ã Â¤Â°': 'rotavator', 'Ã Â®Â°Ã Â¯â€¹Ã Â®Å¸Ã Â¯ÂÃ Â®Å¸Ã Â®Â¾Ã Â®ÂµÃ Â¯â€¡Ã Â®Å¸Ã Â¯ÂÃ Â®Å¸Ã Â®Â°Ã Â¯Â': 'rotavator', 'Ã Â²Â°Ã Â³Å Ã Â²Å¸Ã Â²Â¾Ã Â²ÂµÃ Â³â€¡Ã Â²Å¸Ã Â²Â°Ã Â³Â': 'rotavator',
+        'sprayer': 'sprayer', 'Ã Â°Â¸Ã Â±ÂÃ Â°ÂªÃ Â±ÂÃ Â°Â°Ã Â±â€¡Ã Â°Â¯Ã Â°Â°Ã Â±Â': 'sprayer', 'Ã Â¤Â¸Ã Â¥ÂÃ Â¤ÂªÃ Â¥ÂÃ Â¤Â°Ã Â¥â€¡Ã Â¤Â¯Ã Â¤Â°': 'sprayer', 'Ã Â®Â¤Ã Â¯â€ Ã Â®Â³Ã Â®Â¿Ã Â®ÂªÃ Â¯ÂÃ Â®ÂªÃ Â®Â¾Ã Â®Â©Ã Â¯Â': 'sprayer', 'Ã Â²Â¸Ã Â²Â¿Ã Â²â€šÃ Â²ÂªÃ Â²Â¡Ã Â²Â¿Ã Â²Â¸Ã Â³ÂÃ Â²ÂµÃ Â²ÂµÃ Â²Â¨Ã Â³Â': 'sprayer',
+        'thresher': 'thresher', 'Ã Â°Â¥Ã Â±ÂÃ Â°Â°Ã Â±â€ Ã Â°Â·Ã Â°Â°Ã Â±Â': 'thresher', 'Ã Â¤Â¥Ã Â¥ÂÃ Â¤Â°Ã Â¥â€¡Ã Â¤Â¶Ã Â¤Â°': 'thresher', 'Ã Â®â€¢Ã Â®Â¤Ã Â®Â¿Ã Â®Â°Ã Â¯Â Ã Â®â€¦Ã Â®Å¸Ã Â®Â¿Ã Â®ÂªÃ Â¯ÂÃ Â®ÂªÃ Â®Â¾Ã Â®Â©Ã Â¯Â': 'thresher', 'Ã Â²Â¥Ã Â³ÂÃ Â²Â°Ã Â³â€ Ã Â²Â·Ã Â²Â°Ã Â³Â': 'thresher',
+        'seed drill': 'seed drill', 'Ã Â°Â¸Ã Â±â‚¬Ã Â°Â¡Ã Â±Â Ã Â°Â¡Ã Â±ÂÃ Â°Â°Ã Â°Â¿Ã Â°Â²Ã Â±Â': 'seed drill', 'Ã Â¤Â¸Ã Â¥â‚¬Ã Â¤Â¡ Ã Â¤Â¡Ã Â¥ÂÃ Â¤Â°Ã Â¤Â¿Ã Â¤Â²': 'seed drill', 'Ã Â®ÂµÃ Â®Â¿Ã Â®Â¤Ã Â¯Ë† Ã Â®Â¤Ã Â¯ÂÃ Â®Â°Ã Â®ÂªÃ Â¯ÂÃ Â®ÂªÃ Â®Â£Ã Â®Â®Ã Â¯Â': 'seed drill', 'Ã Â²Â¬Ã Â³â‚¬Ã Â²Å“ Ã Â²Â¡Ã Â³ÂÃ Â²Â°Ã Â²Â¿Ã Â²Â²Ã Â³Â': 'seed drill',
+        'power tiller': 'power tiller', 'Ã Â°ÂªÃ Â°ÂµÃ Â°Â°Ã Â±Â Ã Â°Å¸Ã Â°Â¿Ã Â°Â²Ã Â±ÂÃ Â°Â²Ã Â°Â°Ã Â±Â': 'power tiller', 'Ã Â¤ÂªÃ Â¤Â¾Ã Â¤ÂµÃ Â¤Â° Ã Â¤Å¸Ã Â¤Â¿Ã Â¤Â²Ã Â¤Â°': 'power tiller', 'Ã Â®ÂªÃ Â®ÂµÃ Â®Â°Ã Â¯Â Ã Â®Å¸Ã Â®Â¿Ã Â®Â²Ã Â¯ÂÃ Â®Â²Ã Â®Â°Ã Â¯Â': 'power tiller', 'Ã Â²ÂªÃ Â²ÂµÃ Â²Â°Ã Â³Â Ã Â²Å¸Ã Â²Â¿Ã Â²Â²Ã Â³ÂÃ Â²Â²Ã Â²Â°Ã Â³Â': 'power tiller',
+        'rice transplanter': 'rice transplanter', 'Ã Â°Â°Ã Â±Ë†Ã Â°Â¸Ã Â±Â Ã Â°Å¸Ã Â±ÂÃ Â°Â°Ã Â°Â¾Ã Â°Â¨Ã Â±ÂÃ Â°Â¸Ã Â±ÂÃ¢â‚¬Å’Ã Â°ÂªÃ Â±ÂÃ Â°Â²Ã Â°Â¾Ã Â°â€šÃ Â°Å¸Ã Â°Â°Ã Â±Â': 'rice transplanter', 'Ã Â¤Â°Ã Â¤Â¾Ã Â¤â€¡Ã Â¤Â¸ Ã Â¤Å¸Ã Â¥ÂÃ Â¤Â°Ã Â¤Â¾Ã Â¤â€šÃ Â¤Â¸Ã Â¤ÂªÃ Â¥ÂÃ Â¤Â²Ã Â¤Â¾Ã Â¤â€šÃ Â¤Å¸Ã Â¤Â°': 'rice transplanter', 'Ã Â®Â¨Ã Â¯â€ Ã Â®Â²Ã Â¯Â Ã Â®Â¨Ã Â®Â¾Ã Â®Â±Ã Â¯ÂÃ Â®Â±Ã Â¯Â Ã Â®Â¨Ã Â®Å¸Ã Â¯ÂÃ Â®Â®Ã Â¯Â Ã Â®â€¡Ã Â®Â¯Ã Â®Â¨Ã Â¯ÂÃ Â®Â¤Ã Â®Â¿Ã Â®Â°Ã Â®Â®Ã Â¯Â': 'rice transplanter', 'Ã Â²Â­Ã Â²Â¤Ã Â³ÂÃ Â²Â¤Ã Â²Â¦ Ã Â²Â¨Ã Â²Â¾Ã Â²Å¸Ã Â²Â¿ Ã Â²Â¯Ã Â²â€šÃ Â²Â¤Ã Â³ÂÃ Â²Â°': 'rice transplanter'
       };
-      
+
       let keyword = dictionary[searchStr];
       if (!keyword) {
         // Fallback to AI intent
@@ -148,11 +148,11 @@ const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon
   const R = 6371; // Radius of the earth in km
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = 
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-    Math.sin(dLon / 2) * Math.sin(dLon / 2); 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in km
 };
 
@@ -224,7 +224,32 @@ router.get('/:id', async (req: Request, res: Response, next: any): Promise<void>
       return;
     }
 
-    res.json(equipment);
+    const feedbacks = await prisma.feedback.findMany({
+      where: {
+        category: 'Equipment',
+        subject: equipment.id
+      },
+      include: {
+        user: { select: { name: true } }
+      }
+    });
+
+    const ratingSum = feedbacks.reduce((sum, f) => sum + f.rating, 0);
+    const enrichedEquipment = {
+      ...equipment,
+      rating: feedbacks.length > 0 ? (ratingSum / feedbacks.length).toFixed(1) : 0,
+      reviewCount: feedbacks.length,
+      distance: 0, // Fallback for single item view without location
+      securityDeposit: (equipment as any).securityDeposit || (equipment.pricePerDay * 0.2), // Default 20% if not set
+      reviews: feedbacks.map(f => ({
+        rating: f.rating,
+        text: f.message,
+        author: f.user.name,
+        createdAt: f.createdAt
+      }))
+    };
+
+    res.json(enrichedEquipment);
   } catch (error) {
     console.error('Single Equipment Fetch Error:', error);
     next(error);

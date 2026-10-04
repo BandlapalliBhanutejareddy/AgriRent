@@ -29,6 +29,7 @@ model User {
   savedEquipment    SavedEquipment[]
   sessions          Session[]
   feedbacks         Feedback[]
+  farms             Farm[]
 }
 
 model Equipment {
@@ -58,6 +59,7 @@ model Equipment {
   bookings           Booking[]
   owner              User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   savedEquipment     SavedEquipment[]
+  reviews            EquipmentReview[]
 
   @@unique([title, ownerId])
   @@index([ownerId])
@@ -66,25 +68,127 @@ model Equipment {
 }
 
 model Booking {
-  id            String               @id @default(cuid())
-  farmerId      String
-  equipmentId   String
-  startDate     DateTime
-  endDate       DateTime
-  createdAt     DateTime             @default(now())
-  status        String
-  totalPrice    Float?
-  amountPaid    Float?
-  paymentId     String?
-  paymentStatus String               @default("PENDING")
-  equipment     Equipment            @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  farmer        User                 @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  messages      Message[]
-  payments      PaymentTransaction[]
+  id                    String               @id @default(cuid())
+  farmerId              String
+  equipmentId           String
+  startDate             DateTime
+  endDate               DateTime
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @default(now()) @updatedAt
+  status                String               @default("PENDING")
+  totalPrice            Float?
+  amountPaid            Float?
+  securityDeposit       Float?               @default(0)
+  paymentId             String?
+  paymentStatus         String               @default("PENDING")
+  cancellationReason    String?
+  equipment             Equipment            @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  farmer                User                 @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  messages              Message[]
+  payments              PaymentTransaction[]
+  statusHistory         BookingStatusHistory[]
+  returnInspection      ReturnInspection?
+  equipmentReviews      EquipmentReview[]
+  userReviews           UserReview[]
+  complaints            Complaint[]
 
   @@index([farmerId])
   @@index([equipmentId])
   @@index([createdAt])
+  @@index([status])
+}
+
+model BookingStatusHistory {
+  id        String   @id @default(cuid())
+  bookingId String
+  status    String
+  title     String?
+  note      String?
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([createdAt])
+}
+
+model ReturnInspection {
+  id              String   @id @default(cuid())
+  bookingId       String   @unique
+  condition       String   @default("GOOD")
+  deductionAmount Float    @default(0)
+  notes           String?
+  inspectedAt     DateTime @default(now())
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model EquipmentReview {
+  id                String    @id @default(cuid())
+  bookingId         String
+  farmerId          String
+  equipmentId       String
+  rating            Int
+  performanceRating Int?
+  conditionRating   Int?
+  cleanlinessRating Int?
+  valueRating       Int?
+  comment           String?
+  createdAt         DateTime  @default(now())
+  booking           Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  equipment         Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([equipmentId])
+  @@index([farmerId])
+}
+
+model UserReview {
+  id                  String   @id @default(cuid())
+  bookingId           String
+  reviewerId          String
+  revieweeId          String
+  role                String   // "FARMER_RATING_OWNER" | "OWNER_RATING_FARMER"
+  rating              Int
+  behaviourRating     Int?
+  communicationRating Int?
+  timelinessRating    Int?
+  comment             String?
+  createdAt           DateTime @default(now())
+  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([revieweeId])
+  @@index([reviewerId])
+}
+
+model Complaint {
+  id           String   @id @default(cuid())
+  reporterId   String
+  targetUserId String?
+  bookingId    String?
+  equipmentId  String?
+  category     String
+  description  String
+  evidenceUrl  String?
+  status       String   @default("NEW") // NEW, UNDER_REVIEW, ACTION_REQUIRED, RESOLVED, DISMISSED
+  adminNotes   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  booking      Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([reporterId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OwnerVerification {
+  id              String   @id @default(cuid())
+  ownerId         String   @unique
+  documentType    String
+  documentUrl     String
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
 }
 
 model Notification {
@@ -118,12 +222,14 @@ model Message {
   bookingId String
   senderId  String
   text      String
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
   booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
   @@index([senderId])
+  @@index([read])
 }
 
 model Session {
@@ -192,13 +298,13 @@ model OTPVerification {
 model PaymentTransaction {
   id                String   @id @default(cuid())
   bookingId         String
-  razorpayOrderId   String   @unique
-  razorpayPaymentId String?
-  razorpaySignature String?
+  farmerId          String?
+  ownerId           String?
+  transactionRef    String   @unique @default(cuid())
   amount            Float
-  currency          String
+  currency          String   @default("INR")
   status            String
-  paymentMethod     String?
+  paymentMethod     String?  @default("AGRORENT_DIRECT")
   invoiceUrl        String?
   refundedAmount    Float?
   failureReason     String?
@@ -206,22 +312,255 @@ model PaymentTransaction {
   updatedAt         DateTime @updatedAt
   booking           Booking  @relation(fields: [bookingId], references: [id])
 }
-  
-model Feedback {  
-  id            String   @id @default(cuid())  
-  userId        String  
-  rating        Int  
-  category      String  
-  subject       String?  
-  message       String  
-  attachmentUrl String?  
+
+model Feedback {
+  id            String   @id @default(cuid())
+  userId        String
+  rating        Int
+  category      String
+  subject       String?
+  message       String
+  attachmentUrl String?
   status        String   @default("PENDING")
-  adminResponse String?  
-  activeRole    String?  
-  createdAt     DateTime @default(now())  
-  updatedAt     DateTime @updatedAt  
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)  
-  
-  @@index([userId])  
-  @@index([createdAt])  
+  adminResponse String?
+  activeRole    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// PHASE 5.0 Ã¢â‚¬â€ AI FARM DIGITAL TWIN CORE MODELS
+// ============================================================
+
+model Farm {
+  id         String   @id @default(cuid())
+  ownerId    String
+  name       String
+  location   String
+  area       Float
+  areaUnit   String   @default("acres")
+  soilType   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  owner      User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  crops      FarmCrop[]
+  risks      FarmRisk[]
+  budgets    FarmBudget[]
+  decisions  FarmDecision[]
+  activities FarmActivity[]
+  schedules  FarmSchedule[]
+  memories   FarmMemory[]
+
+  @@index([ownerId])
+  @@index([createdAt])
+}
+
+model FarmCrop {
+  id                  String    @id @default(cuid())
+  farmId              String
+  cropName            String
+  variety             String?
+  season              String
+  stage               String
+  sowingDate          DateTime?
+  expectedHarvestDate DateTime?
+  status              String    @default("ACTIVE")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  farm       Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  operations FarmOperation[]
+  risks      FarmRisk[]
+  budgets    FarmBudget[]
+  decisions  FarmDecision[]
+
+  @@index([farmId])
+  @@index([status])
+}
+
+model FarmOperation {
+  id                  String    @id @default(cuid())
+  farmCropId          String
+  name                String
+  description         String?
+  status              String    @default("PLANNED")
+  plannedStartDate    DateTime?
+  plannedEndDate      DateTime?
+  completedAt         DateTime?
+  labourersNeeded     Int?
+  labourersAvailable  Int?
+  estimatedLabourCost Float?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  crop  FarmCrop   @relation(fields: [farmCropId], references: [id], onDelete: Cascade)
+  tasks FarmTask[]
+  risks FarmRisk[]
+
+  @@index([farmCropId])
+  @@index([status])
+}
+
+model FarmTask {
+  id          String    @id @default(cuid())
+  operationId String
+  title       String
+  description String?
+  status      String    @default("PENDING")
+  priority    String    @default("MEDIUM")
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  operation FarmOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@index([operationId])
+  @@index([status])
+}
+
+model FarmRisk {
+  id          String    @id @default(cuid())
+  farmId      String
+  farmCropId  String?
+  operationId String?
+  type        String
+  severity    String    @default("MEDIUM")
+  title       String
+  description String
+  status      String    @default("OPEN")
+  detectedAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  farm      Farm           @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  crop      FarmCrop?      @relation(fields: [farmCropId], references: [id], onDelete: SetNull)
+  operation FarmOperation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+
+  @@index([farmId])
+  @@index([status])
+}
+
+model FarmBudget {
+  id             String    @id @default(cuid())
+  farmId         String
+  farmCropId     String?
+  totalBudget    Decimal   @db.Decimal(12, 2)
+  spentAmount    Decimal   @default(0) @db.Decimal(12, 2)
+  reservedAmount Decimal   @default(0) @db.Decimal(12, 2)
+  currency       String    @default("INR")
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  farm Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  crop FarmCrop? @relation(fields: [farmCropId], references: [id], onDelete: SetNull)
+
+  @@index([farmId])
+}
+
+model FarmDecision {
+  id         String   @id @default(cuid())
+  farmId     String
+  farmCropId String?
+  type       String
+  title      String
+  decision   String
+  reasoning  String?
+  language   String   @default("en")
+  source     String   @default("SYSTEM")
+  createdAt  DateTime @default(now())
+
+  farm Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  crop FarmCrop? @relation(fields: [farmCropId], references: [id], onDelete: SetNull)
+
+  @@index([farmId])
+  @@index([createdAt])
+}
+
+model FarmActivity {
+  id          String   @id @default(cuid())
+  farmId      String
+  actorId     String?
+  type        String
+  title       String
+  description String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+  @@index([createdAt])
+}
+
+// Append-only farm history used as an advisory signal by deterministic engines.
+model FarmMemory {
+  id          String   @id @default(cuid())
+  farmId      String
+  actorId     String?
+  eventType   String
+  subjectType String?
+  subjectId   String?
+  payload     String
+  occurredAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId, occurredAt])
+  @@index([farmId, eventType])
+  @@index([subjectType, subjectId])
+}
+
+model FarmSchedule {
+  id                 String             @id @default(cuid())
+  farmId             String
+  status             String             @default("DRAFT") // DRAFT, FINALIZED, ARCHIVED
+  qualityScore       Int                @default(0)
+  totalEstimatedCost Decimal            @default(0) @db.Decimal(12, 2)
+  summary            String?
+  language           String             @default("en")
+  createdBy          String?
+  finalizedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  farm               Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  items              FarmScheduleItem[]
+
+  @@index([farmId])
+  @@index([createdAt])
+}
+
+model FarmScheduleItem {
+  id               String       @id @default(cuid())
+  scheduleId       String
+  operationId      String?
+  equipmentId      String?
+  operationName    String
+  stage            String
+  priority         String       @default("MEDIUM")
+  plannedStartDate DateTime
+  plannedEndDate   DateTime
+  durationDays     Int          @default(1)
+  estimatedCost    Float        @default(0)
+  decisionScore    Int          @default(0)
+  riskScore        Int          @default(0)
+  status           String       @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, BLOCKED
+  conflictStatus   String       @default("NONE")
+  reason           String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  schedule         FarmSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId])
 }

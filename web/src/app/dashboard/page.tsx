@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { 
-  Calendar, 
-  IndianRupee, 
-  Tractor, 
-  Clock, 
-  TrendingUp, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Calendar,
+  IndianRupee,
+  Tractor,
+  Clock,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
   Activity,
   Phone,
   CalendarDays,
@@ -20,6 +20,8 @@ import { useStore } from '@/store/useStore';
 import { useToast } from '@/components/ToastProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import DrillDownModal from '@/components/DrillDownModal';
+import { formatCurrency } from '@/lib/formatters';
 
 export default function OwnerDashboard() {
   const { t } = useTranslation();
@@ -29,6 +31,72 @@ export default function OwnerDashboard() {
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+
+  // Drilldown state
+  const [drillDownData, setDrillDownData] = useState<any[]>([]);
+  const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
+  const [drillDownTitle, setDrillDownTitle] = useState('');
+  const [drillDownHeaders, setDrillDownHeaders] = useState<string[]>([]);
+
+  async function fetchDrillDown(type: 'revenue' | 'active' | 'completed' | 'pending') {
+    try {
+      const res = await api.get('/analytics/owner/bookings?limit=100');
+      let filtered = res.data;
+      if (type === 'revenue') {
+        const REVENUE_GENERATING_STATUSES = ['COMPLETED', 'ACTIVE', 'RETURN_PENDING', 'RETURN_IN_PROGRESS', 'RETURNED', 'INSPECTION_PENDING', 'ACCEPTED'];
+        filtered = filtered.filter((b: any) => REVENUE_GENERATING_STATUSES.includes(b.status));
+      } else if (type === 'active') {
+        filtered = filtered.filter((b: any) => ['ACCEPTED', 'ACTIVE'].includes(b.status));
+      } else if (type === 'completed') {
+        filtered = filtered.filter((b: any) => b.status === 'COMPLETED');
+      } else if (type === 'pending') {
+        filtered = filtered.filter((b: any) => b.status === 'PENDING');
+      }
+
+      const rows = filtered.map((b: any) => {
+        try {
+          const start = b.startDate ? new Date(b.startDate).toLocaleDateString() : 'Not available';
+          const end = b.endDate ? new Date(b.endDate).toLocaleDateString() : 'Not available';
+          const period = b.startDate && b.endDate ? `${start} to ${end}` : 'Not available';
+          const createdAt = b.createdAt ? new Date(b.createdAt).toLocaleDateString() : 'Not available';
+          const equipment = b.equipment?.title || b.equipment?.name || 'Not available';
+          const farmer = b.farmer?.name || 'Not available';
+          const crop = b.farmOperation?.farmCrop?.crop?.name || 'Not available';
+          const operation = b.farmOperation?.name || 'Not available';
+
+          return [
+            createdAt,
+            b.id || 'Not available',
+            equipment,
+            farmer,
+            crop,
+            operation,
+            period,
+            formatCurrency(b.totalPrice),
+            b.status || 'Not available',
+            b.paymentStatus || 'PENDING',
+            formatCurrency(b.amountPaid)
+          ];
+        } catch (err) {
+          console.error("Error mapping row:", err, b);
+          return [];
+        }
+      }).filter((r: any[]) => r.length > 0);
+      setDrillDownHeaders(['Date', 'Booking ID', 'Equipment', 'Farmer', 'Crop', 'Operation', 'Rental Period', 'Amount', 'Booking Status', 'Payment Status', 'Amount Paid']);
+      setDrillDownRows(rows);
+      setDrillDownTitle(
+        type === 'revenue' ? t('analytics.rentalValueGenerated', 'Rental Value Generated') :
+        type === 'active' ? t('analytics.activeRentals', 'Active Rentals') :
+        type === 'completed' ? t('analytics.completedRentals', 'Completed Rentals') :
+        t('analytics.pendingBookings', 'Pending Bookings')
+      );
+      setIsDrillDownOpen(true);
+    } catch (e) {
+      showToast(t('failed_drilldown', 'Failed to load drill-down report'), 'warning');
+    }
+  }
+
+  const [drillDownRows, setDrillDownRows] = useState<any[][]>([]);
 
   useEffect(() => {
     fetchData();
@@ -55,7 +123,7 @@ export default function OwnerDashboard() {
   async function handleUpdateStatus(id: string, status: 'ACCEPTED' | 'REJECTED') {
     try {
       await api.put(`/bookings/${id}/status`, { status });
-      setBookings(prev => 
+      setBookings(prev =>
         prev.map(b => b.id === id ? { ...b, status } : b)
       );
       showToast(`Booking request successfully ${status.toLowerCase()}!`, 'success');
@@ -64,9 +132,10 @@ export default function OwnerDashboard() {
     }
   };
 
-  const activeBookings = bookings.filter(b => b.status === 'ACTIVE' || b.status === 'ACCEPTED').length;
-  const pendingRequests = bookings.filter(b => b.status === 'PENDING').length;
+  const activeBookings = analytics?.activeRentals || 0;
+  const pendingRequests = analytics?.pendingBookings || 0;
   const totalEarnings = analytics?.totalRevenue || 0;
+  const completedRentals = analytics?.completedBookings || 0;
 
   if (loading) {
     return (
@@ -84,18 +153,18 @@ export default function OwnerDashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      
+
       {/* Welcome Greeting Hero */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-br from-slate-900 via-primary to-slate-900 p-8 md:p-10 rounded-[32px] text-white shadow-2xl shadow-slate-900/40 border border-slate-700/50 relative overflow-hidden backdrop-blur-xl">
         <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-[80px] bg-secondary/30" />
         <div className="absolute bottom-10 left-10 w-40 h-40 rounded-full blur-[60px] bg-accent/10" />
-        
+
         <div className="relative z-10 space-y-3">
           <span className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest bg-white/10 backdrop-blur-md text-white rounded-xl border border-white/20 shadow-sm inline-flex items-center gap-1.5">
             <Tractor size={12} /> {t('owner_fleet_console', { defaultValue: 'Owner Fleet Console' })}
           </span>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-2">
-            {t('welcome', { defaultValue: 'Welcome' })}, {user?.name || 'Equipment Owner'} 🚜
+            {t('welcome', { defaultValue: 'Welcome' })}, {user?.name || 'Equipment Owner'} Ã°Å¸Å¡Å“
           </h1>
           <p className="text-blue-100 max-w-xl text-sm font-medium leading-relaxed opacity-90">
             {t('dashboard_subtitle', { defaultValue: 'Monitor real-time rental yield, approve pending farmer requests, manage listed fleet inventory, and review monthly payouts.' })}
@@ -108,23 +177,23 @@ export default function OwnerDashboard() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-emerald-500/50 transition-all duration-300">
+
+        <div onClick={() => fetchDrillDown('revenue')} className="cursor-pointer bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-emerald-500/50 transition-all duration-300">
           <div className="flex justify-between items-start mb-6">
             <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl group-hover:scale-110 transition-transform">
               <IndianRupee size={24} strokeWidth={2.5} />
             </div>
             <div className="flex items-center text-emerald-700 bg-emerald-100 dark:bg-emerald-900/40 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-200/50 dark:border-emerald-800/50">
-              <TrendingUp size={12} className="mr-1.5" /> {t('ytd', { defaultValue: 'YTD' })}
+              <TrendingUp size={12} className="mr-1.5" /> {t('analytics.allTime', { defaultValue: 'ALL TIME' })}
             </div>
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('gross_earnings', { defaultValue: 'Gross Earnings' })}</p>
-            <p className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">₹{totalEarnings.toLocaleString()}</p>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('analytics.rentalValueGenerated', { defaultValue: 'Rental Value Generated' })}</p>
+            <p className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{formatCurrency(totalEarnings)}</p>
           </div>
         </div>
-        
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-300">
+
+        <div onClick={() => fetchDrillDown('active')} className="cursor-pointer bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-300">
           <div className="flex justify-between items-start mb-6">
             <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl group-hover:scale-110 transition-transform">
               <Calendar size={24} strokeWidth={2.5} />
@@ -132,12 +201,24 @@ export default function OwnerDashboard() {
             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-100 dark:bg-indigo-900/40 px-3 py-1 rounded-xl border border-indigo-200/50 dark:border-indigo-800/50">{t('live', { defaultValue: 'Live' })}</span>
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('active_bookings', { defaultValue: 'Active Bookings' })}</p>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('analytics.activeRentals', { defaultValue: 'Active Rentals' })}</p>
             <p className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{activeBookings}</p>
           </div>
         </div>
 
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-amber-500/50 transition-all duration-300">
+        <div onClick={() => fetchDrillDown('completed')} className="cursor-pointer bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-blue-500/50 transition-all duration-300">
+          <div className="flex justify-between items-start mb-6">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl group-hover:scale-110 transition-transform">
+              <CheckCircle size={24} strokeWidth={2.5} />
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('analytics.completedRentals', { defaultValue: 'Completed Rentals' })}</p>
+            <p className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{completedRentals}</p>
+          </div>
+        </div>
+
+        <div onClick={() => fetchDrillDown('pending')} className="cursor-pointer bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-amber-500/50 transition-all duration-300">
           <div className="flex justify-between items-start mb-6">
             <div className="p-4 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl group-hover:scale-110 transition-transform">
               <Clock size={24} strokeWidth={2.5} />
@@ -149,27 +230,21 @@ export default function OwnerDashboard() {
             )}
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('pending_requests', { defaultValue: 'Pending Requests' })}</p>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('analytics.pendingBookings', { defaultValue: 'Pending Bookings' })}</p>
             <p className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{pendingRequests}</p>
           </div>
         </div>
-
-        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm flex flex-col justify-between group hover:border-blue-500/50 transition-all duration-300">
-          <div className="flex justify-between items-start mb-6">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl group-hover:scale-110 transition-transform">
-              <Tractor size={24} strokeWidth={2.5} />
-            </div>
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('fleet_count', { defaultValue: 'Fleet Count' })}</p>
-            <p className="text-3xl font-black text-slate-800 dark:text-white mt-1 tracking-tighter">{bookings.filter(b => b.equipment).length}</p>
-          </div>
-        </div>
-
       </div>
 
 
 
+      <DrillDownModal
+        isOpen={isDrillDownOpen}
+        onClose={() => setIsDrillDownOpen(false)}
+        title={drillDownTitle}
+        headers={drillDownHeaders}
+        rows={drillDownRows}
+      />
     </div>
   );
 }

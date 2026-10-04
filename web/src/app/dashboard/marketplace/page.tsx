@@ -5,25 +5,28 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
 import { useStore, useThemeStore } from '@/store/useStore';
-import { 
-  Search, 
-  MapPin, 
-  User, 
-  DollarSign, 
-  Moon, 
-  Sun, 
-  Star, 
-  Phone, 
-  Info, 
-  ShieldCheck, 
-  X, 
-  CalendarDays, 
+import {
+  Search,
+  MapPin,
+  User,
+  DollarSign,
+  Moon,
+  Sun,
+  Star,
+  Phone,
+  Info,
+  ShieldCheck,
+  X,
+  CalendarDays,
   Tractor,
   Compass,
   Mic
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/components/ToastProvider';
+import ChatModal from '@/components/ChatModal';
+import { MessageSquare } from 'lucide-react';
+import { formatCurrency } from '@/lib/formatters';
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 10);
 const parseDate = (date: string) => new Date(date + 'T00:00:00');
@@ -34,25 +37,50 @@ function MarketplaceContent() {
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   const { isDarkMode, toggleTheme } = useThemeStore();
-  
+
   const [equipment, setEquipment] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [chatModal, setChatModal] = useState<{ isOpen: boolean; bookingId: string | null; recipientName: string }>({
+    isOpen: false,
+    bookingId: null,
+    recipientName: ''
+  });
   const [category, setCategory] = useState('All Categories');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [bookingDrafts, setBookingDrafts] = useState<Record<string, { startDate: string; endDate: string; loading: boolean }>>({});
   const [isListening, setIsListening] = useState(false);
-  
+
   // Selected specs modal
   const [selectedSpecsItem, setSelectedSpecsItem] = useState<any | null>(null);
+  const [confirmModal, setConfirmModal] = useState<any | null>(null);
+  const [successModal, setSuccessModal] = useState<any | null>(null);
 
   // Read URL search params on mount
   useEffect(() => {
     const query = searchParams.get('search');
     if (query) {
       setSearch(query);
+    }
+
+    const eqId = searchParams.get('equipmentId');
+    if (eqId) {
+      // Fetch specific equipment details and open specs
+      api.get(`/equipment/${eqId}`).then(res => {
+        if (res.data) {
+          setSelectedSpecsItem(res.data);
+          setBookingDrafts(prev => ({
+            ...prev,
+            [res.data.id]: {
+              startDate: formatDateInput(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+              endDate: formatDateInput(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)),
+              loading: false,
+            }
+          }));
+        }
+      }).catch(err => console.error('Failed to load equipmentId:', err));
     }
   }, [searchParams]);
 
@@ -73,15 +101,15 @@ function MarketplaceContent() {
           page,
           limit: 20,
           search: search || undefined,
-          category: category === 'All Categories' || category === (t('categories.all') || 'All Categories') ? undefined : category
+          category: category === 'All Categories' || category === (t('categories.all', 'All Categories')) ? undefined : category
         }
       });
       const data = response.data?.data || [];
       const pagination = response.data?.pagination || { page: 1, totalPages: 1, total: 0 };
-      
+
       setTotalPages(pagination.totalPages);
       setTotalItems(pagination.total);
-      
+
       // Use actual data from backend
       const enriched = data.map((item: any, idx: number) => ({
         ...item,
@@ -119,7 +147,7 @@ function MarketplaceContent() {
 
   const categories = useMemo(() => {
     return [
-      t('categories.all') || 'All Categories',
+      t('categories.all', 'All Categories'),
       'TRACTOR', 'HARVESTER', 'IMPLEMENT', 'ROTAVATOR', 'CULTIVATOR', 'SEED DRILL', 'SPRAYER', 'POWER TILLER', 'RICE TRANSPLANTER'
     ];
   }, [t]);
@@ -142,18 +170,18 @@ function MarketplaceContent() {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
-      
+
       recognition.onstart = () => setIsListening(true);
-      
+
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setSearch(transcript);
         setIsListening(false);
       };
-      
+
       recognition.onerror = () => setIsListening(false);
       recognition.onend = () => setIsListening(false);
-      
+
       recognition.start();
     } else {
       showToast('Voice search is not supported in this browser.', 'warning');
@@ -177,76 +205,50 @@ function MarketplaceContent() {
       return;
     }
 
+    // Live Availability Check against Database
+    try {
+      const checkRes = await api.get('/bookings/availability', { params: { equipmentId: item.id } });
+      const blocked = checkRes.data.blockedRanges || [];
+      const hasOverlap = blocked.some((b: any) => {
+        const bStart = new Date(b.startDate);
+        const bEnd = new Date(b.endDate);
+        return start < bEnd && end > bStart;
+      });
+
+      if (hasOverlap) {
+        showToast('Selected dates collide with an existing booking. Please choose open dates.', 'warning');
+        return;
+      }
+    } catch (e) {
+      console.warn('Availability check failed, proceeding to atomic backend check', e);
+    }
+
+    // Open confirmation modal
+    setConfirmModal({ item, draft, start, end });
+  };
+
+  async function confirmDirectBooking() {
+    if (!confirmModal) return;
+    const { item, draft, start, end } = confirmModal;
+
     setBookingDrafts((prev) => ({
       ...prev,
       [item.id]: { ...prev[item.id], loading: true }
     }));
 
     try {
-      // 1. Create Booking
+      // Create Booking & Payment Record
       const bookingRes = await api.post('/bookings', {
         equipmentId: item.id,
         startDate: start.toISOString(),
         endDate: end.toISOString(),
       });
-      const bookingId = bookingRes.data.id;
 
-      // 2. Load Razorpay script dynamically
-      const res = await new Promise((resolve) => {
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
-      });
-
-      if (!res) {
-        showToast('Razorpay SDK failed to load. Are you online?', 'warning');
-        return;
-      }
-
-      // 3. Create Razorpay Order
-      const orderRes = await api.post('/payments/create-order', { bookingId });
-      const { orderId, amount, currency } = orderRes.data;
-
-      // 4. Open Razorpay Checkout
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_xxxxx',
-        amount: amount,
-        currency: currency,
-        name: 'AgroRent AI',
-        description: `Rental Payment for ${item.title}`,
-        order_id: orderId,
-        handler: async function (response: any) {
-          try {
-            showToast('Processing payment verification...', 'success');
-            // 5. Verify Signature
-            await api.post('/payments/verify', {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              bookingId: bookingId
-            });
-            showToast(`Rental booking confirmed for ${item.title}!`, 'success');
-            setSelectedSpecsItem(null);
-            fetchEquipment(); // refresh data
-          } catch (err) {
-            showToast('Payment verification failed. Contact support.', 'warning');
-          }
-        },
-        prefill: {
-          name: user?.name,
-          email: user?.email,
-          contact: user?.phone
-        },
-        theme: {
-          color: '#059669' // emerald-600
-        }
-      };
-
-      const paymentObject = new (window as any).Razorpay(options);
-      paymentObject.open();
-
+      const booking = bookingRes.data;
+      setConfirmModal(null);
+      setSuccessModal({ item, draft, booking });
+      setSelectedSpecsItem(null);
+      fetchEquipment();
     } catch (error: any) {
       showToast(error.response?.data?.error || 'Failed to initiate booking payment.', 'warning');
     } finally {
@@ -270,7 +272,7 @@ function MarketplaceContent() {
       <div className="mt-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-1 text-[10px] font-black text-slate-400 uppercase tracking-wide">
-            <span>{t('start_date')}</span>
+            <span>{t('start_date', 'Start Date')}</span>
             <input
               type="date"
               value={draft.startDate}
@@ -279,7 +281,7 @@ function MarketplaceContent() {
             />
           </label>
           <label className="space-y-1 text-[10px] font-black text-slate-400 uppercase tracking-wide">
-            <span>{t('end_date')}</span>
+            <span>{t('end_date', 'End Date')}</span>
             <input
               type="date"
               value={draft.endDate}
@@ -288,15 +290,15 @@ function MarketplaceContent() {
             />
           </label>
         </div>
-        
+
         <div className="flex justify-between items-center text-xs">
           <div>
-            <span className="text-slate-400 block font-bold">{t('duration')}</span>
-            <span className="font-bold text-slate-800 dark:text-white">{rentalDays} {t('day')}{rentalDays === 1 ? '' : 's'}</span>
+            <span className="text-slate-400 block font-bold">{t('duration', 'Duration')}</span>
+            <span className="font-bold text-slate-800 dark:text-white">{rentalDays} {t('day', 'Day')}{rentalDays === 1 ? '' : 's'}</span>
           </div>
           <div className="text-right">
-            <span className="text-slate-400 block font-bold">{t('estimated_yield')}</span>
-            <span className="font-black text-emerald-600 dark:text-emerald-400">₹{totalPrice.toLocaleString()}</span>
+            <span className="text-slate-400 block font-bold">{t('estimated_yield', 'Estimated Yield')}</span>
+            <span className="font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(totalPrice)}</span>
           </div>
         </div>
 
@@ -307,11 +309,11 @@ function MarketplaceContent() {
             disabled={!item.available || draft.loading}
             className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-500/10"
           >
-            {draft.loading ? t('submitting', { defaultValue: 'Processing...' }) : t('pay_and_book', { defaultValue: 'Pay & Confirm Booking' })}
+            {draft.loading ? t('submitting', 'Processing...') : t('pay_and_book', 'Pay & Confirm Booking')}
           </button>
         ) : (
           <div className="text-[10px] text-center p-2.5 bg-amber-50 dark:bg-slate-800 text-amber-600 dark:text-slate-350 border border-amber-100 dark:border-slate-750 rounded-xl font-bold">
-            {t('switch_to_farmer_to_rent')}</div>
+            {t('switch_to_farmer_to_rent', 'Switch to Farmer account to rent.')}</div>
         )}
       </div>
     );
@@ -319,13 +321,13 @@ function MarketplaceContent() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      
+
       {/* Top Banner Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-850 dark:text-white tracking-tight">{t('marketplace') || 'Machinery Marketplace'}</h1>
+          <h1 className="text-3xl font-black text-slate-850 dark:text-white tracking-tight">{t('marketplace', 'Machinery Marketplace')}</h1>
           <p className="mt-1 text-slate-450 dark:text-slate-500 text-xs font-semibold max-w-xl">
-            {t('marketplace_desc', { defaultValue: 'Browse listed agricultural inventory, inspect owner testimonials, map security deposits, and request rental bookings.' })}
+            {t('marketplace_desc', 'Browse listed agricultural inventory, inspect owner testimonials, map security deposits, and request rental bookings.')}
           </p>
         </div>
 
@@ -334,11 +336,11 @@ function MarketplaceContent() {
           <button
             onClick={toggleTheme}
             className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-slate-550 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shrink-0"
-            title={t('toggle_theme_view')}
+            title={t('toggle_theme_view', 'Toggle Theme')}
           >
             {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          
+
           <div className="flex-grow sm:flex-grow-0 grid grid-cols-2 gap-3 max-w-md w-full">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -347,13 +349,13 @@ function MarketplaceContent() {
                 data-testid="equipment-search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder={t('search_equipment_placeholder', { defaultValue: 'Search tools...' })}
+                placeholder={t('search_equipment_placeholder', 'Search tools...')}
                 className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-3 pl-10 pr-10 text-xs text-slate-800 dark:text-white outline-none focus:border-emerald-500 transition-all"
               />
-              <button 
+              <button
                 onClick={handleVoiceSearch}
                 className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${isListening ? 'text-red-500 animate-pulse' : 'text-slate-400 hover:text-emerald-500'}`}
-                title={t('voice_search', { defaultValue: 'Voice Search' })}
+                title={t('voice_search', 'Voice Search')}
               >
                 <Mic size={16} />
               </button>
@@ -380,23 +382,23 @@ function MarketplaceContent() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredEquipment.length === 0 ? (
-            
+
             /* Illustrated Fallback State */
             <div className="col-span-full rounded-[32px] border-2 border-slate-200 dark:border-slate-800 border-dashed bg-white dark:bg-slate-900 p-12 text-center flex flex-col items-center justify-center space-y-4">
               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-350">
                 <Tractor size={40} />
               </div>
               <div className="max-w-xs">
-                <p className="text-lg font-bold text-slate-850 dark:text-white">{t('no_equipment_matches', { defaultValue: 'No Equipment Matches' })}</p>
+                <p className="text-lg font-bold text-slate-850 dark:text-white">{t('no_equipment_matches', 'No Equipment Matches')}</p>
                 <p className="mt-1 text-xs text-slate-450 dark:text-slate-500 font-semibold leading-relaxed">
-                  {t('try_broadening_search', { defaultValue: 'Try broadening your keyword queries, resetting tractor categories, or adjusting crop preferences.' })}
+                  {t('try_broadening_search', 'Try broadening your keyword queries, resetting tractor categories, or adjusting crop preferences.')}
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => { setSearch(''); setCategory('All Categories'); setPage(1); }}
                 className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
               >
-                {t('reset_filters', { defaultValue: 'Reset Filters' })}
+                {t('reset_filters', 'Reset Filters')}
               </button>
             </div>
           ) : filteredEquipment.map((item) => {
@@ -412,7 +414,7 @@ function MarketplaceContent() {
             else if (cat.includes('power tiller')) staticImage = '/equipment/power-tiller.jpg';
             else if (cat.includes('rice transplanter') || cat.includes('transplanter')) staticImage = '/equipment/rice-transplanter.jpg';
             else if (cat.includes('tractor')) staticImage = '/equipment/tractor.jpg';
-            
+
             const displayImage = hasOwnerImage ? item.imageUrl : staticImage;
 
             return (
@@ -420,20 +422,20 @@ function MarketplaceContent() {
               <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 relative">
                 <img src={displayImage} alt={item.title} className="w-full h-full object-cover" />
                 <div className="absolute bottom-4 right-4 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-center shadow-xl">
-                  <span className="text-white font-black text-sm tracking-tight">₹{item.pricePerDay}</span>
-                  <span className="text-white/70 font-semibold text-[10px] ml-1 uppercase tracking-widest">/{t('per_day', { defaultValue: 'day' })}</span>
+                  <span className="text-white font-black text-sm tracking-tight">Ã¢â€šÂ¹{item.pricePerDay}</span>
+                  <span className="text-white/70 font-semibold text-[10px] ml-1 uppercase tracking-widest">/{t('per_day', 'day')}</span>
                 </div>
               </div>
               <div className="p-6 space-y-4">
-                
+
                 {/* Header Accents */}
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-bold text-slate-850 dark:text-white line-clamp-1">{item.title}</h2>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{t(item.category.toLowerCase(), { defaultValue: item.category })}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{t(item.category.toLowerCase(), { defaultValue: item.category }) as string}</span>
                   </div>
                   <div className={`rounded-xl px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${item.available ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300'}`}>
-                    {item.available ? t('available', { defaultValue: 'Available' }) : t('booked', { defaultValue: 'Booked' })}
+                    {item.available ? t('available', 'Available') : t('booked', 'Booked')}
                   </div>
                 </div>
 
@@ -443,10 +445,10 @@ function MarketplaceContent() {
                     <Star size={14} fill="currentColor" />
                     <span>{item.rating}</span>
                   </div>
-                  <span className="text-slate-400 font-semibold">({item.reviewCount} {t('reviews', { defaultValue: 'Reviews' })})</span>
-                  <span className="text-slate-300 dark:text-slate-800">•</span>
+                  <span className="text-slate-400 font-semibold">({item.reviewCount} {t('reviews', 'Reviews')})</span>
+                  <span className="text-slate-300 dark:text-slate-800">Ã¢â‚¬Â¢</span>
                   <span className="text-slate-450 dark:text-slate-400 font-bold flex items-center gap-0.5">
-                    <Compass size={12} /> {item.distance} {t('km_away', { defaultValue: 'km away' })}
+                    <Compass size={12} /> {item.distance} {t('km_away', 'km away')}
                   </span>
                 </div>
 
@@ -466,7 +468,7 @@ function MarketplaceContent() {
                   </div>
                   <div className="flex items-center gap-2 font-semibold">
                     <DollarSign size={14} className="text-slate-400" />
-                    <span className="font-bold text-slate-850 dark:text-white">₹{item.pricePerDay} {t('per_day', { defaultValue: 'per day' })}</span>
+                    <span className="font-bold text-slate-850 dark:text-white">Ã¢â€šÂ¹{item.pricePerDay} {t('per_day', 'per day')}</span>
                   </div>
                 </div>
 
@@ -475,7 +477,7 @@ function MarketplaceContent() {
                   onClick={() => setSelectedSpecsItem(item)}
                   className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/50 border border-slate-150 dark:border-slate-750 text-slate-655 dark:text-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
                 >
-                  {t('inspect_specs', { defaultValue: 'Inspect Specifications & Reviews' })}
+                  {t('inspect_specs', 'Inspect Specifications & Reviews')}
                 </button>
 
                 {/* Calendar / Booking drafts */}
@@ -484,26 +486,26 @@ function MarketplaceContent() {
             </div>
             );
           })}
-          
+
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="col-span-full flex items-center justify-between mt-8 p-4 bg-white dark:bg-slate-900 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm">
-              <button 
+              <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 text-xs font-bold uppercase rounded-xl transition-colors"
               >
-                {t('previous')}
+                {t('previous', 'Previous')}
               </button>
               <div className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                {t('page')} {page} {t('of')} {totalPages} <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg">{totalItems} {t('items')}</span>
+                {t('page', 'Page')} {page} {t('of', 'of')} {totalPages} <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg">{totalItems} {t('items', 'items')}</span>
               </div>
-              <button 
+              <button
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 text-xs font-bold uppercase rounded-xl transition-colors"
               >
-                {t('next')}
+                {t('next', 'Next')}
               </button>
             </div>
           )}
@@ -514,7 +516,7 @@ function MarketplaceContent() {
       <AnimatePresence>
         {selectedSpecsItem && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -522,10 +524,10 @@ function MarketplaceContent() {
             >
               <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div>
-                  <h3 className="font-black text-slate-850 dark:text-white uppercase text-xs tracking-wider">{t('specifications_reviews', { defaultValue: 'Specifications & Reviews' })}</h3>
+                  <h3 className="font-black text-slate-850 dark:text-white uppercase text-xs tracking-wider">{t('specifications_reviews', 'Specifications & Reviews')}</h3>
                   <span className="text-[9px] text-slate-400 font-bold uppercase">{selectedSpecsItem.title}</span>
                 </div>
-                <button 
+                <button
                   onClick={() => setSelectedSpecsItem(null)}
                   className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all"
                 >
@@ -534,20 +536,20 @@ function MarketplaceContent() {
               </div>
 
               <div className="space-y-5 text-xs text-slate-600 dark:text-slate-350">
-                
+
                 {/* Highlights grid */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-2xl text-center">
-                    <span className="block text-[9px] uppercase font-bold text-slate-400">{t('security_deposit', { defaultValue: 'Security Deposit' })}</span>
-                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1 block">₹{selectedSpecsItem.securityDeposit.toLocaleString()}</span>
+                    <span className="block text-[9px] uppercase font-bold text-slate-400">{t('security_deposit', 'Security Deposit')}</span>
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1 block">{formatCurrency(selectedSpecsItem.securityDeposit)}</span>
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-2xl text-center">
-                    <span className="block text-[9px] uppercase font-bold text-slate-400">{t('distance_label', { defaultValue: 'Distance' })}</span>
-                    <span className="text-sm font-black text-indigo-500 mt-1 block">{selectedSpecsItem.distance} {t('km')}</span>
+                    <span className="block text-[9px] uppercase font-bold text-slate-400">{t('distance_label', 'Distance')}</span>
+                    <span className="text-sm font-black text-indigo-500 mt-1 block">{selectedSpecsItem.distance} {t('km', 'km')}</span>
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-2xl text-center">
-                    <span className="block text-[9px] uppercase font-bold text-slate-400">{t('rating_yield', { defaultValue: 'Rating Yield' })}</span>
-                    <span className="text-sm font-black text-amber-500 mt-1 block">★ {selectedSpecsItem.rating}</span>
+                    <span className="block text-[9px] uppercase font-bold text-slate-400">{t('rating_yield', 'Rating Yield')}</span>
+                    <span className="text-sm font-black text-amber-500 mt-1 block">Ã¢Ëœâ€¦ {selectedSpecsItem.rating}</span>
                   </div>
                 </div>
 
@@ -559,19 +561,19 @@ function MarketplaceContent() {
                     </div>
                     <div>
                       <span className="block font-bold text-slate-800 dark:text-white">{selectedSpecsItem.owner?.name}</span>
-                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-tight">{t('verified_partner', { defaultValue: 'Verified AgroRent Partner' })}</span>
+                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-tight">{t('verified_partner', 'Verified AgroRent Partner')}</span>
                     </div>
                   </div>
-                  <a 
-                    href={`tel:${selectedSpecsItem.owner?.phone}`} 
+                  <a
+                    href={`tel:${selectedSpecsItem.owner?.phone}`}
                     className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors"
                   >
-                    <Phone size={12} /> {t('contact_button', { defaultValue: 'Contact' })}
+                    <Phone size={12} /> {t('contact_button', 'Contact')}
                   </a>
                 </div>
 
                 <div className="space-y-1.5">
-                  <h4 className="font-black text-slate-850 dark:text-white uppercase tracking-wider text-[10px]">{t('machine_description', { defaultValue: 'Machine Description' })}</h4>
+                  <h4 className="font-black text-slate-850 dark:text-white uppercase tracking-wider text-[10px]">{t('machine_description', 'Machine Description')}</h4>
                   <p className="leading-relaxed font-semibold text-slate-500 dark:text-slate-400">
                     {selectedSpecsItem.description || 'No description listed by the owner.'}
                   </p>
@@ -579,9 +581,9 @@ function MarketplaceContent() {
 
                 {/* Reviews section */}
                 <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <h4 className="font-black text-slate-850 dark:text-white uppercase tracking-wider text-[10px]">{t('farmer_testimonials')}</h4>
+                  <h4 className="font-black text-slate-850 dark:text-white uppercase tracking-wider text-[10px]">{t('farmer_testimonials', 'Testimonials')}</h4>
                   <div className="space-y-3.5">
-                    {selectedSpecsItem.reviews.map((rev: any, idx: number) => (
+                    {(selectedSpecsItem.reviews || []).map((rev: any, idx: number) => (
                       <div key={idx} className="p-3.5 bg-slate-50/50 dark:bg-slate-800/25 border border-slate-100 dark:border-slate-800 rounded-2xl space-y-1">
                         <div className="flex justify-between items-center">
                           <span className="font-bold text-slate-800 dark:text-white text-xs">{rev.author}</span>
@@ -599,7 +601,7 @@ function MarketplaceContent() {
 
                 {/* Direct Booking Drawer embedded inside Specs */}
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <h4 className="font-black text-slate-850 dark:text-white uppercase tracking-wider text-[10px] mb-3">{t('instant_booking_placement')}</h4>
+                  <h4 className="font-black text-slate-850 dark:text-white uppercase tracking-wider text-[10px] mb-3">{t('instant_booking_placement', 'Instant Booking')}</h4>
                   {renderBookingCardControls(selectedSpecsItem)}
                 </div>
               </div>
@@ -608,6 +610,127 @@ function MarketplaceContent() {
         )}
       </AnimatePresence>
 
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[32px] p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-2xl space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <h3 className="font-black text-slate-850 dark:text-white uppercase tracking-wider">{t('booking.paymentSummary', 'Payment Summary')}</h3>
+                <p className="text-xs text-slate-500 font-semibold">{t('booking.confirmDetails', 'Confirm your booking details below.')}</p>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl space-y-3 text-xs text-slate-700 dark:text-slate-300">
+                <div className="flex justify-between">
+                  <span className="font-bold">{t('booking.equipmentLabel', 'Equipment:')}</span>
+                  <span className="font-black text-right">{confirmModal.item.title}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">{t('booking.ownerLabel', 'Owner:')}</span>
+                  <span className="font-black text-right">{confirmModal.item.owner?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">{t('booking.datesLabel', 'Dates:')}</span>
+                  <span className="font-black text-right text-indigo-500">{confirmModal.draft.startDate} &rarr; {confirmModal.draft.endDate}</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t border-slate-200 dark:border-slate-700">
+                  <span className="font-bold">{t('booking.totalAmountLabel', 'Total Amount:')}</span>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(confirmModal.item.pricePerDay * Math.max(1, Math.ceil((confirmModal.end.getTime() - confirmModal.start.getTime()) / (1000 * 3600 * 24))))}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-xl flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 tracking-widest">{t('booking.agroRentDirect', 'AgroRent Direct Confirmation')}</span>
+                </div>
+
+                <button
+                  onClick={confirmDirectBooking}
+                  disabled={bookingDrafts[confirmModal.item.id]?.loading}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {bookingDrafts[confirmModal.item.id]?.loading ? t('booking.confirming', 'Confirming...') : t('booking.confirmAndBook', 'Confirm & Book')}
+                </button>
+                <button
+                  onClick={() => setConfirmModal(null)}
+                  disabled={bookingDrafts[confirmModal.item.id]?.loading}
+                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                >
+                  {t('booking.cancel', 'Cancel')}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Modal */}
+      <AnimatePresence>
+        {successModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[32px] p-6 sm:p-8 border border-emerald-500/50 shadow-2xl space-y-6 text-center"
+            >
+              <div className="w-16 h-16 mx-auto bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 flex items-center justify-center rounded-full mb-2">
+                <ShieldCheck size={32} />
+              </div>
+              <h3 className="font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-xl">{t('booking.bookingSubmitted', 'Booking Request Submitted Ã¢Å“â€œ')}</h3>
+              <p className="text-xs text-slate-500 font-semibold">{t('booking.requestPending', 'Your request has been submitted and is pending owner approval. Payment status is recorded as PAID.')}</p>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                <div className="font-bold flex justify-between"><span>{t('booking.equipmentLabel', 'Equipment:')}</span> <span className="font-black text-right">{successModal.item.title}</span></div>
+                <div className="font-bold flex justify-between"><span>{t('booking.datesLabel', 'Dates:')}</span> <span className="font-black text-indigo-500 text-right">{successModal.draft.startDate} &rarr; {successModal.draft.endDate}</span></div>
+                <div className="font-bold flex justify-between"><span>{t('booking.ownerLabel', 'Owner:')}</span> <span className="font-black text-right">{successModal.item.owner?.name}</span></div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                {successModal.item.owner?.phone && (
+                  <a href={`tel:${successModal.item.owner.phone}`} className="w-full flex items-center justify-center gap-2 py-3 border-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+                    <Phone size={14} /> {t('booking.callOwner', 'Call Owner')} ({successModal.item.owner.phone})
+                  </a>
+                )}
+                <button
+                  onClick={() => {
+                    const bId = successModal.booking?.id;
+                    const oName = successModal.item?.owner?.name || 'Owner';
+                    setSuccessModal(null);
+                    if (bId) {
+                      setChatModal({ isOpen: true, bookingId: bId, recipientName: oName });
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 border-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                >
+                  <MessageSquare size={14} /> {t('booking.chatWithOwner', 'Chat With Owner')}
+                </button>
+                <button onClick={() => { setSuccessModal(null); window.location.href='/dashboard/rentals'; }} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity">
+                  {t('booking.viewRentals', 'View My Rentals')}
+                </button>
+                <button onClick={() => setSuccessModal(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-bold uppercase tracking-widest mt-2">
+                  {t('booking.close', 'Close')}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <ChatModal
+        bookingId={chatModal.bookingId}
+        isOpen={chatModal.isOpen}
+        onClose={() => setChatModal({ isOpen: false, bookingId: null, recipientName: '' })}
+        title="Equipment Owner Chat"
+        recipientName={chatModal.recipientName}
+      />
     </div>
   );
 }

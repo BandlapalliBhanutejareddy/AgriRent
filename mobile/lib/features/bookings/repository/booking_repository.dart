@@ -39,8 +39,29 @@ class BookingRepository {
   Future<List<Booking>> fetchMyRentals(String role) async {
     try {
       final response = await _apiClient.dio.get('${ApiConstants.bookings}?role=$role');
-      final List<dynamic> data = response.data['data'] ?? response.data;
-      return data.map((json) => Booking.fromJson(json)).toList();
+      final dynamic raw = response.data;
+      final List<dynamic> data = raw is List
+          ? raw
+          : (raw is Map && raw['data'] is List
+              ? raw['data']
+              : (raw is Map && raw['data'] is Map && raw['data']['data'] is List
+                  ? raw['data']['data']
+                  : []));
+      return data
+          .whereType<Map>()
+          .map((json) => Booking.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
+
+  Future<Booking> fetchBookingById(String bookingId) async {
+    try {
+      final response = await _apiClient.dio.get('${ApiConstants.bookings}/$bookingId/tracking');
+      final dynamic raw = response.data;
+      final dynamic responseData = (raw is Map && raw['data'] is Map) ? raw['data'] : (raw is Map ? raw : {});
+      return Booking.fromJson(Map<String, dynamic>.from(responseData));
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
@@ -49,8 +70,18 @@ class BookingRepository {
   Future<List<Booking>> fetchOwnerBookings() async {
     try {
       final response = await _apiClient.dio.get(ApiConstants.ownerBookings);
-      final List<dynamic> data = response.data['data'] ?? response.data;
-      return data.map((json) => Booking.fromJson(json)).toList();
+      final dynamic raw = response.data;
+      final List<dynamic> data = raw is List
+          ? raw
+          : (raw is Map && raw['data'] is List
+              ? raw['data']
+              : (raw is Map && raw['data'] is Map && raw['data']['data'] is List
+                  ? raw['data']['data']
+                  : []));
+      return data
+          .whereType<Map>()
+          .map((json) => Booking.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }

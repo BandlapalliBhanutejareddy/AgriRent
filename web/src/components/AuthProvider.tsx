@@ -23,7 +23,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Safety timeout to ensure login page is reachable
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 5000);
+    }, 1500);
 
     async function initAuth() {
       try {
@@ -34,7 +34,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             const response = await api.get('/auth/me');
             setUser(response.data);
           } catch (err) {
-            console.error('Session validation failed', err);
+            console.error('Session validation failed, clearing local auth store:', err);
+            setSession(null);
+            setUser(null as any);
           }
         } else {
           // 2. Check Supabase session
@@ -92,14 +94,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       router.replace('/login');
     } else if (hasSession && isAuthRoute) {
       const storedActive = useStore.getState().activeRole;
-      
+
       if (!storedActive && user?.role === 'BOTH') {
         router.replace('/dashboard/role-select');
         return;
       }
 
       const currentActive = storedActive || user?.role;
-      
+
       if (currentActive === 'FARMER') {
         router.replace('/dashboard/farmer');
       } else if (currentActive === 'OWNER') {

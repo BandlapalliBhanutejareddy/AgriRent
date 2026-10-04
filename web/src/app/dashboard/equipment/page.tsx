@@ -2,25 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Tractor, 
-  CheckCircle, 
-  XCircle, 
-  Search, 
-  Calendar, 
-  Clock, 
-  TrendingUp, 
-  Eye, 
-  X, 
-  AlertTriangle 
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Tractor,
+  CheckCircle,
+  XCircle,
+  Search,
+  Calendar,
+  Clock,
+  TrendingUp,
+  Eye,
+  X,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/components/ToastProvider';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/formatters';
 
 export default function EquipmentManagement() {
   const { t } = useTranslation();
@@ -63,7 +64,7 @@ export default function EquipmentManagement() {
   useEffect(() => {
     let filtered = equipment;
     if (search) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.title.toLowerCase().includes(search.toLowerCase()) ||
         item.description?.toLowerCase().includes(search.toLowerCase())
       );
@@ -113,7 +114,7 @@ export default function EquipmentManagement() {
 
     try {
       await api.put(`/equipment/${editingItem.id}`, payload);
-      setEquipment(prev => 
+      setEquipment(prev =>
         prev.map(e => e.id === editingItem.id ? { ...e, ...payload } : e)
       );
       showToast('Machinery specifications updated successfully!', 'success');
@@ -142,7 +143,7 @@ export default function EquipmentManagement() {
   async function handleToggleAvailability(id: string, currentStatus: boolean) {
     try {
       await api.put(`/equipment/${id}`, { available: !currentStatus });
-      setEquipment(prev => 
+      setEquipment(prev =>
         prev.map(e => e.id === id ? { ...e, available: !currentStatus } : e)
       );
       showToast(`Equipment availability toggled. Now ${!currentStatus ? 'Online' : 'Offline'}.`, 'success');
@@ -170,7 +171,7 @@ export default function EquipmentManagement() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -187,16 +188,16 @@ export default function EquipmentManagement() {
       <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800/85 shadow-sm flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-                type="text" 
-                placeholder={t('search_fleet_placeholder', { defaultValue: 'Search fleet inventory...' })} 
+            <input
+                type="text"
+                placeholder={t('search_fleet_placeholder', { defaultValue: 'Search fleet inventory...' })}
                 className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 transition-all text-xs font-medium text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400 shadow-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
             />
         </div>
         <div className="flex gap-2">
-            <select 
+            <select
               className="bg-white dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-900 dark:text-slate-50 outline-none cursor-pointer shadow-sm"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -212,7 +213,7 @@ export default function EquipmentManagement() {
       {/* Equipment Grid List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredEquipment.length === 0 ? (
-          
+
           /* Empty Fleet Illustration */
           <div className="col-span-full py-20 text-center bg-white dark:bg-slate-900 rounded-[32px] border-2 border-slate-200 dark:border-slate-800 border-dashed p-12 flex flex-col items-center justify-center space-y-4 shadow-inner">
             <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-300 dark:text-slate-700">
@@ -241,7 +242,7 @@ export default function EquipmentManagement() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="p-6 flex-1 flex flex-col space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
@@ -249,7 +250,7 @@ export default function EquipmentManagement() {
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{item.category}</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-lg">₹{item.pricePerDay}</span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-lg">Ã¢â€šÂ¹{item.pricePerDay}</span>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{t('per_day', { defaultValue: 'Per Day' })}</p>
                   </div>
                 </div>
@@ -257,9 +258,9 @@ export default function EquipmentManagement() {
                 <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed font-semibold">
                   {item.description || 'No description listed by the owner.'}
                 </p>
-                
+
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 flex justify-between items-center mt-auto">
-                  <button 
+                  <button
                     onClick={() => handleToggleAvailability(item.id, item.available)}
                     className={`flex items-center space-x-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${item.available ? 'text-red-500 hover:text-red-600' : 'text-emerald-600 hover:text-emerald-700'}`}
                   >
@@ -275,16 +276,16 @@ export default function EquipmentManagement() {
                       </>
                     )}
                   </button>
-                  
+
                   <div className="flex space-x-1.5">
-                    <button 
+                    <button
                       onClick={() => setSelectedItem(item)}
                       className="p-2 text-slate-400 hover:text-indigo-650 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 border border-slate-100 dark:border-slate-800 rounded-xl transition-all"
                       title={t('inspect_machine_utilization')}
                     >
                       <Eye size={16} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleOpenEdit(item)}
                       data-testid="edit-equipment"
                       className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 border border-slate-100 dark:border-slate-800 rounded-xl transition-all"
@@ -292,7 +293,7 @@ export default function EquipmentManagement() {
                     >
                       <Edit2 size={16} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => setDeletingItemId(item.id)}
                       data-testid="delete-equipment"
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 border border-slate-100 dark:border-slate-800 rounded-xl transition-all"
@@ -312,7 +313,7 @@ export default function EquipmentManagement() {
       <AnimatePresence>
         {editingItem && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -323,7 +324,7 @@ export default function EquipmentManagement() {
                   <h3 className="font-black text-slate-850 dark:text-white uppercase text-xs tracking-wider">{t('edit_fleet', { defaultValue: 'Edit Fleet' })} {t('machinery')}</h3>
                   <span className="text-[9px] text-slate-400 font-bold uppercase">{t('id')}{editingItem.id}</span>
                 </div>
-                <button 
+                <button
                   onClick={() => setEditingItem(null)}
                   className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all"
                 >
@@ -334,9 +335,9 @@ export default function EquipmentManagement() {
               <form onSubmit={handleSaveChanges} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('machinery_title')}</label>
-                  <input 
-                    type="text" 
-                    value={editTitle} 
+                  <input
+                    type="text"
+                    value={editTitle}
                     onChange={e => setEditTitle(e.target.value)}
                     className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-xs font-medium text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400"
                     required
@@ -346,9 +347,9 @@ export default function EquipmentManagement() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('daily_rate_inr')}</label>
-                    <input 
-                      type="number" 
-                      value={editPrice} 
+                    <input
+                      type="number"
+                      value={editPrice}
                       onChange={e => setEditPrice(Number(e.target.value))}
                       className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-xs font-medium text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400"
                       required
@@ -357,8 +358,8 @@ export default function EquipmentManagement() {
 
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('category')}</label>
-                    <select 
-                      value={editCategory} 
+                    <select
+                      value={editCategory}
                       onChange={e => setEditCategory(e.target.value)}
                       className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-xs font-bold text-slate-900 dark:text-slate-50 cursor-pointer"
                     >
@@ -371,8 +372,8 @@ export default function EquipmentManagement() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-wide">{t('brief_description')}</label>
-                  <textarea 
-                    value={editDescription} 
+                  <textarea
+                    value={editDescription}
                     onChange={e => setEditDescription(e.target.value)}
                     rows={3}
                     className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-xs font-medium text-slate-900 dark:text-slate-50 placeholder-slate-500 dark:placeholder-slate-400 resize-none"
@@ -384,22 +385,22 @@ export default function EquipmentManagement() {
                     <span className="block font-bold text-slate-850 dark:text-white">{t('active_in_marketplace')}</span>
                     <span className="text-slate-400 font-medium">{t('show_live_in_catalog_listings')}</span>
                   </div>
-                  <input 
-                    type="checkbox" 
-                    checked={editAvailable} 
+                  <input
+                    type="checkbox"
+                    checked={editAvailable}
                     onChange={e => setEditAvailable(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer" 
+                    className="h-4 w-4 rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
                   />
                 </label>
 
                 <div className="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setEditingItem(null)}
                     className="flex-1 py-3.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-bold uppercase tracking-wider transition-colors border border-slate-150 dark:border-slate-700"
                   >
                     {t('cancel')}</button>
-                  <button 
+                  <button
                     type="submit"
                     className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-colors shadow-md hover:shadow-lg"
                   >
@@ -415,7 +416,7 @@ export default function EquipmentManagement() {
       <AnimatePresence>
         {deletingItemId && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -432,12 +433,12 @@ export default function EquipmentManagement() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button 
+                <button
                   onClick={() => setDeletingItemId(null)}
                   className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-bold uppercase tracking-wider transition-colors border border-slate-150 dark:border-slate-700"
                 >
                   {t('keep')}</button>
-                <button 
+                <button
                   onClick={handleConfirmDelete}
                   className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-colors shadow-md hover:shadow-lg"
                 >
@@ -453,8 +454,8 @@ export default function EquipmentManagement() {
         {selectedItem && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end">
             <div className="absolute inset-0" onClick={() => setSelectedItem(null)} />
-            
-            <motion.div 
+
+            <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
@@ -467,7 +468,7 @@ export default function EquipmentManagement() {
                     <h3 className="font-black text-slate-850 dark:text-white uppercase text-xs tracking-wider">{t('fleet_utilization_details')}</h3>
                     <span className="text-[9px] text-slate-400 font-bold uppercase">{t('specs_inspection_dashboard')}</span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setSelectedItem(null)}
                     className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 rounded-xl transition-all"
                   >
@@ -485,7 +486,7 @@ export default function EquipmentManagement() {
                     </div>
                   )}
                   <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/10 text-white font-bold text-xs uppercase tracking-wide">
-                    ₹{selectedItem.pricePerDay}{t('day')}</div>
+                    Ã¢â€šÂ¹{selectedItem.pricePerDay}{t('day')}</div>
                 </div>
 
                 <div className="space-y-4">
@@ -509,7 +510,7 @@ export default function EquipmentManagement() {
                   </div>
                   <div className="p-4 bg-slate-50 dark:bg-slate-800/35 border border-slate-100 dark:border-slate-850 rounded-2xl text-center">
                     <span className="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">{t('secured_revenue')}</span>
-                    <span className="text-xl font-black text-emerald-500 mt-1 block">₹{(selectedItem.revenueGenerated || 28400).toLocaleString()}</span>
+                    <span className="text-xl font-black text-emerald-500 mt-1 block">{formatCurrency(selectedItem.revenueGenerated)}</span>
                   </div>
                 </div>
 
@@ -535,7 +536,7 @@ export default function EquipmentManagement() {
               </div>
 
               <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                <button 
+                <button
                   onClick={() => setSelectedItem(null)}
                   className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-md transition-colors"
                 >
