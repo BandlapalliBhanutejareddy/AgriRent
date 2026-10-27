@@ -1,0 +1,181 @@
+name: Application CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  backend-ci:
+    name: Backend CI (Build & Tests)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: agrorent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install Root Dependencies
+      run: npm install
+
+    - name: Install Backend Dependencies
+      run: |
+        cd backend
+        npm install
+
+    - name: Migrate Database Schema & Seed Demo Data
+      run: |
+        cd backend
+        npx prisma db push --skip-generate
+        npm run seed
+      env:
+        DATABASE_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        DIRECT_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        JWT_SECRET: "test_jwt_secret_for_ci_environment_32chars_long"
+
+    - name: Compile Backend TypeScript
+      run: |
+        cd backend
+        npm run build
+
+    - name: Start Backend Service
+      run: |
+        cd backend
+        npm start &
+      env:
+        PORT: 4000
+        DATABASE_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        DIRECT_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        JWT_SECRET: "test_jwt_secret_for_ci_environment_32chars_long"
+        SUPABASE_URL: "https://placeholder.supabase.co"
+        SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+
+    - name: Wait for Backend Health Readiness
+      run: |
+        echo "Waiting for Backend (http://localhost:4000/api/health)..."
+        for i in {1..30}; do
+          if curl -s http://localhost:4000/api/health; then
+            echo "Backend is ready!"
+            break
+          fi
+          sleep 1
+        done
+
+    - name: Execute Backend REST API Tests
+      run: npm run test:api
+      env:
+        API_BASE_URL: "http://localhost:4000"
+
+    - name: Execute Security & RBAC Suite
+      run: npm run test:security
+      env:
+        API_BASE_URL: "http://localhost:4000"
+
+    - name: Execute Cross-Platform API Contract Verification
+      run: npm run test:cross
+      env:
+        API_BASE_URL: "http://localhost:4000"
+
+    - name: Upload Backend QA Reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-qa-reports
+        path: reports/qa/backend-api/
+        if-no-files-found: warn
+
+  web-ci:
+    name: Web CI (Build & Type Check)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install Web Dependencies
+      run: |
+        cd web
+        npm install
+
+    - name: Build Next.js Web Application
+      run: |
+        cd web
+        npm run build
+      env:
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+        NEXT_PUBLIC_API_URL: "http://localhost:4000/api"
+
+  mobile-ci:
+    name: Mobile CI (Flutter Tests & Android Build)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+
+    - name: Install Mobile Dependencies
+      run: |
+        cd mobile
+        flutter pub get
+
+    - name: Run Flutter Static Analysis
+      run: |
+        cd mobile
+        flutter analyze --no-fatal-infos
+
+    - name: Execute Flutter Unit & Widget Tests
+      run: |
+        cd mobile
+        flutter test --no-pub
+
+    - name: Build Android Debug APK
+      run: |
+        cd mobile
+        flutter build apk --debug
+
+    - name: Upload Debug APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: agrorent-android-debug-apk
+        path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+        if-no-files-found: warn

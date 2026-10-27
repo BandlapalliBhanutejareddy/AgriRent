@@ -2,7 +2,16 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('../../../backend/node_modules/xlsx');
+let XLSX;
+try {
+  XLSX = require('xlsx');
+} catch (e1) {
+  try {
+    XLSX = require('../../../backend/node_modules/xlsx');
+  } catch (e2) {
+    XLSX = null;
+  }
+}
 
 const BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
 const OUTPUT_DIR = path.resolve(__dirname, '../../../reports/qa/backend-api');
@@ -270,22 +279,28 @@ async function main() {
   fs.writeFileSync(path.join(OUTPUT_DIR, 'api_test_results.json'), JSON.stringify(jsonReport, null, 2));
 
   // 2. Excel
-  const wb = XLSX.utils.book_new();
-  const summaryData = [
-    { Parameter: 'Test Suite', Value: 'Backend API Functional Verification' },
-    { Parameter: 'Target Host', Value: BASE_URL },
-    { Parameter: 'Execution Time', Value: new Date().toISOString() },
-    { Parameter: 'Total Tests', Value: total },
-    { Parameter: 'Passed Tests', Value: passed },
-    { Parameter: 'Failed Tests', Value: failed },
-    { Parameter: 'Pass Rate (%)', Value: `${((passed / total) * 100).toFixed(1)}%` },
-    { Parameter: 'Duration (s)', Value: (totalDurationMs / 1000).toFixed(2) }
-  ];
-  const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
-  const wsDetails = XLSX.utils.json_to_sheet(testResults);
-  XLSX.utils.book_append_sheet(wb, wsDetails, 'Endpoints Breakdown');
-  XLSX.writeFile(wb, path.join(OUTPUT_DIR, 'api_test_results.xlsx'));
+  if (XLSX) {
+    try {
+      const wb = XLSX.utils.book_new();
+      const summaryData = [
+        { Parameter: 'Test Suite', Value: 'Backend API Functional Verification' },
+        { Parameter: 'Target Host', Value: BASE_URL },
+        { Parameter: 'Execution Time', Value: new Date().toISOString() },
+        { Parameter: 'Total Tests', Value: total },
+        { Parameter: 'Passed Tests', Value: passed },
+        { Parameter: 'Failed Tests', Value: failed },
+        { Parameter: 'Pass Rate (%)', Value: `${((passed / total) * 100).toFixed(1)}%` },
+        { Parameter: 'Duration (s)', Value: (totalDurationMs / 1000).toFixed(2) }
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+      const wsDetails = XLSX.utils.json_to_sheet(testResults);
+      XLSX.utils.book_append_sheet(wb, wsDetails, 'Endpoints Breakdown');
+      XLSX.writeFile(wb, path.join(OUTPUT_DIR, 'api_test_results.xlsx'));
+    } catch (e) {
+      log(`Warning: Failed to write Excel report: ${e.message}`);
+    }
+  }
 
   // 3. HTML
   const htmlContent = `<!DOCTYPE html>
