@@ -20,11 +20,13 @@ import {
   CalendarDays,
   Tractor,
   Compass,
-  Mic
+  Mic,
+  Bookmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/components/ToastProvider';
 import ChatModal from '@/components/ChatModal';
+import EquipmentLocationMap from '@/components/EquipmentLocationMap';
 import { MessageSquare } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 
@@ -57,6 +59,41 @@ function MarketplaceContent() {
   const [selectedSpecsItem, setSelectedSpecsItem] = useState<any | null>(null);
   const [confirmModal, setConfirmModal] = useState<any | null>(null);
   const [successModal, setSuccessModal] = useState<any | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (user) {
+      api.get('/saved/ids')
+        .then((res) => {
+          if (res.data?.savedIds) {
+            setSavedIds(new Set(res.data.savedIds));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const toggleSaveEquipment = async (e: React.MouseEvent, eqId: string) => {
+    e.stopPropagation();
+    const isSaved = savedIds.has(eqId);
+    try {
+      if (isSaved) {
+        await api.delete(`/saved/${eqId}`);
+        setSavedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(eqId);
+          return next;
+        });
+        showToast('Machinery removed from your saved list.', 'success');
+      } else {
+        await api.post(`/saved/${eqId}`);
+        setSavedIds((prev) => new Set(prev).add(eqId));
+        showToast('Machinery saved to your shortlisted equipment!', 'success');
+      }
+    } catch (err: any) {
+      showToast('Please sign in as a farmer to save machinery.', 'warning');
+    }
+  };
 
   // Read URL search params on mount
   useEffect(() => {
@@ -421,8 +458,20 @@ function MarketplaceContent() {
             <div key={item.id} className="rounded-[32px] border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-lg transition-all duration-350">
               <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 relative">
                 <img src={displayImage} alt={item.title} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={(e) => toggleSaveEquipment(e, item.id)}
+                  className={`absolute top-3 right-3 p-2 rounded-xl backdrop-blur-md shadow-md transition-all cursor-pointer ${
+                    savedIds.has(item.id)
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:text-amber-500'
+                  }`}
+                  title={savedIds.has(item.id) ? 'Remove bookmark' : 'Bookmark machinery'}
+                >
+                  <Bookmark size={15} fill={savedIds.has(item.id) ? 'currentColor' : 'none'} />
+                </button>
                 <div className="absolute bottom-4 right-4 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-center shadow-xl">
-                  <span className="text-white font-black text-sm tracking-tight">Ã¢â€šÂ¹{item.pricePerDay}</span>
+                  <span className="text-white font-black text-sm tracking-tight">₹{item.pricePerDay}</span>
                   <span className="text-white/70 font-semibold text-[10px] ml-1 uppercase tracking-widest">/{t('per_day', 'day')}</span>
                 </div>
               </div>
@@ -446,7 +495,7 @@ function MarketplaceContent() {
                     <span>{item.rating}</span>
                   </div>
                   <span className="text-slate-400 font-semibold">({item.reviewCount} {t('reviews', 'Reviews')})</span>
-                  <span className="text-slate-300 dark:text-slate-800">Ã¢â‚¬Â¢</span>
+                  <span className="text-slate-300 dark:text-slate-800">•</span>
                   <span className="text-slate-450 dark:text-slate-400 font-bold flex items-center gap-0.5">
                     <Compass size={12} /> {item.distance} {t('km_away', 'km away')}
                   </span>
@@ -468,7 +517,7 @@ function MarketplaceContent() {
                   </div>
                   <div className="flex items-center gap-2 font-semibold">
                     <DollarSign size={14} className="text-slate-400" />
-                    <span className="font-bold text-slate-850 dark:text-white">Ã¢â€šÂ¹{item.pricePerDay} {t('per_day', 'per day')}</span>
+                    <span className="font-bold text-slate-850 dark:text-white">₹{item.pricePerDay} {t('per_day', 'per day')}</span>
                   </div>
                 </div>
 
@@ -549,7 +598,7 @@ function MarketplaceContent() {
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-850 rounded-2xl text-center">
                     <span className="block text-[9px] uppercase font-bold text-slate-400">{t('rating_yield', 'Rating Yield')}</span>
-                    <span className="text-sm font-black text-amber-500 mt-1 block">Ã¢Ëœâ€¦ {selectedSpecsItem.rating}</span>
+                    <span className="text-sm font-black text-amber-500 mt-1 block">★ {selectedSpecsItem.rating}</span>
                   </div>
                 </div>
 
@@ -577,6 +626,18 @@ function MarketplaceContent() {
                   <p className="leading-relaxed font-semibold text-slate-500 dark:text-slate-400">
                     {selectedSpecsItem.description || 'No description listed by the owner.'}
                   </p>
+                </div>
+
+                {/* Pickup Location Map Component */}
+                <div className="pt-2">
+                  <EquipmentLocationMap
+                    equipmentId={selectedSpecsItem.id}
+                    title={selectedSpecsItem.title}
+                    location={selectedSpecsItem.location}
+                    latitude={selectedSpecsItem.latitude}
+                    longitude={selectedSpecsItem.longitude}
+                    isOwner={user?.id === selectedSpecsItem.ownerId}
+                  />
                 </div>
 
                 {/* Reviews section */}
@@ -684,7 +745,7 @@ function MarketplaceContent() {
               <div className="w-16 h-16 mx-auto bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 flex items-center justify-center rounded-full mb-2">
                 <ShieldCheck size={32} />
               </div>
-              <h3 className="font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-xl">{t('booking.bookingSubmitted', 'Booking Request Submitted Ã¢Å“â€œ')}</h3>
+              <h3 className="font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-xl">{t('booking.bookingSubmitted', 'Booking Request Submitted ✓')}</h3>
               <p className="text-xs text-slate-500 font-semibold">{t('booking.requestPending', 'Your request has been submitted and is pending owner approval. Payment status is recorded as PAID.')}</p>
 
               <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl space-y-2 text-xs text-slate-700 dark:text-slate-300">

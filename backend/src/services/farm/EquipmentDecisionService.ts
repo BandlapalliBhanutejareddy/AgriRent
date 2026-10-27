@@ -104,6 +104,10 @@ export class EquipmentDecisionService {
       startDate?: string;
       endDate?: string;
       language?: string;
+      nextActionTitle?: string;
+      activeRisks?: any[];
+      financialState?: any;
+      skipSubservices?: boolean;
     },
     isAdmin = false
   ): Promise<EquipmentDecisionResponse> {
@@ -115,27 +119,33 @@ export class EquipmentDecisionService {
     const crop = aggregate.crops[0] || null;
     const acreage = farm.area || 5.0;
 
-    // Get Next Best Action
-    let nextActionTitle = 'Land Preparation & Puddling';
-    try {
-      const nba = await nextBestActionService.getNextBestActions(farmId, ownerId, undefined, lang, isAdmin);
-      if (nba.bestAction) {
-        nextActionTitle = nba.bestAction.title;
-      }
-    } catch (e) {}
+    // Get Next Best Action (use passed context if available to eliminate duplicate subservice overhead)
+    let nextActionTitle = options?.nextActionTitle || 'Land Preparation & Puddling';
+    if (!options?.nextActionTitle && !options?.skipSubservices) {
+      try {
+        const nba = await nextBestActionService.getNextBestActions(farmId, ownerId, undefined, lang, isAdmin);
+        if (nba.bestAction) {
+          nextActionTitle = nba.bestAction.title;
+        }
+      } catch (e) {}
+    }
 
-    // Get Risk & Financial Intelligence
-    let activeRisks: any[] = [];
-    try {
-      const riskAssessment = await farmRiskEngineService.getRiskAssessment(farmId, ownerId, 'en', isAdmin);
-      activeRisks = riskAssessment.preventionItems || [];
-    } catch (e) {}
+    // Get Risk & Financial Intelligence (use passed context if available)
+    let activeRisks: any[] = options?.activeRisks || [];
+    if (!options?.activeRisks && !options?.skipSubservices) {
+      try {
+        const riskAssessment = await farmRiskEngineService.getRiskAssessment(farmId, ownerId, 'en', isAdmin);
+        activeRisks = riskAssessment.preventionItems || [];
+      } catch (e) {}
+    }
 
-    let financialState: any = null;
-    try {
-      const fin = await farmFinancialService.getFinancialAnalysis(farmId, ownerId, 'en', isAdmin);
-      financialState = fin.financialState;
-    } catch (e) {}
+    let financialState: any = options?.financialState || null;
+    if (!options?.financialState && !options?.skipSubservices) {
+      try {
+        const fin = await farmFinancialService.getFinancialAnalysis(farmId, ownerId, 'en', isAdmin);
+        financialState = fin.financialState;
+      } catch (e) {}
+    }
 
     // Define Operation Window
     const now = new Date();
@@ -244,12 +254,11 @@ export class EquipmentDecisionService {
     let explanation = `Best machine selected is ${primary?.equipmentName || 'None'} with decision score ${primary?.decisionScore || 0}/100 for ${nextActionTitle}.`;
     let decisionSource: EquipmentDecisionResponse['decisionSource'] = 'DETERMINISTIC_ENGINE';
 
-    if (primary) {
+    if (primary && lang === 'en') {
       try {
-        const sysPrompt = `You are a professional farm machinery advisor. Explain the following equipment decision facts in 2 sentences in ${lang} language. Do NOT change numbers, prices, or equipment names.`;
+        const sysPrompt = `You are a professional farm machinery advisor. Explain the following equipment decision facts in 2 sentences in English. Do NOT change numbers, prices, or equipment names.`;
         const userPrompt = `Machine: ${primary.equipmentName}, Score: ${primary.decisionScore}/100 (${primary.decisionTier}), Cost: ₹${primary.estimatedCost}, Cost/Acre: ₹${primary.costPerAcre}, Operation: ${nextActionTitle}, Availability: ${primary.availabilityStatus}.`;
         
-        // Use a strict 1500ms timeout for the API call to prevent blocking
         const aiRes = await aiProvider.generateText(userPrompt, sysPrompt, 1500);
         
         if (aiRes && !aiRes.includes('<?xml')) {

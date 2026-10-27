@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/localization/app_localizations.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'farmer_home_screen.dart';
+import '../../farm/ui/my_farm_screen.dart';
 import 'farmer_marketplace_screen.dart';
 import 'my_rentals_screen.dart';
-import '../../farm/ui/my_farm_screen.dart';
-import '../../profile/ui/profile_screen.dart';
+import 'farmer_more_screen.dart';
 
 class FarmerMainScreen extends ConsumerStatefulWidget {
   const FarmerMainScreen({super.key});
@@ -29,14 +30,17 @@ class _FarmerMainScreenState extends ConsumerState<FarmerMainScreen> {
         },
       ),
       const MyFarmScreen(key: ValueKey('farmer_farm_tab')),
-      const FarmerMarketplaceScreen(key: ValueKey('farmer_marketplace_tab')),
+      const FarmerMarketplaceScreen(
+        key: ValueKey('farmer_marketplace_tab'),
+      ),
       const MyRentalsScreen(key: ValueKey('farmer_rentals_tab')),
-      const ProfileScreen(key: ValueKey('farmer_profile_tab')),
+      const FarmerMoreScreen(key: ValueKey('farmer_more_tab')),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
@@ -67,31 +71,31 @@ class _FarmerMainScreenState extends ConsumerState<FarmerMainScreen> {
               _currentIndex = index;
             });
           },
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded, color: AppTheme.primaryGreen),
-              label: 'Home',
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home_rounded, color: AppTheme.primaryGreen),
+              label: 'home'.tr(lang),
             ),
             NavigationDestination(
-              icon: Icon(Icons.agriculture_outlined),
-              selectedIcon: Icon(Icons.agriculture_rounded, color: AppTheme.primaryGreen),
-              label: 'Farm',
+              icon: const Icon(Icons.agriculture_outlined),
+              selectedIcon: const Icon(Icons.agriculture_rounded, color: AppTheme.primaryGreen),
+              label: 'my_farm'.tr(lang),
             ),
             NavigationDestination(
-              icon: Icon(Icons.storefront_outlined),
-              selectedIcon: Icon(Icons.storefront_rounded, color: AppTheme.primaryGreen),
-              label: 'Market',
+              icon: const Icon(Icons.storefront_outlined),
+              selectedIcon: const Icon(Icons.storefront_rounded, color: AppTheme.primaryGreen),
+              label: 'marketplace'.tr(lang),
             ),
             NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
-              label: 'Bookings',
+              icon: const Icon(Icons.receipt_long_outlined),
+              selectedIcon: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
+              label: 'bookings'.tr(lang),
             ),
             NavigationDestination(
-              icon: Icon(Icons.menu_outlined),
-              selectedIcon: Icon(Icons.menu_rounded, color: AppTheme.primaryGreen),
-              label: 'More',
+              icon: const Icon(Icons.person_outline_rounded),
+              selectedIcon: const Icon(Icons.person_rounded, color: AppTheme.primaryGreen),
+              label: 'profile'.tr(lang),
             ),
           ],
         ),

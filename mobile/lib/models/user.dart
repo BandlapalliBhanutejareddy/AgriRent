@@ -6,6 +6,8 @@ class User {
   final String? phone;
   final String? profileImage;
   final String preferredLanguage;
+  final bool isSuspended;
+  final bool isVerified;
 
   User({
     required this.id,
@@ -15,6 +17,8 @@ class User {
     this.phone,
     this.profileImage,
     required this.preferredLanguage,
+    this.isSuspended = false,
+    this.isVerified = false,
   });
 
   factory User.fromJson(dynamic raw) {
@@ -44,6 +48,8 @@ class User {
       phone: json['phone']?.toString(),
       profileImage: json['profileImage']?.toString(),
       preferredLanguage: json['preferredLanguage']?.toString() ?? 'en',
+      isSuspended: json['isSuspended'] == true,
+      isVerified: json['isVerified'] == true,
     );
   }
 
@@ -56,6 +62,32 @@ class User {
       'phone': phone,
       'profileImage': profileImage,
       'preferredLanguage': preferredLanguage,
+      'isSuspended': isSuspended,
+      'isVerified': isVerified,
     };
+  }
+
+  User copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? role,
+    String? phone,
+    String? profileImage,
+    String? preferredLanguage,
+    bool? isSuspended,
+    bool? isVerified,
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      role: role ?? this.role,
+      phone: phone ?? this.phone,
+      profileImage: profileImage ?? this.profileImage,
+      preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      isSuspended: isSuspended ?? this.isSuspended,
+      isVerified: isVerified ?? this.isVerified,
+    );
   }
 }

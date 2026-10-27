@@ -44,7 +44,7 @@ function main() {
                 create: u,
             });
         }
-        console.log('Ã¢Å“â€¦ Database seeded with Secure Users successfully');
+        console.log('✅ Database seeded with Secure Users successfully');
     });
 }
 main()

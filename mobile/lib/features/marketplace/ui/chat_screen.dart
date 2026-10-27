@@ -8,10 +8,13 @@ import '../../auth/providers/auth_provider.dart';
 import '../../chat/models/chat_message.dart';
 import '../../chat/providers/chat_provider.dart';
 
+import '../../../core/api/api_client.dart';
+
 class ChatScreen extends ConsumerStatefulWidget {
   final Booking? booking;
+  final String? bookingId;
 
-  const ChatScreen({super.key, required this.booking});
+  const ChatScreen({super.key, this.booking, this.bookingId});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -21,16 +24,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _hasText = false;
+  Booking? _resolvedBooking;
+  bool _isLoadingBooking = false;
 
   @override
   void initState() {
     super.initState();
     _textController.addListener(_onTextChanged);
-    if (widget.booking != null && widget.booking!.id.isNotEmpty) {
-      // Trigger read status
+    _resolvedBooking = widget.booking;
+    if (_resolvedBooking == null && widget.bookingId != null && widget.bookingId!.isNotEmpty) {
+      _loadBookingById(widget.bookingId!);
+    } else if (_resolvedBooking != null && _resolvedBooking!.id.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(chatProvider(widget.booking!.id).notifier).markAsRead();
+        ref.read(chatProvider(_resolvedBooking!.id).notifier).markAsRead();
       });
+    }
+  }
+
+  Future<void> _loadBookingById(String id) async {
+    setState(() => _isLoadingBooking = true);
+    try {
+      final res = await ApiClient().dio.get('bookings/$id');
+      final raw = res.data['data'] ?? res.data;
+      if (raw is Map<String, dynamic> && mounted) {
+        final b = Booking.fromJson(raw);
+        setState(() {
+          _resolvedBooking = b;
+          _isLoadingBooking = false;
+        });
+        ref.read(chatProvider(b.id).notifier).markAsRead();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingBooking = false);
     }
   }
 
@@ -67,39 +92,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _handleSendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty || widget.booking == null) return;
+    if (text.isEmpty || _resolvedBooking == null) return;
 
-    final bookingId = widget.booking!.id;
+    final bookingId = _resolvedBooking!.id;
     final lang = ref.read(languageProvider);
+    final currentUser = ref.read(authProvider).user;
     final notifier = ref.read(chatProvider(bookingId).notifier);
 
+    // Clear input field and scroll immediately for snappiest user experience
     _textController.clear();
-    final success = await notifier.sendMessage(text);
-    if (success) {
-      _scrollToBottom(animated: true);
-    } else {
-      if (mounted) {
-        final sendError = ref.read(chatProvider(bookingId)).sendError;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              sendError ?? 'message_could_not_be_sent'.tr(lang),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: const Color(0xFFC62828),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            action: SnackBarAction(
-              label: 'retry'.tr(lang),
-              textColor: Colors.white,
-              onPressed: () {
-                _textController.text = text;
-                _handleSendMessage();
-              },
-            ),
+    _scrollToBottom(animated: true);
+
+    final success = await notifier.sendMessage(
+      text,
+      senderId: currentUser?.id,
+      senderName: currentUser?.name,
+    );
+    if (!success && mounted) {
+      // If send failed, restore text into controller so the user does not lose their draft
+      _textController.text = text;
+      final sendError = ref.read(chatProvider(bookingId)).sendError;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            sendError ?? 'message_could_not_be_sent'.tr(lang),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-        );
-      }
+          backgroundColor: const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          action: SnackBarAction(
+            label: 'retry'.tr(lang),
+            textColor: Colors.white,
+            onPressed: () {
+              _handleSendMessage();
+            },
+          ),
+        ),
+      );
     }
   }
 
@@ -108,7 +138,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final lang = ref.watch(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    if (widget.booking == null || widget.booking!.id.isEmpty) {
+    if (_isLoadingBooking) {
+      return Scaffold(
+        backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+        appBar: AppBar(
+          title: Text('chat'.tr(lang)),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+        ),
+      );
+    }
+
+    if (_resolvedBooking == null || _resolvedBooking!.id.isEmpty) {
       return Scaffold(
         backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
         appBar: AppBar(
@@ -150,7 +194,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
-    final booking = widget.booking!;
+    final booking = _resolvedBooking!;
     final chatState = ref.watch(chatProvider(booking.id));
     final currentUser = ref.watch(authProvider).user;
 
@@ -317,18 +361,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     String bookingId,
   ) {
     if (state.isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
+            const CircularProgressIndicator(
               color: AppTheme.primaryGreen,
               strokeWidth: 3,
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
-              'Loading conversation...',
-              style: TextStyle(
+              'loading_conversation'.tr(lang),
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: AppTheme.textMutedGray,
@@ -476,99 +520,135 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildMessageBubble(ChatMessage msg, bool isMe, bool isDark) {
     final timeFormatted = DateFormat('h:mm a').format(msg.createdAt);
+    final senderName = msg.sender?.name ?? (isMe ? 'You' : 'User');
+    final senderInitial = senderName.isNotEmpty ? senderName[0].toUpperCase() : 'U';
+    final profileImg = msg.sender?.profileImage;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Align(
-        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.78,
-          ),
-          child: Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (!isMe && msg.sender?.name != null && msg.sender!.name.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 6, bottom: 4),
-                  child: Text(
-                    msg.sender!.name,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white60 : AppTheme.textMutedGray,
-                    ),
-                  ),
-                ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isMe
-                      ? AppTheme.primaryGreen
-                      : (isDark ? AppTheme.darkCard : Colors.white),
-                  borderRadius: BorderRadius.circular(18).copyWith(
-                    bottomRight: isMe ? const Radius.circular(2) : const Radius.circular(18),
-                    bottomLeft: !isMe ? const Radius.circular(2) : const Radius.circular(18),
-                  ),
-                  border: isMe
-                      ? null
-                      : Border.all(
-                          color: isDark
-                              ? Colors.white10
-                              : Colors.black.withValues(alpha: 0.08),
-                          width: 1,
-                        ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      msg.text,
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.15),
+              backgroundImage: (profileImg != null && profileImg.isNotEmpty)
+                  ? NetworkImage(profileImg)
+                  : null,
+              child: (profileImg == null || profileImg.isEmpty)
+                  ? Text(
+                      senderInitial,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 8),
+          ],
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.72,
+            ),
+            child: Column(
+              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (!isMe && senderName.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6, bottom: 4),
+                    child: Text(
+                      senderName,
                       style: TextStyle(
-                        fontSize: 14.5,
-                        height: 1.35,
-                        color: isMe
-                            ? Colors.white
-                            : (isDark ? Colors.white : AppTheme.textDarkNavy),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white60 : AppTheme.textMutedGray,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          timeFormatted,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
-                            color: isMe
-                                ? Colors.white.withValues(alpha: 0.8)
-                                : (isDark ? Colors.white54 : AppTheme.textMutedGray),
-                          ),
-                        ),
-                        if (isMe) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            msg.read ? Icons.done_all_rounded : Icons.done_rounded,
-                            size: 13,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
-                        ],
-                      ],
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? AppTheme.primaryGreen
+                        : (isDark ? AppTheme.darkCard : Colors.white),
+                    borderRadius: BorderRadius.circular(18).copyWith(
+                      bottomRight: isMe ? const Radius.circular(2) : const Radius.circular(18),
+                      bottomLeft: !isMe ? const Radius.circular(2) : const Radius.circular(18),
                     ),
-                  ],
+                    border: isMe
+                        ? null
+                        : Border.all(
+                            color: isDark
+                                ? Colors.white10
+                                : Colors.black.withValues(alpha: 0.08),
+                            width: 1,
+                          ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        msg.text,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          height: 1.35,
+                          color: isMe
+                              ? Colors.white
+                              : (isDark ? Colors.white : AppTheme.textDarkNavy),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            timeFormatted,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                              color: isMe
+                                  ? Colors.white.withValues(alpha: 0.8)
+                                  : (isDark ? Colors.white54 : AppTheme.textMutedGray),
+                            ),
+                          ),
+                          if (isMe) ...[
+                            const SizedBox(width: 4),
+                            if (msg.isSending)
+                              const SizedBox(
+                                width: 11,
+                                height: 11,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            else
+                              Icon(
+                                msg.read ? Icons.done_all_rounded : Icons.done_rounded,
+                                size: 13,
+                                color: Colors.white.withValues(alpha: 0.85),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

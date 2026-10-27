@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/localization/app_localizations.dart';
 import '../../../models/equipment.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'equipment_details_screen.dart';
 
-class EquipmentLoaderScreen extends StatefulWidget {
+class EquipmentLoaderScreen extends ConsumerStatefulWidget {
   final String equipmentId;
   const EquipmentLoaderScreen({super.key, required this.equipmentId});
 
   @override
-  State<EquipmentLoaderScreen> createState() => _EquipmentLoaderScreenState();
+  ConsumerState<EquipmentLoaderScreen> createState() => _EquipmentLoaderScreenState();
 }
 
-class _EquipmentLoaderScreenState extends State<EquipmentLoaderScreen> {
+class _EquipmentLoaderScreenState extends ConsumerState<EquipmentLoaderScreen> {
   Equipment? _equipment;
   bool _isLoading = true;
   String? _error;
@@ -44,7 +46,7 @@ class _EquipmentLoaderScreenState extends State<EquipmentLoaderScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Unable to load equipment details.';
+          _error = e.toString();
           _isLoading = false;
         });
       }
@@ -53,6 +55,8 @@ class _EquipmentLoaderScreenState extends State<EquipmentLoaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(languageProvider);
+
     if (_isLoading) {
       return const Scaffold(
         body: Center(
@@ -63,7 +67,7 @@ class _EquipmentLoaderScreenState extends State<EquipmentLoaderScreen> {
 
     if (_error != null || _equipment == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Equipment Details')),
+        appBar: AppBar(title: Text('equipment_details'.tr(lang))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
@@ -72,12 +76,16 @@ class _EquipmentLoaderScreenState extends State<EquipmentLoaderScreen> {
               children: [
                 const Icon(Icons.error_outline, size: 48, color: Colors.red),
                 const SizedBox(height: 16),
-                Text(_error ?? 'Equipment not found', style: const TextStyle(fontSize: 16)),
+                Text(
+                  'unable_to_load_equipment'.tr(lang),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: _fetchEquipment,
                   style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
-                  child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                  child: Text('retry'.tr(lang), style: const TextStyle(color: Colors.white)),
                 ),
               ],
             ),

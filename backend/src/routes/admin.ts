@@ -29,7 +29,8 @@ router.get('/stats', async (req: AuthRequest, res: Response): Promise<void> => {
       rejectedBookings,
       payments,
       complaints,
-      feedbacks
+      feedbacks,
+      cropGroupsList
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { role: { in: ['FARMER', 'BOTH'] } } }),
@@ -49,7 +50,8 @@ router.get('/stats', async (req: AuthRequest, res: Response): Promise<void> => {
       prisma.booking.count({ where: { status: 'REJECTED' } }),
       prisma.paymentTransaction.findMany({ select: { amount: true, status: true, refundedAmount: true } }),
       prisma.complaint.count({ where: { status: { in: ['NEW', 'UNDER_REVIEW'] } } }),
-      prisma.feedback.count()
+      prisma.feedback.count(),
+      prisma.farmCrop.findMany({ select: { cropName: true }, distinct: ['cropName'] })
     ]);
 
     const gmv = payments
@@ -78,6 +80,11 @@ router.get('/stats', async (req: AuthRequest, res: Response): Promise<void> => {
         rented: activeBookings,
         pendingModeration: pendingModeration
       },
+      cropGroups: {
+        total: cropGroupsList.length,
+        items: cropGroupsList.map(c => c.cropName)
+      },
+      totalCropGroups: cropGroupsList.length,
       bookings: {
         total: totalBookings,
         pending: pendingBookings,
@@ -426,6 +433,59 @@ router.get('/bookings', async (req: AuthRequest, res: Response): Promise<void> =
   } catch (error) {
     console.error('Booking fetch error', error);
     res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// 11b. Get Payments List for Admin
+router.get('/payments', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { page = '1', limit = '20', search, status } = req.query;
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 20;
+    const skip = (pageNum - 1) * limitNum;
+
+    let where: any = {};
+    if (status && status !== 'All') where.status = String(status);
+
+    const [total, payments] = await Promise.all([
+      prisma.paymentTransaction.count({ where }),
+      prisma.paymentTransaction.findMany({
+        where,
+        include: {
+          booking: {
+            include: {
+              farmer: { select: { id: true, name: true, email: true } },
+              equipment: {
+                include: {
+                  owner: { select: { id: true, name: true, email: true } }
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum
+      })
+    ]);
+
+    const formattedPayments = payments.map(p => ({
+      id: p.id,
+      transactionRef: p.transactionRef,
+      bookingId: p.bookingId,
+      amount: p.amount,
+      paymentMethod: p.paymentMethod,
+      status: p.status,
+      createdAt: p.createdAt,
+      farmerName: p.booking?.farmer?.name || 'Farmer',
+      ownerName: p.booking?.equipment?.owner?.name || 'Owner',
+      equipmentTitle: p.booking?.equipment?.title || 'Equipment'
+    }));
+
+    res.json({ data: formattedPayments, total, page: pageNum, limit: limitNum });
+  } catch (error) {
+    console.error('Admin Payments Error:', error);
+    res.status(500).json({ error: 'Failed to fetch admin payments' });
   }
 });
 

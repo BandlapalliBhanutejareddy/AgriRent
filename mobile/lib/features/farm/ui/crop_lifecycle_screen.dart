@@ -1,5 +1,7 @@
+import '../../../core/localization/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../providers/farm_provider.dart';
@@ -84,7 +86,8 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
 
   // SCREEN 6: UPDATE STAGE BOTTOM SHEET
   void _showUpdateStageSheet(String farmId, String cropId, String cropName, String currentStage) {
-    String selectedStage = currentStage.toUpperCase();
+    final lang = ref.read(languageProvider);
+    String selectedStage = AppLocalizations.localizedCropStage(currentStage, lang);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
@@ -190,7 +193,7 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
                       itemBuilder: (context, index) {
                         final st = kCanonicalStages[index];
                         final isSelected = selectedStage == st;
-                        final isCurrent = currentStage.toUpperCase() == st;
+                        final isCurrent = AppLocalizations.localizedCropStage(currentStage, lang) == st;
                         final label = '${st[0]}${st.substring(1).toLowerCase()}${isCurrent ? ' (Current)' : ''}';
 
                         return InkWell(
@@ -275,8 +278,7 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
 
   // SCREEN 7: MARK STAGE COMPLETE CONFIRMATION DIALOG
   void _showMarkStageCompleteDialog(String farmId, String cropId, String currentStage) {
-    final currentIndex = kCanonicalStages.contains(currentStage.toUpperCase())
-        ? kCanonicalStages.indexOf(currentStage.toUpperCase())
+    final currentIndex = kCanonicalStages.contains(currentStage.toUpperCase()) ? kCanonicalStages.indexOf(currentStage.toUpperCase())
         : 3;
     final nextStage = currentIndex < kCanonicalStages.length - 1
         ? kCanonicalStages[currentIndex + 1]
@@ -403,6 +405,7 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(languageProvider);
     final farmState = ref.watch(farmProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -458,6 +461,7 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
                   final isLast = index == kCanonicalStages.length - 1;
 
                   return _buildTimelineItem(
+                    lang: lang,
                     stage: stage,
                     index: index,
                     isCompleted: isCompleted,
@@ -503,6 +507,7 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
   }
 
   Widget _buildTimelineItem({
+    required String lang,
     required String stage,
     required int index,
     required bool isCompleted,
@@ -515,7 +520,7 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
     required String cropName,
     required String currentStage,
   }) {
-    final stageName = '${stage[0]}${stage.substring(1).toLowerCase()}';
+    final stageName = AppLocalizations.localizedCropStage(stage, lang);
     final duration = kStageDurations[stage] ?? '10-15 days';
 
     final dates = [
@@ -585,13 +590,12 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
               padding: const EdgeInsets.only(bottom: 20.0),
               child: InkWell(
                 onTap: () {
-                  if (farmId.isNotEmpty && cropId.isNotEmpty) {
-                    if (isCurrent) {
-                      _showMarkStageCompleteDialog(farmId, cropId, currentStage);
-                    } else {
-                      _showUpdateStageSheet(farmId, cropId, cropName, currentStage);
-                    }
-                  }
+                  context.push('/stage-details', extra: {
+                    'cropName': cropName,
+                    'stage': stage,
+                    'farmId': farmId,
+                    'cropId': cropId,
+                  });
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
@@ -658,8 +662,7 @@ class _CropLifecycleScreenState extends ConsumerState<CropLifecycleScreen> {
                             color: const Color(0xFF0284C7),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Text(
-                            'Active',
+                          child: Text('active'.tr(lang),
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
                           ),
                         ),

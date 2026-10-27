@@ -43,7 +43,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
           context.go('/farmer');
         }
       } else {
-        context.go('/login');
+        context.go('/welcome');
       }
     });
   }
@@ -125,8 +125,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                       ),
                       child: const Center(
                         child: Icon(
-                          Icons.eco_rounded,
-                          size: 54,
+                          Icons.agriculture_rounded,
+                          size: 56,
                           color: Color(0xFF15803D),
                         ),
                       ),

@@ -292,11 +292,15 @@ router.get('/:farmId/crops/:cropId/operations', async (req: AuthRequest, res: Re
  * 8.6 Mark Farm Operation Completed
  * POST /api/farms/:farmId/crops/:cropId/operations/:operationId/complete
  */
-router.post('/:farmId/crops/:cropId/operations/:operationId/complete', async (req: AuthRequest, res: Response): Promise<void> => {
+router.post(['/:farmId/crops/:cropId/operations/:operationId/complete', '/:farmId/operations/:operationId/complete'], async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const farmId = String(req.params.farmId);
-    const cropId = String(req.params.cropId);
+    let cropId = String(req.params.cropId || '');
     const operationId = String(req.params.operationId);
+    if (!cropId) {
+      const op = await prisma.farmOperation.findUnique({ where: { id: operationId }, select: { farmCropId: true } });
+      if (op?.farmCropId) cropId = op.farmCropId;
+    }
     const { feedback, notes } = req.body;
     const ownerId = (req as any).prismaUser.id;
     const isAdmin = (req as any).prismaUser.role === 'ADMIN';
@@ -414,6 +418,36 @@ router.post('/:farmId/crops/:cropId/operations/:operationId/tasks', async (req: 
 });
 
 /**
+ * Create Farm Operation
+ * POST /api/farms/:farmId/crops/:cropId/operations
+ */
+router.post('/:farmId/crops/:cropId/operations', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmId = String(req.params.farmId);
+    const cropId = String(req.params.cropId);
+    const ownerId = (req as any).prismaUser.id;
+    const isAdmin = (req as any).prismaUser.role === 'ADMIN';
+
+    const operation = await farmPlanService.createOperation(
+      ownerId,
+      farmId,
+      cropId,
+      req.body,
+      isAdmin
+    );
+
+    res.status(201).json({ success: true, data: operation });
+  } catch (error: any) {
+    if (error.message === 'FORBIDDEN_FARM_ACCESS') {
+      res.status(403).json({ error: 'Forbidden: You do not own this farm.' });
+      return;
+    }
+    console.error('Create Operation Error:', error);
+    res.status(400).json({ error: error.message || 'Failed to create farm operation' });
+  }
+});
+
+/**
  * 8.6d Edit Farm Operation
  * PUT /api/farms/:farmId/crops/:cropId/operations/:operationId
  */
@@ -446,6 +480,41 @@ router.put('/:farmId/crops/:cropId/operations/:operationId', async (req: AuthReq
     }
     console.error('Edit Operation Error:', error);
     res.status(500).json({ error: 'Failed to edit farm operation' });
+  }
+});
+
+/**
+ * Delete Farm Operation
+ * DELETE /api/farms/:farmId/crops/:cropId/operations/:operationId
+ */
+router.delete('/:farmId/crops/:cropId/operations/:operationId', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmId = String(req.params.farmId);
+    const cropId = String(req.params.cropId);
+    const operationId = String(req.params.operationId);
+    const ownerId = (req as any).prismaUser.id;
+    const isAdmin = (req as any).prismaUser.role === 'ADMIN';
+
+    const deleted = await farmPlanService.deleteOperation(
+      ownerId,
+      farmId,
+      cropId,
+      operationId,
+      isAdmin
+    );
+
+    res.json({ success: true, data: deleted });
+  } catch (error: any) {
+    if (error.message === 'FORBIDDEN_FARM_ACCESS') {
+      res.status(403).json({ error: 'Forbidden: You do not own this farm.' });
+      return;
+    }
+    if (error.message === 'OPERATION_NOT_FOUND') {
+      res.status(404).json({ error: 'Farm operation not found.' });
+      return;
+    }
+    console.error('Delete Operation Error:', error);
+    res.status(500).json({ error: 'Failed to delete farm operation' });
   }
 });
 
@@ -484,6 +553,43 @@ router.put('/:farmId/crops/:cropId/operations/:operationId/tasks/:taskId', async
     }
     console.error('Edit Task Error:', error);
     res.status(500).json({ error: 'Failed to edit farm task' });
+  }
+});
+
+/**
+ * Delete Farm Task
+ * DELETE /api/farms/:farmId/crops/:cropId/operations/:operationId/tasks/:taskId
+ */
+router.delete('/:farmId/crops/:cropId/operations/:operationId/tasks/:taskId', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmId = String(req.params.farmId);
+    const cropId = String(req.params.cropId);
+    const operationId = String(req.params.operationId);
+    const taskId = String(req.params.taskId);
+    const ownerId = (req as any).prismaUser.id;
+    const isAdmin = (req as any).prismaUser.role === 'ADMIN';
+
+    const deleted = await farmPlanService.deleteTask(
+      ownerId,
+      farmId,
+      cropId,
+      operationId,
+      taskId,
+      isAdmin
+    );
+
+    res.json({ success: true, data: deleted });
+  } catch (error: any) {
+    if (error.message === 'FORBIDDEN_FARM_ACCESS') {
+      res.status(403).json({ error: 'Forbidden: You do not own this farm.' });
+      return;
+    }
+    if (error.message === 'TASK_NOT_FOUND') {
+      res.status(404).json({ error: 'Farm task not found.' });
+      return;
+    }
+    console.error('Delete Task Error:', error);
+    res.status(500).json({ error: 'Failed to delete farm task' });
   }
 });
 
@@ -831,7 +937,7 @@ router.post('/:farmId/financials/expense', async (req: AuthRequest, res: Respons
     const farmId = String(req.params.farmId);
     const ownerId = (req as any).prismaUser.id;
     const isAdmin = (req as any).prismaUser.role === 'ADMIN';
-    const { title, amount, category } = req.body;
+    const { title, amount, category, description, date, cropId } = req.body;
 
     const farm = await prisma.farm.findUnique({
       where: { id: farmId },
@@ -863,6 +969,8 @@ router.post('/:farmId/financials/expense', async (req: AuthRequest, res: Respons
       });
     }
 
+    const expenseDate = date ? new Date(date).toISOString() : new Date().toISOString();
+
     // Persist individual expense record into FarmActivity
     const activity = await prisma.farmActivity.create({
       data: {
@@ -870,11 +978,13 @@ router.post('/:farmId/financials/expense', async (req: AuthRequest, res: Respons
         actorId: ownerId,
         type: 'EXPENSE',
         title: title || 'Farm Expense',
-        description: category || 'General Expense',
+        description: description || category || 'General Expense',
         metadata: JSON.stringify({
           amount: expenseAmt,
           category: category || 'General Expense',
-          date: new Date().toISOString()
+          description: description || '',
+          date: expenseDate,
+          cropId: cropId || null,
         })
       }
     });
@@ -885,9 +995,11 @@ router.post('/:farmId/financials/expense', async (req: AuthRequest, res: Respons
       data: {
         id: activity.id,
         title: activity.title,
+        description: description || '',
         category: category || 'General Expense',
         amount: expenseAmt,
-        date: activity.createdAt,
+        date: expenseDate,
+        cropId: cropId || null,
         farmId
       }
     });
@@ -947,10 +1059,11 @@ router.get('/:farmId/financials/expenses', async (req: AuthRequest, res: Respons
       return {
         id: act.id,
         title: act.title,
-        description: act.description || meta.category || 'General',
+        description: meta.description || act.description || meta.category || 'General',
         category: meta.category || act.description || 'Other Expense',
         amount: meta.amount != null ? Number(meta.amount) : 0,
         date: meta.date ? meta.date : act.createdAt.toISOString(),
+        cropId: meta.cropId || null,
         createdAt: act.createdAt,
         isRental: false
       };
@@ -1645,6 +1758,28 @@ router.get('/:farmId/spending-report', async (req, res) => {
 });
 
 
+
+// GET /api/farms/weather/lookup?location=...
+router.get('/weather/lookup', async (req: AuthRequest, res: Response) => {
+  try {
+    const locationQuery = (req.query.location as string) || '';
+    let locText = locationQuery.trim();
+
+    if (!locText) {
+      const farm = await prisma.farm.findFirst({
+        where: { ownerId: req.user!.id },
+        orderBy: { createdAt: 'desc' }
+      });
+      locText = farm?.location || 'Guntur, Andhra Pradesh';
+    }
+
+    const weatherData = await WeatherService.getFarmWeather('current-lookup', locText);
+    return res.json(weatherData);
+  } catch (err) {
+    console.error('Weather lookup error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error.' });
+  }
+});
 
 // GET /api/farms/:farmId/weather
 router.get('/:farmId/weather', async (req: AuthRequest, res: Response) => {

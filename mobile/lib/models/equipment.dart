@@ -86,4 +86,40 @@ class Equipment {
       'securityDeposit': securityDeposit,
     };
   }
+
+  Equipment copyWith({
+    String? id,
+    String? category,
+    String? description,
+    double? pricePerDay,
+    String? imageUrl,
+    String? ownerId,
+    bool? available,
+    String? title,
+    String? location,
+    double? latitude,
+    double? longitude,
+    User? owner,
+    double? rating,
+    int? reviewCount,
+    double? securityDeposit,
+  }) {
+    return Equipment(
+      id: id ?? this.id,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      pricePerDay: pricePerDay ?? this.pricePerDay,
+      imageUrl: imageUrl ?? this.imageUrl,
+      ownerId: ownerId ?? this.ownerId,
+      available: available ?? this.available,
+      title: title ?? this.title,
+      location: location ?? this.location,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      owner: owner ?? this.owner,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      securityDeposit: securityDeposit ?? this.securityDeposit,
+    );
+  }
 }

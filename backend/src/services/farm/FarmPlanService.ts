@@ -635,6 +635,107 @@ export class FarmPlanService {
     return updated;
   }
 
+  async createOperation(
+    ownerId: string,
+    farmId: string,
+    cropId: string,
+    data: {
+      name: string;
+      description?: string;
+      status?: string;
+      plannedStartDate?: string | Date;
+      plannedEndDate?: string | Date;
+      labourersNeeded?: number;
+      labourersAvailable?: number;
+      estimatedLabourCost?: number;
+    },
+    isAdmin = false
+  ) {
+    const farm = await prisma.farm.findUnique({
+      where: { id: farmId },
+      include: { crops: { where: { id: cropId } } }
+    });
+
+    if (!farm || (!isAdmin && farm.ownerId !== ownerId) || farm.crops.length === 0) {
+      throw new Error('FORBIDDEN_FARM_ACCESS');
+    }
+
+    if (!data.name || !data.name.trim()) {
+      throw new Error('OPERATION_NAME_REQUIRED');
+    }
+
+    const op = await prisma.farmOperation.create({
+      data: {
+        farmCropId: cropId,
+        name: data.name.trim(),
+        description: data.description?.trim() || `Operation for ${data.name.trim()}`,
+        status: data.status || 'PLANNED',
+        plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate) : new Date(),
+        plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate) : new Date(Date.now() + 86400000 * 3),
+        labourersNeeded: data.labourersNeeded ? Number(data.labourersNeeded) : 1,
+        labourersAvailable: data.labourersAvailable ? Number(data.labourersAvailable) : 1,
+        estimatedLabourCost: data.estimatedLabourCost ? Number(data.estimatedLabourCost) : 0
+      },
+      include: { tasks: true }
+    });
+
+    return op;
+  }
+
+  async deleteOperation(
+    ownerId: string,
+    farmId: string,
+    cropId: string,
+    operationId: string,
+    isAdmin = false
+  ) {
+    const farm = await prisma.farm.findUnique({
+      where: { id: farmId },
+      include: { crops: { where: { id: cropId } } }
+    });
+
+    if (!farm || (!isAdmin && farm.ownerId !== ownerId) || farm.crops.length === 0) {
+      throw new Error('FORBIDDEN_FARM_ACCESS');
+    }
+
+    const op = await prisma.farmOperation.findUnique({ where: { id: operationId } });
+    if (!op || op.farmCropId !== cropId) {
+      throw new Error('OPERATION_NOT_FOUND');
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      await tx.farmTask.deleteMany({ where: { operationId } });
+      const deleted = await tx.farmOperation.delete({ where: { id: operationId } });
+      return deleted;
+    });
+  }
+
+  async deleteTask(
+    ownerId: string,
+    farmId: string,
+    cropId: string,
+    operationId: string,
+    taskId: string,
+    isAdmin = false
+  ) {
+    const farm = await prisma.farm.findUnique({
+      where: { id: farmId },
+      include: { crops: { where: { id: cropId } } }
+    });
+
+    if (!farm || (!isAdmin && farm.ownerId !== ownerId) || farm.crops.length === 0) {
+      throw new Error('FORBIDDEN_FARM_ACCESS');
+    }
+
+    const task = await prisma.farmTask.findUnique({ where: { id: taskId } });
+    if (!task || task.operationId !== operationId) {
+      throw new Error('TASK_NOT_FOUND');
+    }
+
+    const deleted = await prisma.farmTask.delete({ where: { id: taskId } });
+    return deleted;
+  }
+
   async getCompletedTasks(ownerId: string, farmId: string, cropId?: string, isAdmin = false) {
     const farm = await prisma.farm.findUnique({
       where: { id: farmId },

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import {
-  Tractor, CheckCircle, Search, PlayCircle, MapPin,
-  Activity, CheckCircle2, Circle, Clock3, AlertTriangle, DollarSign, Calendar
+  Tractor, CheckCircle, Search, MapPin,
+  Activity, CheckCircle2, Clock3, AlertTriangle, DollarSign, Calendar,
+  ArrowRight, ShieldCheck, Sparkles, CloudSun, BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import { useStore } from '@/store/useStore';
@@ -70,7 +71,7 @@ export default function FarmerDashboard() {
       });
       setDrillDownHeaders(['Date', 'Equipment', 'Owner', 'Rental Period', 'Amount', 'Booking Status', 'Payment Status', 'Amount Paid']);
       setDrillDownRows(rows);
-      setDrillDownTitle('Rental Spending Report');
+      setDrillDownTitle('Rental Spending Ledger');
       setIsDrillDownOpen(true);
     } catch (e) {
       showToast('Failed to load spending report', 'warning');
@@ -178,14 +179,17 @@ export default function FarmerDashboard() {
     setCompletingOp(true);
     try {
       const fbStr = t(`completion.${feedbackType}`);
-      const fullFeedback = `${fbStr}. ${feedbackNotes}`;
+      const notes = feedbackNotes ? `${fbStr}: ${feedbackNotes}` : fbStr;
+
       await api.post(`/farms/${farmId}/crops/${cropId}/operations/${showFeedbackModal}/complete`, {
-        feedback: feedbackType,
-        notes: feedbackNotes
+        notes,
+        completedAt: new Date().toISOString()
       });
+
       showToast(t('completion.success'), 'success');
       setShowFeedbackModal(null);
       setFeedbackNotes('');
+      // Reload updated operations
       loadDashboardData(farmId, cropId, selectedLanguage);
     } catch (err: any) {
       showToast(err.response?.data?.error || t('completion.failed'), 'error');
@@ -225,139 +229,256 @@ export default function FarmerDashboard() {
   const budgetStatusText = bState ? getStatusLabel(bState.budgetStatus) : '';
 
   if (farmLoading) {
-    return <div className="p-8 text-center animate-pulse">{t('common.loadingFarm')}</div>;
+    return (
+      <div className="p-12 text-center">
+        <div className="inline-block w-8 h-8 border-4 border-[#163A2D] border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-sm font-medium text-slate-500">{t('common.loadingFarm', 'Loading your farm profile...')}</p>
+      </div>
+    );
   }
 
   if (!farmProfile) {
     return (
-      <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200">
-        <h2 className="text-xl font-bold">{t('common.noFarmProfile')}</h2>
-        <Link href="/dashboard/farmer/setup" className="mt-4 inline-block px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold">{t('common.setupFarm')}</Link>
+      <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-[#E1E8E2] dark:border-slate-800 shadow-card max-w-lg mx-auto my-12">
+        <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-[#16845B] flex items-center justify-center mx-auto mb-4">
+          <Tractor size={24} />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">{t('common.noFarmProfile', 'No Registered Farm Found')}</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Set up your crop details, land area, and season to unlock customized equipment schedules.</p>
+        <Link href="/dashboard/farmer/setup" className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-[#163A2D] hover:bg-[#205140] text-white rounded-xl font-semibold text-xs transition-colors">
+          <span>{t('common.setupFarm', 'Configure Farm Profile')}</span>
+          <ArrowRight size={14} />
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in max-w-5xl mx-auto pb-12">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
 
-      <div className="text-center p-6">
-        <h1 className="text-3xl font-black uppercase text-slate-900 dark:text-white tracking-tight">
-          {t('farmPlan.title')}
-        </h1>
-        <p className="text-lg font-bold text-slate-500 mt-2">
-          {farmProfile.crop} Ã¢â‚¬Â¢ {farmProfile.acreage} {t('common.acres')} Ã¢â‚¬Â¢ {farmProfile.season} Ã¢â‚¬Â¢ {farmProfile.location}
-        </p>
-      </div>
+      {/* Hero Farm Overview Card */}
+      <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card transition-all">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#163A2D]/10 text-[#163A2D] dark:text-[#84CC16] text-[11px] font-semibold mb-2">
+              <ShieldCheck size={14} />
+              <span>Verified Crop Operations Plan</span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              {farmProfile.crop} Cultivation Operations
+            </h1>
+            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                <span className="font-semibold text-slate-900 dark:text-white">{farmProfile.acreage}</span> Acres
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                <span className="font-semibold text-slate-900 dark:text-white">{farmProfile.season}</span> Season
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                <MapPin size={13} className="text-slate-400" />
+                <span>{farmProfile.location}</span>
+              </span>
+            </div>
+          </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-        <h3 className="text-sm font-black tracking-widest text-emerald-600 uppercase mb-4 flex items-center gap-2">
-          {t('farmPlan.howToFarm')}
-        </h3>
-        {overviewLoading ? (
-          <div className="animate-pulse space-y-3">
-            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
-            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-full"></div>
-            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-5/6"></div>
+          <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0">
+            <Link
+              href="/dashboard/marketplace"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#163A2D] hover:bg-[#205140] text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
+            >
+              <Tractor size={15} />
+              <span>Browse Machinery</span>
+            </Link>
+            <Link
+              href="/dashboard/weather"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-colors"
+            >
+              <CloudSun size={15} />
+              <span>Weather & Mandi</span>
+            </Link>
           </div>
-        ) : overview ? (
-          <div className="prose dark:prose-invert max-w-none text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed font-medium">
-            {overview}
+        </div>
+
+        {overview && (
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-[#F6F8F6] dark:bg-slate-800/40 p-3.5 rounded-xl">
+              <Sparkles size={16} className="text-[#16845B] shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-slate-900 dark:text-white block mb-0.5">Agricultural Advisory</span>
+                <p>{overview}</p>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="text-slate-500">{t('farmPlan.overviewNotAvailable')}</div>
         )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm overflow-x-auto">
-        <h3 className="text-sm font-black tracking-widest text-slate-500 uppercase mb-6 flex items-center gap-2">
-          {t('farmPlan.completeJourney')}
-        </h3>
+      {/* My Farm Journey Timeline */}
+      <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              {t('farmPlan.completeJourney', 'Crop Growth Journey')}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Chronological progress through cultivation milestones
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-[#16845B] dark:text-[#84CC16] bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-md">
+            Stage: {translatedStage(cropStage)}
+          </span>
+        </div>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {STAGES.map((s, idx) => {
-            const isPast = STAGES.indexOf(cropStage) > idx;
-            const isCurrent = cropStage === s;
-            return (
-              <div key={s} className="flex items-center gap-3 md:flex-col relative z-10 w-full md:w-24">
-                <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${isPast ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 dark:ring-indigo-900' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
-                  {isPast ? <CheckCircle2 size={16} /> : isCurrent ? <Activity size={16} /> : <Clock3 size={16} />}
-                </div>
-                <div className="flex flex-col md:items-center">
-                  <span className={`text-[11px] font-black uppercase text-center break-words ${isCurrent ? 'text-indigo-600 dark:text-indigo-400' : isPast ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                    {isPast && `${t('journey.completedPrefix')} `}{translatedStage(s)}
+        <div className="overflow-x-auto pb-2">
+          <div className="flex items-start gap-2 min-w-[700px]">
+            {STAGES.map((s, idx) => {
+              const currentIdx = STAGES.indexOf(cropStage);
+              const isPast = currentIdx > idx;
+              const isCurrent = cropStage === s;
+              const isUpcoming = currentIdx < idx;
+
+              return (
+                <div key={s} className="flex-1 flex flex-col items-center relative">
+                  {/* Connecting Bar */}
+                  {idx < STAGES.length - 1 && (
+                    <div className={`absolute top-4 left-1/2 w-full h-0.5 z-0 ${
+                      isPast ? 'bg-[#16845B]' : 'bg-slate-200 dark:bg-slate-800'
+                    }`} />
+                  )}
+
+                  {/* Icon Node */}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs relative z-10 transition-all ${
+                    isPast
+                      ? 'bg-[#16845B] text-white shadow-sm'
+                      : isCurrent
+                      ? 'bg-[#163A2D] text-[#84CC16] ring-4 ring-[#84CC16]/30 shadow-md'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700'
+                  }`}>
+                    {isPast ? (
+                      <CheckCircle2 size={16} />
+                    ) : isCurrent ? (
+                      <Activity size={16} className="animate-pulse" />
+                    ) : (
+                      <Clock3 size={15} />
+                    )}
+                  </div>
+
+                  {/* Stage Label (No Strikethrough!) */}
+                  <span className={`text-[11px] font-semibold uppercase text-center mt-2.5 px-1 leading-tight ${
+                    isCurrent
+                      ? 'text-[#163A2D] dark:text-[#84CC16] font-bold'
+                      : isPast
+                      ? 'text-[#16845B] dark:text-emerald-400'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }`}>
+                    {translatedStage(s)}
                   </span>
-                  {isCurrent && <span className="text-[10px] text-indigo-400 font-bold uppercase md:mt-1 break-words">{t('farmPlan.youAreHere')}</span>}
-                  {!isPast && !isCurrent && <span className="text-[10px] text-slate-400 font-bold uppercase md:mt-1 break-words">{t('farmPlan.upcoming')}</span>}
+
+                  {/* Status Subtitle */}
+                  <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">
+                    {isPast ? 'Completed' : isCurrent ? 'Active Now' : 'Upcoming'}
+                  </span>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      {/* Main Operations Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        <div className="md:col-span-7 space-y-6">
+        {/* Left Column: Today's Work & Recommendations (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
 
-          <div className="bg-white dark:bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
-            <h3 className="text-sm font-black tracking-widest text-emerald-600 uppercase mb-4 ml-2 flex items-center gap-2">
-              {t('todayWork.title')}
-            </h3>
+          {/* Today's Work Card */}
+          <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#16845B]"></span>
+                <span>{t('todayWork.title', "Today's Work & Next Milestone")}</span>
+              </h2>
+              <span className="px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-[#16845B] dark:text-[#84CC16] text-[11px] font-semibold rounded-md">
+                Active Priority
+              </span>
+            </div>
 
             {opsLoading || schedLoading ? (
-              <div className="animate-pulse h-24 bg-slate-100 dark:bg-slate-800 rounded-xl ml-2" />
+              <div className="animate-pulse space-y-3">
+                <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded w-2/3"></div>
+                <div className="h-16 bg-slate-100 dark:bg-slate-800 rounded"></div>
+              </div>
             ) : actualCurrentOp || currentScheduledOp ? (
-              <div className="ml-2">
-                <span className="text-2xl font-black text-slate-900 dark:text-white uppercase mb-2 block">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                   {getOperationLabel(actualCurrentOp ? actualCurrentOp.name : currentScheduledOp.name)}
-                </span>
+                </h3>
 
-                <div className="bg-emerald-50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/30 mb-6 mt-4">
-                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 block mb-1">{t('todayWork.why')}</span>
-                  <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
+                <div className="bg-[#F6F8F6] dark:bg-slate-800/40 p-3.5 rounded-xl border border-[#E1E8E2] dark:border-slate-800 mt-3 mb-4">
+                  <span className="text-[11px] font-semibold text-[#16845B] dark:text-[#84CC16] block mb-0.5">
+                    Recommendation Context
+                  </span>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
                     {currentScheduledOp?.reason || t('todayWork.defaultReason', { stage: translatedStage(cropStage) })}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="text-xs font-bold text-slate-500 uppercase">{t('todayWork.status')}</span>
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 rounded-lg text-xs font-black uppercase tracking-wider">
-                    {t('todayWork.doToday')}
+                <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 mb-5">
+                  <span className="font-semibold text-slate-900 dark:text-white">Status:</span>
+                  <span className="inline-flex items-center gap-1 text-[#16845B] dark:text-[#84CC16] font-semibold">
+                    <Activity size={14} />
+                    <span>Scheduled for Current Crop Cycle</span>
                   </span>
                 </div>
 
                 {(actualCurrentOp || currentScheduledOp?.operationId) && (
                   <button
                     onClick={() => setShowFeedbackModal(actualCurrentOp?.id || currentScheduledOp.operationId)}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-sm transition-all shadow-md text-center flex items-center justify-center gap-2"
+                    className="w-full py-2.5 px-4 bg-[#163A2D] hover:bg-[#205140] text-white font-semibold rounded-xl text-xs transition-colors shadow-sm flex items-center justify-center gap-2"
                   >
-                    <CheckCircle2 size={20} />
-                    {t('todayWork.markCompleted')}
+                    <CheckCircle2 size={16} />
+                    <span>{t('todayWork.markCompleted', 'Mark Task Completed')}</span>
                   </button>
                 )}
               </div>
             ) : (
-              <div className="ml-2 text-sm text-slate-500 font-medium">{t('todayWork.notScheduled')}</div>
+              <div className="text-xs text-slate-500 font-medium py-3">
+                {t('todayWork.notScheduled', 'No immediate pending operations scheduled. You are on track!')}
+              </div>
             )}
           </div>
 
+          {/* Feedback Completion Modal */}
           {showFeedbackModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-              <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase mb-4">{t('completion.confirmTitle')}</h3>
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-6">{t('completion.didYouComplete')}</p>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-xl">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">
+                  {t('completion.confirmTitle', 'Confirm Operation Completion')}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  {t('completion.didYouComplete', 'Did you complete this operation in your field?')}
+                </p>
 
-                <div className="space-y-4 mb-6">
-                  <span className="text-xs font-bold text-slate-500 uppercase">{t('completion.howDidWorkGo')}</span>
-                  <div className="flex gap-2">
-                    {['wentWell', 'normal', 'problem'].map(opt => (
+                <div className="space-y-3 mb-5">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                    {t('completion.howDidWorkGo', 'How did the operation proceed?')}
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'wentWell', label: 'Went Well' },
+                      { id: 'normal', label: 'Normal' },
+                      { id: 'problem', label: 'Had Issues' }
+                    ].map(opt => (
                       <button
-                        key={opt}
-                        onClick={() => setFeedbackType(opt)}
-                        className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl border ${feedbackType === opt ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/30' : 'bg-transparent border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400'}`}
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setFeedbackType(opt.id)}
+                        className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-all ${
+                          feedbackType === opt.id
+                            ? 'bg-[#163A2D] text-white border-[#163A2D]'
+                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                        }`}
                       >
-                        {t(`completion.${opt}`)}
+                        {opt.label}
                       </button>
                     ))}
                   </div>
@@ -365,259 +486,229 @@ export default function FarmerDashboard() {
                   <textarea
                     value={feedbackNotes}
                     onChange={e => setFeedbackNotes(e.target.value)}
-                    placeholder={t('completion.whatHappened')}
-                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium"
+                    placeholder="Add operational notes or soil observations (optional)..."
+                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-normal text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#16845B]/20"
                     rows={3}
                   />
                 </div>
 
-                <div className="flex gap-3">
-                  <button onClick={() => setShowFeedbackModal(null)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black rounded-xl text-sm">{t('completion.notYet')}</button>
-                  <button onClick={handleMarkCompleted} disabled={completingOp} className="flex-1 py-3 bg-emerald-600 text-white font-black rounded-xl text-sm">{completingOp ? t('completion.saving') : t('completion.yesCompleted')}</button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowFeedbackModal(null)}
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleMarkCompleted}
+                    disabled={completingOp}
+                    className="flex-1 py-2.5 bg-[#163A2D] hover:bg-[#205140] text-white font-semibold rounded-xl text-xs transition-colors disabled:opacity-50"
+                  >
+                    {completingOp ? 'Saving...' : 'Yes, Complete Task'}
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
+          {/* Recommended Equipment Card */}
           {currentScheduledOp?.equipment && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-              <h3 className="text-sm font-black tracking-widest text-slate-500 uppercase mb-4 flex items-center gap-2">
-                {t('equipment.title')}
-              </h3>
+            <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <Tractor size={16} className="text-[#16845B]" />
+                  <span>{t('equipment.title', 'Recommended Machinery')}</span>
+                </h2>
+                <span className="text-[11px] font-semibold text-[#16845B] dark:text-[#84CC16]">
+                  Matched for {translatedStage(cropStage)}
+                </span>
+              </div>
 
-              <div className="space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <span className="text-lg font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                      {currentScheduledOp.equipment.name}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#F6F8F6] dark:bg-slate-800/40 border border-[#E1E8E2] dark:border-slate-800">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    {currentScheduledOp.equipment.name}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
+                      currentScheduledOp.equipment.availabilityStatus === 'AVAILABLE' ? 'text-[#16845B]' : 'text-amber-600'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        currentScheduledOp.equipment.availabilityStatus === 'AVAILABLE' ? 'bg-[#16845B]' : 'bg-amber-500'
+                      }`} />
+                      <span>{currentScheduledOp.equipment.availabilityStatus === 'AVAILABLE' ? 'Available for Rent' : 'Reserved'}</span>
                     </span>
-                    <span className={`font-bold flex items-center gap-1 mt-1 text-sm ${currentScheduledOp.equipment.availabilityStatus === 'AVAILABLE' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {currentScheduledOp.equipment.availabilityStatus === 'AVAILABLE' ? t('equipment.available') : t('equipment.notAvailable')}
-                    </span>
-                  </div>
-                  <div className="text-left md:text-right flex flex-col items-start md:items-end">
-                    <span className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrency(currentScheduledOp.equipment.rentalPrice, selectedLanguage)}<span className="text-sm text-slate-500">{t('equipment.perDay')}</span></span>
                   </div>
                 </div>
 
-                <div className="pt-4 flex flex-col sm:flex-row gap-3">
+                <div className="text-left sm:text-right">
+                  <span className="text-xl font-bold text-slate-900 dark:text-white block">
+                    {formatCurrency(currentScheduledOp.equipment.rentalPrice, selectedLanguage)}
+                    <span className="text-xs font-normal text-slate-500 ml-1">/ day</span>
+                  </span>
                   <button
                     onClick={() => router.push(`/dashboard/marketplace?equipmentId=${currentScheduledOp.equipment.id}`)}
-                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl text-sm uppercase tracking-wider transition-colors text-center"
+                    className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-[#163A2D] hover:bg-[#205140] text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
                   >
-                    {t('equipment.bookMachine')}
-                  </button>
-                  <button
-                    onClick={() => showToast(t('common.whyInfo'), 'info')}
-                    className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black rounded-xl text-sm uppercase tracking-wider text-center"
-                  >
-                    {t('equipment.whyThisMachine')}
+                    <span>{t('equipment.bookMachine', 'Book Machine')}</span>
+                    <ArrowRight size={13} />
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="bg-white dark:bg-slate-900 border border-indigo-500/20 rounded-3xl p-6 shadow-sm relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-2 h-full bg-indigo-400/50"></div>
-             <h3 className="text-sm font-black tracking-widest text-indigo-500 uppercase mb-4 ml-2 flex items-center gap-2">
-               {t('nextWork.title')}
-             </h3>
-             {schedLoading ? (
-               <div className="h-16 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse ml-2" />
-             ) : nextScheduledOp ? (
-               <div className="ml-2">
-                 <span className="text-lg font-black text-slate-900 dark:text-white uppercase mb-2 block">{getOperationLabel(nextScheduledOp.name)}</span>
-                 <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
-                   {nextScheduledOp.reason || t('nextWork.defaultReason')}
-                 </p>
-               </div>
-             ) : (
-               <div className="ml-2 text-sm text-slate-500 font-medium">{t('nextWork.noUpcoming')}</div>
-             )}
-          </div>
+          {/* Upcoming Milestone */}
+          {nextScheduledOp && (
+            <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-5 shadow-card">
+              <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <Clock3 size={14} />
+                <span>Next Upcoming Operation</span>
+              </h2>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <span className="text-sm font-bold text-slate-800 dark:text-white block">
+                    {getOperationLabel(nextScheduledOp.name)}
+                  </span>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {nextScheduledOp.reason || t('nextWork.defaultReason', 'Scheduled following completion of current stage.')}
+                  </p>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md shrink-0">
+                  Upcoming
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="md:col-span-5 space-y-6">
+        {/* Right Column: Spending, Budget & Operations Ledger (5 cols) */}
+        <div className="lg:col-span-5 space-y-6">
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-             <h3 className="text-sm font-black tracking-widest text-slate-500 uppercase mb-6 flex items-center gap-2">
-               {t('journey.title')}
-             </h3>
+          {/* Farm Spending Metrics */}
+          <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                {t('spending.title', 'Farm Spending Overview')}
+              </h2>
+              <span className="text-xs text-slate-400 font-medium">Real-time</span>
+            </div>
 
-             <div className="space-y-4">
-                 {completedOps.map((op: any) => (
-                   <div key={op.id} className="flex items-start gap-3 opacity-60">
-                     <CheckCircle2 size={18} className="text-emerald-500 mt-0.5 shrink-0" />
-                     <div>
-                       <span className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase block leading-tight line-through">{getOperationLabel(op.name)}</span>
-                       <span className="text-xs font-bold text-slate-400 block mt-0.5">{t('farmPlan.completed')}: {new Date(op.completedAt).toLocaleDateString()}</span>
-                     </div>
-                   </div>
-                 ))}
-                              {(actualCurrentOp || currentScheduledOp) && (
-                   <div className="relative">
-                     <div className="absolute -left-[30px] bg-white dark:bg-slate-900 rounded-full p-1 border-2 border-emerald-500 z-10 hidden md:block">
-                       <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                     </div>
-                     <div className="flex items-start gap-3 pt-2">
-                       <Activity size={18} className="text-emerald-500 mt-0.5 shrink-0 md:hidden" />
-                       <div>
-                         <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 uppercase block leading-tight">{getOperationLabel(actualCurrentOp?.name || currentScheduledOp.name)}</span>
-                         <span className="text-xs text-emerald-700 mt-1 uppercase font-bold tracking-wider bg-emerald-100 dark:bg-emerald-900/50 inline-block px-2 py-0.5 rounded">YOU ARE HERE</span>
-                       </div>
-                     </div>
-                   </div>
-                 )}
-
-               {nextScheduledOp && (
-                 <div className="flex items-start gap-3 pt-2">
-                   <Clock3 size={18} className="text-slate-400 mt-0.5 shrink-0" />
-                   <div>
-                     <span className="text-sm font-black text-slate-600 dark:text-slate-400 uppercase block leading-tight">Ã¢ÂÂ³ {getOperationLabel(nextScheduledOp.name)}</span>
-                     <span className="text-xs font-bold text-slate-400 block mt-0.5">{t('journey.next')}</span>
-                   </div>
-                 </div>
-               )}
-             </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm mb-6">
-            <h3 className="text-sm font-black tracking-widest text-slate-500 uppercase mb-4 flex items-center gap-2">
-              {t('spending.title', { defaultValue: 'My Farm Spending' })}
-            </h3>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div onClick={fetchDrillDown} className="cursor-pointer p-4 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/50 rounded-2xl transition-colors border border-slate-100 dark:border-slate-700 group">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1 block group-hover:text-emerald-500 transition-colors">
-                  {t('spending.total', { defaultValue: 'Total Spending' })}
+            <div className="grid grid-cols-3 gap-3">
+              <div onClick={fetchDrillDown} className="cursor-pointer p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 rounded-xl transition-colors border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-1">
+                  Total Spent
                 </span>
-                <span className="text-xl font-black text-slate-800 dark:text-white">
+                <span className="text-base font-bold text-slate-900 dark:text-white block">
                   {analytics ? formatCurrency(analytics.totalSpending, selectedLanguage) : formatCurrency(0, selectedLanguage)}
                 </span>
               </div>
 
-              <div onClick={fetchDrillDown} className="cursor-pointer p-4 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/50 rounded-2xl transition-colors border border-slate-100 dark:border-slate-700 group">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1 block group-hover:text-indigo-500 transition-colors">
-                  {t('spending.active', { defaultValue: 'Active Rentals' })}
+              <div onClick={fetchDrillDown} className="cursor-pointer p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 rounded-xl transition-colors border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-1">
+                  Active
                 </span>
-                <span className="text-xl font-black text-slate-800 dark:text-white">
+                <span className="text-base font-bold text-slate-900 dark:text-white block">
                   {analytics?.activeRentals || 0}
                 </span>
               </div>
 
-              <div onClick={fetchDrillDown} className="cursor-pointer p-4 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/50 rounded-2xl transition-colors border border-slate-100 dark:border-slate-700 group">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1 block group-hover:text-amber-500 transition-colors">
-                  {t('spending.pending', { defaultValue: 'Pending Bookings' })}
+              <div onClick={fetchDrillDown} className="cursor-pointer p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 rounded-xl transition-colors border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-1">
+                  Pending
                 </span>
-                <span className="text-xl font-black text-slate-800 dark:text-white">
+                <span className="text-base font-bold text-slate-900 dark:text-white block">
                   {analytics?.pendingBookings || 0}
                 </span>
               </div>
             </div>
 
-            <button onClick={fetchDrillDown} className="w-full mt-4 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-black rounded-lg text-xs uppercase transition-colors">
-              {t('spending.viewReport', { defaultValue: 'View Spending Report' })}
+            <button
+              onClick={fetchDrillDown}
+              className="w-full mt-4 py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+            >
+              <span>{t('spending.viewReport', 'View Spending Ledger')}</span>
+              <ArrowRight size={13} />
             </button>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-            <h3 className="text-sm font-black tracking-widest text-slate-500 uppercase mb-4 flex items-center gap-2">
-              {t('budget.title')}
-            </h3>
+          {/* Budget Health Card */}
+          <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">
+              {t('budget.title', 'Crop Budget Plan')}
+            </h2>
 
             {budgetLoading ? (
-               <div className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+              <div className="h-20 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
             ) : bState ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-xs font-bold text-slate-400 block mb-1">{t('budget.budget')}</span>
-                    <span className="text-lg font-black text-slate-900 dark:text-white">{formatCurrency(bState.totalBudget, selectedLanguage)}</span>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                    <span className="text-[10px] font-medium text-slate-400 block mb-0.5">Budget</span>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      {formatCurrency(bState.totalBudget, selectedLanguage)}
+                    </span>
                   </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-400 block mb-1">{t('budget.planned')}</span>
-                    <span className="text-lg font-black text-amber-500">{formatCurrency(bState.projectedTotalCost, selectedLanguage)}</span>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                    <span className="text-[10px] font-medium text-slate-400 block mb-0.5">Planned</span>
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(bState.projectedTotalCost, selectedLanguage)}
+                    </span>
                   </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-400 block mb-1">{t('budget.remaining')}</span>
-                    <span className="text-lg font-black text-emerald-500">{formatCurrency(bState.remainingBudget, selectedLanguage)}</span>
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                    <span className="text-[10px] font-medium text-slate-400 block mb-0.5">Remaining</span>
+                    <span className="text-xs font-bold text-[#16845B] dark:text-[#84CC16]">
+                      {formatCurrency(bState.remainingBudget, selectedLanguage)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-sm font-black uppercase">{budgetStatusText}</span>
-                  {bState.budgetStatus === 'BUDGET_OVERRUN' && (
-                    <p className="text-xs font-medium text-rose-500 mt-1">{t('budget.overrunWarning')}</p>
-                  )}
+                <div className="pt-2">
+                  <div className="flex justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    <span>Budget Status</span>
+                    <span className={bState.budgetStatus === 'BUDGET_OVERRUN' ? 'text-rose-600' : 'text-[#16845B]'}>
+                      {budgetStatusText || 'Healthy'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        bState.budgetStatus === 'BUDGET_OVERRUN' ? 'bg-rose-500' : 'bg-[#16845B]'
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.round((bState.projectedTotalCost / (bState.totalBudget || 1)) * 100))}%`
+                      }}
+                    />
+                  </div>
                 </div>
-
-                <button className="w-full py-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black rounded-lg text-xs uppercase transition-colors">
-                  {t('budget.viewPlan')}
-                </button>
               </div>
             ) : (
-              <div className="text-sm text-slate-500 font-medium">{t('budget.notAvailable')}</div>
+              <div className="text-xs text-slate-500 font-medium py-2">
+                Budget estimates will calculate automatically as machinery bookings are placed.
+              </div>
             )}
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-            <h3 className="text-sm font-black tracking-widest text-slate-500 uppercase mb-4 flex items-center gap-2">
-              {t('learning.title')}
-            </h3>
-            <div className="flex flex-col gap-3">
-              {[
-                { title: translatedStage('SOWING'), query: `${farmProfile.crop} Sowing ${selectedLanguage}` },
-                { title: translatedStage('VEGETATIVE'), query: `${farmProfile.crop} Vegetative care ${selectedLanguage}` },
-                { title: translatedStage('FLOWERING'), query: `${farmProfile.crop} Flowering care ${selectedLanguage}` }
-              ].map(vid => (
-                <a
-                  key={vid.title}
-                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent(vid.query)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/50 rounded-xl transition-colors border border-slate-100 dark:border-slate-700"
-                >
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{t('learning.watchVideos', { title: vid.title })}</span>
-                  <PlayCircle size={18} className="text-red-500" />
-                </a>
-              ))}
+          {/* Quick Guidance & AI Copilot Card */}
+          <div className="bg-[#F6F8F6] dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card">
+            <div className="flex items-center gap-2 mb-2 text-[#16845B] dark:text-[#84CC16]">
+              <Sparkles size={16} />
+              <h2 className="text-xs font-bold uppercase tracking-wider">AI Farm Advisor</h2>
             </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mb-4 font-normal">
+              Need personalized machinery or soil preparation recommendations for {farmProfile.crop}?
+            </p>
+
+            <Link
+              href="/dashboard/ai-advisor"
+              className="w-full py-2.5 px-4 bg-[#163A2D] hover:bg-[#205140] text-white font-semibold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <span>Consult Farmer Assistant</span>
+              <ArrowRight size={13} />
+            </Link>
           </div>
 
         </div>
-      </div>
-
-      <div className="bg-gradient-to-r from-emerald-50 to-indigo-50 dark:from-emerald-900/10 dark:to-indigo-900/10 border border-emerald-100 dark:border-emerald-800/30 rounded-[32px] p-6 shadow-sm">
-        <h3 className="text-sm font-black tracking-widest text-emerald-600 uppercase mb-4 flex items-center gap-2">
-          {t('copilot.title')}
-        </h3>
-
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={userQuery}
-            onChange={(e) => setUserQuery(e.target.value)}
-            placeholder={t('copilot.placeholder')}
-            className="flex-1 px-6 py-3 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            onKeyDown={(e) => e.key === 'Enter' && fetchCopilotPlan()}
-          />
-          <button
-            onClick={() => fetchCopilotPlan()}
-            disabled={copilotLoading}
-            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-sm transition-all shadow-md"
-          >
-            {copilotLoading ? t('copilot.loading') : t('copilot.askBtn')}
-          </button>
-        </div>
-
-        {copilotData && (
-          <div className="mt-4 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
-             <div className="text-sm text-slate-700 dark:text-slate-300 font-medium">
-               {copilotData.copilot?.explanation}
-             </div>
-          </div>
-        )}
       </div>
 
       <DrillDownModal

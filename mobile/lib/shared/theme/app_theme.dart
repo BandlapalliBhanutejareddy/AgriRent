@@ -15,6 +15,7 @@ class AppTheme {
   static const Color primaryGreen = Color(0xFF2E7D32); // Deep agricultural green
   static const Color secondaryGreen = Color(0xFF2F6B4F); // Secondary Green
   static const Color accentGreen = Color(0xFF81C784); // Subtle fresh green
+  static const Color accentLime = Color(0xFF84CC16); // Brand vibrant accent lime
   static const Color background = Color(0xFFF9FBF9); // Soft off-white
   static const Color lightBackground = Color(0xFFF9FBF9); // Soft off-white
   static const Color darkBackground = Color(0xFF1B241D); // Dark green/charcoal
@@ -59,7 +60,7 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryGreen,
           foregroundColor: Colors.white,
-          minimumSize: const Size.fromHeight(buttonMinHeight),
+          minimumSize: const Size(64, buttonMinHeight),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(buttonRadius),
@@ -82,6 +83,14 @@ class AppTheme {
           borderRadius: BorderRadius.circular(inputRadius),
           borderSide: const BorderSide(color: primaryGreen, width: 1.8),
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: primaryGreen);
+          }
+          return const TextStyle(fontSize: 11, fontWeight: FontWeight.w500);
+        }),
       ),
     );
   }
@@ -116,7 +125,7 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryGreen,
           foregroundColor: Colors.white,
-          minimumSize: const Size.fromHeight(buttonMinHeight),
+          minimumSize: const Size(64, buttonMinHeight),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(buttonRadius),
@@ -139,6 +148,14 @@ class AppTheme {
           borderRadius: BorderRadius.circular(inputRadius),
           borderSide: const BorderSide(color: primaryGreen, width: 1.8),
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: primaryGreen);
+          }
+          return const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.white70);
+        }),
       ),
     );
   }

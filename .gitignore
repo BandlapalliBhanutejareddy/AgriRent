@@ -58,6 +58,11 @@ postgres.zip
 pg/
 pgdata/
 
+# Temporary Debug Captures & Screencaps
+/*.png
+/mobile/*.png
+backend/scripts/*.json
+
 # Logs & Temporary Files
 *.log
 npm-debug.log*

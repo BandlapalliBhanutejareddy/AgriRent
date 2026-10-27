@@ -205,24 +205,27 @@ export class FarmCopilotService {
       });
     }
 
-    // 5. Build prompt for Ollama AI Reasoning
-    const prompt = this.buildOllamaPrompt(context, processedEquipment, input.question, startDate, endDate);
+    const requiresEquipment = this.isEquipmentQuery(input.question);
+    const equipmentToProvide = requiresEquipment ? processedEquipment : [];
+
+    // 5. Build prompt for AI Reasoning
+    const prompt = this.buildOllamaPrompt(context, equipmentToProvide, input.question, startDate, endDate, requiresEquipment);
 
     let aiReasoning: any = null;
     let usingFallback = false;
 
     try {
-      const systemPrompt = `You are AgroRent AI Farm Copilot. Respond strictly in valid JSON format matching the schema provided. Do not invent equipment or prices. Respect the requested language (${lang}). Answer the user's specific question directly.`;
-      const responseText = await aiProvider.generateText(prompt, systemPrompt, 1500);
+      const systemPrompt = `You are Farmer Assistant, an expert agricultural advisory assistant. Respond strictly in valid JSON format matching the schema provided. Do not invent equipment or prices. Respect the requested language (${lang}). Answer the user's specific question directly, concisely, and practically. Do not recommend equipment unless specifically asked.`;
+      const responseText = await aiProvider.generateText(prompt, systemPrompt, 6000);
       
       aiReasoning = this.parseOllamaResponse(responseText);
     } catch (err) {
-      console.warn('Ollama Copilot call failed or timed out. Engaging local deterministic fallback.');
+      console.warn('AI Assistant call failed or timed out. Engaging local deterministic fallback.');
       usingFallback = true;
     }
 
     // 6. If AI reasoning is missing or invalid, generate question-specific deterministic fallback
-    let fallbackReasoning = this.generateDeterministicFallback(context, processedEquipment, lang, input.question);
+    let fallbackReasoning = this.generateDeterministicFallback(context, equipmentToProvide, lang, input.question);
     if (!aiReasoning) {
       aiReasoning = fallbackReasoning;
       usingFallback = true;
@@ -240,7 +243,7 @@ export class FarmCopilotService {
       },
       translatedCropPlan: aiReasoning.translatedCropPlan || fallbackReasoning.translatedCropPlan,
       actionableSteps: (aiReasoning.actionableSteps && aiReasoning.actionableSteps.length > 0) ? aiReasoning.actionableSteps : fallbackReasoning.actionableSteps,
-      translatedEquipment: processedEquipment.map((eq, i) => {
+      translatedEquipment: requiresEquipment ? equipmentToProvide.map((eq, i) => {
         const aiEq = (aiReasoning.translatedEquipment || [])[i];
         const fbEq = (fallbackReasoning.translatedEquipment || [])[i];
         return {
@@ -250,7 +253,7 @@ export class FarmCopilotService {
           whenToUse: aiEq?.whenToUse || fbEq?.whenToUse || `During ${context.farmProfile.cropStage}`,
           basicUsage: aiEq?.basicUsage || fbEq?.basicUsage || `Operate according to standard guidelines.`
         };
-      }),
+      }) : [],
       conflicts,
       risks: [
         ...risks,
@@ -285,7 +288,27 @@ export class FarmCopilotService {
     return response;
   }
 
-  private buildOllamaPrompt(context: CanonicalFarmContext, equipment: CopilotEquipmentItem[], query?: string, startDate?: Date, endDate?: Date): string {
+  private isEquipmentQuery(question?: string): boolean {
+    if (!question) return false;
+    const q = question.toLowerCase();
+    const equipmentKeywords = [
+      'equipment', 'tractor', 'harvester', 'implement', 'machine', 'machinery',
+      'rent', 'hire', 'cost to rent', 'rental', 'tool', 'tools',
+      'plough', 'plow', 'rotavator', 'tiller', 'cultivator', 'seeder', 'seed drill',
+      'sprayer', 'pump', 'trolley', 'trailer', 'combine', 'thresh', 'thresher',
+      'which machine', 'what machine', 'need machine', 'need equipment', 'need tractor'
+    ];
+    return equipmentKeywords.some(keyword => q.includes(keyword));
+  }
+
+  private buildOllamaPrompt(context: CanonicalFarmContext, equipment: CopilotEquipmentItem[], query?: string, startDate?: Date, endDate?: Date, requiresEquipment: boolean = false): string {
+    const equipmentSection = requiresEquipment && equipment.length > 0 ? `
+VERIFIED AVAILABLE DATABASE EQUIPMENT CANDIDATES:
+${JSON.stringify(equipment, null, 2)}
+` : `
+NOTE: The farmer did NOT ask about machinery or equipment. DO NOT suggest equipment unless strictly requested. Keep translatedEquipment empty [].
+`;
+
     return `
 FARMER CONTEXT:
 Farmer Name: ${context.farmerName}
@@ -301,9 +324,7 @@ Language: ${context.farmProfile.preferredLanguage}
 Current Date: ${context.currentDate}
 Date Range: ${startDate?.toLocaleDateString()} to ${endDate?.toLocaleDateString()}
 Farmer Question: ${query || 'What should I do today on my farm?'}
-
-VERIFIED AVAILABLE DATABASE EQUIPMENT CANDIDATES:
-${JSON.stringify(equipment, null, 2)}
+${equipmentSection}
 
 Produce a JSON response answering the question directly, with all content translated into ${context.farmProfile.preferredLanguage}.
 {
@@ -319,12 +340,12 @@ Produce a JSON response answering the question directly, with all content transl
     "Specific actionable step 3 directly answering the query"
   ],
   "translatedEquipment": [
-    {
+    ${requiresEquipment ? `{
       "whyNeeded": "Why equipment is needed (translated)",
       "whatItDoes": "What equipment does (translated)",
       "whenToUse": "When to use it (translated)",
       "basicUsage": "How to use it (translated)"
-    }
+    }` : ''}
   ],
   "warnings": [
     "Specific warning relevant to the question and stage (translated)"

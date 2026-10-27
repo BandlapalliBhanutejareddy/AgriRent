@@ -160,10 +160,10 @@ router.post('/booking/:bookingId', requireAuth, async (req: AuthRequest, res: Re
       }
     });
 
-    await prisma.notification.create({
+    const createdNotif = await prisma.notification.create({
       data: {
         userId: receiverId,
-        title: 'New Message Ã°Å¸â€™Â¬',
+        title: 'New Message 💬',
         message: `${req.prismaUser.name}: "${String(text).trim().slice(0, 50)}${text.length > 50 ? '...' : ''}"`,
         type: 'CHAT_MESSAGE',
         relatedId: bookingId
@@ -171,6 +171,7 @@ router.post('/booking/:bookingId', requireAuth, async (req: AuthRequest, res: Re
     });
 
     emitToUser(receiverId, 'new_message', chatMessage);
+    emitToUser(receiverId, 'notification', createdNotif);
 
     res.status(201).json(chatMessage);
   } catch (error) {

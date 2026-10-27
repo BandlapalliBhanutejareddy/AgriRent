@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../core/localization/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../../profile/providers/owner_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -12,7 +14,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController(text: 'farmer@example.com');
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   String _selectedRole = 'FARMER';
@@ -33,9 +35,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
 
     if (success && mounted) {
+      if (_selectedRole == 'EQUIPMENT_OWNER' || _selectedRole == 'OWNER') {
+        ref.read(ownerProvider.notifier).fetchDashboardData();
+      }
       context.go('/');
     }
   }
+
 
   @override
   void dispose() {
@@ -48,6 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = ref.watch(languageProvider);
 
     if (authState.error != null && authState.error!.contains('not verified yet') && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,7 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.eco, color: AppTheme.primaryGreen, size: 24),
+                    child: const Icon(Icons.agriculture_rounded, color: AppTheme.primaryGreen, size: 26),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -110,7 +117,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Role Toggle Segment (Farmer / Owner)
+              // Role Toggle Segment (Farmer / Owner / Admin)
               Container(
                 decoration: BoxDecoration(
                   color: isDark ? AppTheme.darkCard : const Color(0xFFE2E8F0),
@@ -120,70 +127,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 padding: const EdgeInsets.all(4),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => _selectedRole = 'FARMER'),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: _selectedRole == 'FARMER' ? AppTheme.primaryGreen : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: _selectedRole == 'FARMER'
-                                ? [
-                                    BoxShadow(
-                                      color: AppTheme.primaryGreen.withValues(alpha: 0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Text(
-                            'Farmer',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _selectedRole == 'FARMER' ? Colors.white : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => _selectedRole = 'OWNER'),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: _selectedRole == 'OWNER' ? AppTheme.primaryGreen : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: _selectedRole == 'OWNER'
-                                ? [
-                                    BoxShadow(
-                                      color: AppTheme.primaryGreen.withValues(alpha: 0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Text(
-                            'Owner',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _selectedRole == 'OWNER' ? Colors.white : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    _buildRoleTab('farmer'.tr(lang), 'FARMER', isDark),
+                    _buildRoleTab('owner'.tr(lang), 'OWNER', isDark),
+                    _buildRoleTab('admin'.tr(lang), 'ADMIN', isDark),
                   ],
                 ),
               ),
@@ -264,7 +210,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 obscureText: _obscurePassword,
                 style: TextStyle(color: isDark ? Colors.white : AppTheme.textDarkNavy, fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢',
+                  hintText: '••••••••',
                   hintStyle: TextStyle(color: isDark ? Colors.grey.shade600 : Colors.grey.shade400, fontSize: 14),
                   filled: true,
                   fillColor: isDark ? AppTheme.darkCard : Colors.white,
@@ -361,6 +307,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleTab(String label, String roleValue, bool isDark) {
+    final isSelected = _selectedRole == roleValue;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          ref.read(authProvider.notifier).clearError();
+          setState(() {
+            _selectedRole = roleValue;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primaryGreen : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected ? Colors.white : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
           ),
         ),
       ),

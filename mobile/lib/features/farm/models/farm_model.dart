@@ -76,6 +76,8 @@ class FarmCropModel {
   final String? variety;
   final String season;
   final String stage;
+  final DateTime? sowingDate;
+  final DateTime? expectedHarvestDate;
   final String status;
 
   FarmCropModel({
@@ -85,6 +87,8 @@ class FarmCropModel {
     this.variety,
     required this.season,
     required this.stage,
+    this.sowingDate,
+    this.expectedHarvestDate,
     required this.status,
   });
 
@@ -96,6 +100,8 @@ class FarmCropModel {
       variety: json['variety'],
       season: json['season'] ?? '',
       stage: json['stage'] ?? '',
+      sowingDate: json['sowingDate'] != null ? DateTime.tryParse(json['sowingDate'].toString()) : null,
+      expectedHarvestDate: json['expectedHarvestDate'] != null ? DateTime.tryParse(json['expectedHarvestDate'].toString()) : null,
       status: json['status'] ?? 'ACTIVE',
     );
   }
@@ -134,6 +140,8 @@ class FarmTaskModel {
       completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt']) : null,
     );
   }
+
+  bool get isCompleted => status.toUpperCase() == 'COMPLETED';
 }
 
 class FarmOperationModel {
@@ -145,6 +153,7 @@ class FarmOperationModel {
   final DateTime? plannedStartDate;
   final DateTime? plannedEndDate;
   final DateTime? completedAt;
+  final String? stage;
   final List<FarmTaskModel> tasks;
 
   FarmOperationModel({
@@ -156,8 +165,27 @@ class FarmOperationModel {
     this.plannedStartDate,
     this.plannedEndDate,
     this.completedAt,
+    this.stage,
     this.tasks = const [],
   });
+
+  bool get isCompleted => status.toUpperCase() == 'COMPLETED';
+  bool get isInProgress => status.toUpperCase() == 'IN_PROGRESS';
+
+  /// An operation is overdue ONLY if it is not completed and plannedStartDate is strictly before today.
+  /// Undated operations are NEVER classified as overdue.
+  bool get isOverdue {
+    if (isCompleted) return false;
+    final dt = plannedStartDate;
+    if (dt == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return dt.isBefore(today);
+  }
+
+  int get completedTasksCount => tasks.where((t) => t.status.toUpperCase() == 'COMPLETED').length;
+  int get totalTasksCount => tasks.length;
+  double get progressRatio => totalTasksCount > 0 ? (completedTasksCount / totalTasksCount) : 0.0;
 
   factory FarmOperationModel.fromJson(Map<String, dynamic> json) {
     var tasksList = json['tasks'] as List? ?? [];
@@ -166,12 +194,15 @@ class FarmOperationModel {
     return FarmOperationModel(
       id: json['id'] ?? '',
       farmCropId: json['farmCropId'] ?? '',
-      name: json['name'] ?? '',
+      name: json['name'] ?? json['title'] ?? '',
       description: json['description'],
       status: json['status'] ?? 'PLANNED',
-      plannedStartDate: json['plannedStartDate'] != null ? DateTime.tryParse(json['plannedStartDate']) : null,
-      plannedEndDate: json['plannedEndDate'] != null ? DateTime.tryParse(json['plannedEndDate']) : null,
-      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt']) : null,
+      plannedStartDate: json['plannedStartDate'] != null
+          ? DateTime.tryParse(json['plannedStartDate'].toString())
+          : (json['dueDate'] != null ? DateTime.tryParse(json['dueDate'].toString()) : null),
+      plannedEndDate: json['plannedEndDate'] != null ? DateTime.tryParse(json['plannedEndDate'].toString()) : null,
+      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'].toString()) : null,
+      stage: json['stage']?.toString(),
       tasks: parsedTasks,
     );
   }

@@ -16,7 +16,7 @@ class FarmOperationsList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final providerParams = {'farmId': farmId, 'cropId': cropId};
+    final providerParams = OperationsParams(farmId: farmId, cropId: cropId);
     final operationsState = ref.watch(operationsProvider(providerParams));
 
     if (operationsState.isLoading) {

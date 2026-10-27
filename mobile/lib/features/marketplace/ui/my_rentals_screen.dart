@@ -1,3 +1,4 @@
+import '../../../core/services/call_relay_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +12,9 @@ import 'receipt_screen.dart';
 
 final myRentalsProvider = FutureProvider<List<Booking>>((ref) async {
   final authState = ref.watch(authProvider);
+  if (authState.user == null) {
+    return <Booking>[];
+  }
   final role = authState.activeRole ?? 'FARMER';
   return BookingRepository().fetchMyRentals(role);
 });
@@ -23,14 +27,18 @@ class MyRentalsScreen extends ConsumerStatefulWidget {
 }
 
 class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
+  final Set<String> _pendingActions = {};
+
   Future<void> _cancelBooking(String id, String lang) async {
+    if (_pendingActions.contains(id)) return;
+    setState(() => _pendingActions.add(id));
     try {
       await BookingRepository().updateBookingStatus(id, 'CANCELLED');
       ref.invalidate(myRentalsProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Booking cancelled successfully'),
+          SnackBar(
+            content: Text('booking_cancelled_success'.tr(lang)),
             backgroundColor: AppTheme.primaryGreen,
             behavior: SnackBarBehavior.floating,
           ),
@@ -45,6 +53,42 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _pendingActions.remove(id));
+      }
+    }
+  }
+
+  Future<void> _requestReturn(String id, String lang) async {
+    if (_pendingActions.contains(id)) return;
+    setState(() => _pendingActions.add(id));
+    try {
+      await BookingRepository().updateBookingStatus(id, 'RETURN_PENDING');
+      ref.invalidate(myRentalsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('return_requested_success'.tr(lang)),
+            backgroundColor: AppTheme.primaryGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: const Color(0xFFC62828),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _pendingActions.remove(id));
       }
     }
   }
@@ -63,7 +107,7 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
           ),
         ),
         content: Text(
-          'Are you sure you want to cancel this booking request?',
+          'cancel_booking_confirm'.tr(lang),
           style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textDarkNavy),
         ),
         actions: [
@@ -84,6 +128,47 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
               foregroundColor: Colors.white,
             ),
             child: Text('cancel_booking'.tr(lang)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmReturn(String id, String lang, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.cardRadius)),
+        title: Text(
+          'request_return'.tr(lang),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : AppTheme.textDarkNavy,
+          ),
+        ),
+        content: Text(
+          'request_return_confirm_msg'.tr(lang),
+          style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textDarkNavy),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'cancel'.tr(lang),
+              style: TextStyle(color: isDark ? Colors.white54 : AppTheme.textMutedGray),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _requestReturn(id, lang);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0288D1),
+              foregroundColor: Colors.white,
+            ),
+            child: Text('request_return'.tr(lang)),
           ),
         ],
       ),
@@ -219,7 +304,6 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
           final start = DateFormat('MMM d, yyyy').format(booking.startDate);
           final end = DateFormat('MMM d, yyyy').format(booking.endDate);
           final durationDays = booking.endDate.difference(booking.startDate).inDays + 1;
-          final isPending = booking.status == 'PENDING';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
@@ -272,7 +356,7 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      eq.category.toUpperCase(),
+                                      AppLocalizations.localizedEquipmentCategory(eq.category, lang),
                                       style: const TextStyle(
                                         fontSize: 9,
                                         fontWeight: FontWeight.w800,
@@ -295,7 +379,7 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          _buildStatusChip(booking.status),
+                          _buildStatusChip(booking.status, lang),
                         ],
                       ),
 
@@ -348,9 +432,7 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
                                 ),
                               ),
                               Text(
-                                booking.totalPrice != null
-                                    ? 'Ã¢â€šÂ¹${booking.totalPrice!.toStringAsFixed(booking.totalPrice! % 1 == 0 ? 0 : 2)}'
-                                    : 'not_available'.tr(lang),
+                                AppFormatters.currency(booking.totalPrice, lang: lang),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
@@ -359,84 +441,145 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
                               ),
                             ],
                           ),
-                          Row(
-                            children: [
-                              // Chat shortcut button
-                              IconButton(
-                                icon: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : AppTheme.primaryGreen.withValues(alpha: 0.08),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.chat_bubble_outline,
-                                    size: 16,
-                                    color: AppTheme.primaryGreen,
-                                  ),
-                                ),
-                                tooltip: 'chat_with_owner'.tr(lang),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatScreen(booking: booking),
+                          Flexible(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              reverse: true,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Chat shortcut button
+                                  IconButton(
+                                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                                    constraints: const BoxConstraints(),
+                                    icon: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.white.withValues(alpha: 0.08)
+                                            : AppTheme.primaryGreen.withValues(alpha: 0.08),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.chat_bubble_outline,
+                                        size: 16,
+                                        color: AppTheme.primaryGreen,
+                                      ),
                                     ),
-                                  );
-                                },
-                              ),
+                                    tooltip: 'chat_with_owner'.tr(lang),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ChatScreen(booking: booking),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  IconButton(
+                                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                                    constraints: const BoxConstraints(),
+                                    icon: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.white.withValues(alpha: 0.08)
+                                            : const Color(0xFF16A34A).withValues(alpha: 0.08),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.phone_in_talk_outlined,
+                                        size: 16,
+                                        color: Color(0xFF16A34A),
+                                      ),
+                                    ),
+                                    tooltip: 'call_owner'.tr(lang),
+                                    onPressed: () {
+                                      CallRelayService.initiatePrivateCall(
+                                        bookingId: booking.id,
+                                        context: context,
+                                        lang: lang,
+                                        isDark: isDark,
+                                      );
+                                    },
+                                  ),
 
-                              if (showCancel && isPending) ...[
-                                const SizedBox(width: 6),
-                                OutlinedButton(
-                                  onPressed: () => _confirmCancel(booking.id, lang, isDark),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFFC62828),
-                                    side: const BorderSide(color: Color(0xFFC62828)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
+                                  if (booking.isFarmerCancellable) ...[
+                                    const SizedBox(width: 4),
+                                    OutlinedButton(
+                                      onPressed: _pendingActions.contains(booking.id)
+                                          ? null
+                                          : () => _confirmCancel(booking.id, lang, isDark),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFFC62828),
+                                        side: const BorderSide(color: Color(0xFFC62828)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'cancel'.tr(lang),
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                      ),
                                     ),
-                                  ),
-                                  child: Text(
-                                    'cancel'.tr(lang),
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                              ],
+                                  ],
 
-                              const SizedBox(width: 6),
-                              OutlinedButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ReceiptScreen(booking: booking),
+                                  if (booking.isFarmerReturnable) ...[
+                                    const SizedBox(width: 4),
+                                    ElevatedButton(
+                                      onPressed: _pendingActions.contains(booking.id)
+                                          ? null
+                                          : () => _confirmReturn(booking.id, lang, isDark),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0288D1),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'request_return'.tr(lang),
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                      ),
                                     ),
-                                  ).then((_) => ref.invalidate(myRentalsProvider));
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: isDark ? Colors.white : AppTheme.textDarkNavy,
-                                  side: BorderSide(
-                                    color: isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.15),
+                                  ],
+
+                                  const SizedBox(width: 4),
+                                  OutlinedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ReceiptScreen(booking: booking),
+                                        ),
+                                      );
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                      side: BorderSide(
+                                        color: isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.15),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'view_details'.tr(lang),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                ),
-                                child: Text(
-                                  'view_details'.tr(lang),
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                                ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
@@ -451,7 +594,7 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(String status, String lang) {
     Color bg;
     Color fg;
 
@@ -495,8 +638,7 @@ class _MyRentalsScreenState extends ConsumerState<MyRentalsScreen> {
         color: bg,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Text(
-        status.toUpperCase(),
+      child: Text(AppLocalizations.localizedBookingStatus(status, lang),
         style: TextStyle(
           color: fg,
           fontSize: 9,

@@ -5,6 +5,8 @@ import '../../../core/api/api_client.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 import '../../../core/theme/app_theme.dart';
 
+import '../../../core/errors/api_error_handler.dart';
+
 class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -19,38 +21,67 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   bool _isLoading = false;
 
   Future<void> _submit() async {
-    if (_currentPasswordController.text.isEmpty || _newPasswordController.text.isEmpty || _confirmPasswordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+    final currentPass = _currentPasswordController.text;
+    final newPass = _newPasswordController.text;
+    final confirmPass = _confirmPasswordController.text;
+
+    if (currentPass.isEmpty || newPass.isEmpty || confirmPass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+      );
       return;
     }
 
-    if (_newPasswordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('New passwords do not match.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+    if (newPass.length < 8 ||
+        !RegExp(r'[A-Z]').hasMatch(newPass) ||
+        !RegExp(r'[a-z]').hasMatch(newPass) ||
+        !RegExp(r'[0-9]').hasMatch(newPass)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New password must be at least 8 characters and include 1 uppercase, 1 lowercase, and 1 number.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (newPass != confirmPass) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match.', style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
     try {
       final data = {
-        'currentPassword': _currentPasswordController.text,
-        'newPassword': _newPasswordController.text,
+        'currentPassword': currentPass,
+        'newPassword': newPass,
       };
       
       final response = await ApiClient().dio.post('/auth/change-password', data: data);
       
       if (response.data['success'] == true) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed successfully!', style: TextStyle(color: Colors.white)), backgroundColor: AppTheme.primaryGreen));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password changed successfully!', style: TextStyle(color: Colors.white)), backgroundColor: AppTheme.primaryGreen),
+          );
           context.pop();
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response.data['error'] ?? 'Failed to change password', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+          final err = response.data['error']?.toString() ?? 'Failed to change password';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(err, style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+          );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+        final err = ApiErrorHandler.getMessage(e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err, style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

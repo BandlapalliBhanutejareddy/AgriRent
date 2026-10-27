@@ -6,6 +6,7 @@ import '../../../models/booking.dart';
 import '../../../models/equipment.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../marketplace/ui/receipt_screen.dart';
+import '../../marketplace/ui/my_rentals_screen.dart';
 import '../repository/booking_repository.dart';
 
 class BookingFormScreen extends ConsumerStatefulWidget {
@@ -70,6 +71,20 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
   Future<void> _submitBooking(String lang) async {
     if (_isLoading) return;
 
+    if (!widget.equipment.available) {
+      setState(() {
+        _errorMessage = 'equipment_unavailable'.tr(lang);
+      });
+      return;
+    }
+
+    if (_endDate.isBefore(_startDate)) {
+      setState(() {
+        _errorMessage = 'end_date_cannot_be_before_start_date'.tr(lang);
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -81,6 +96,9 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
         startDate: _startDate,
         endDate: _endDate,
       );
+
+      // Invalidate rentals list so the new booking immediately displays in My Rentals
+      ref.invalidate(myRentalsProvider);
 
       if (!mounted) return;
 
@@ -306,7 +324,7 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
                       InkWell(
                         onTap: () => _selectDateRange(isDark),
                         child: Text(
-                          'Change',
+                          'change'.tr(lang),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -469,14 +487,40 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
               ),
             ),
 
-            const SizedBox(height: 28),
+            
+            // Pending status & zero initial payment disclosure notice
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: AppTheme.primaryGreen, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'booking_pending_notice'.tr(lang),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : AppTheme.textDarkNavy,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
             // Submit Booking Button
             SizedBox(
               width: double.infinity,
               height: AppTheme.buttonMinHeight,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : () => _submitBooking(lang),
+                onPressed: (_isLoading || !widget.equipment.available) ? null : () => _submitBooking(lang),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryGreen,
                   foregroundColor: Colors.white,

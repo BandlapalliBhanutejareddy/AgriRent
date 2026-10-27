@@ -25,13 +25,25 @@ class SocketClient {
 
     _socket?.connect();
 
-    _socket?.onConnect((_) {
+    _socket?.onConnect((_) async {
       log('Socket Connected');
+      final userId = await SecureStorage.getUserId();
+      if (userId != null && userId.isNotEmpty) {
+        _socket?.emit('register', userId);
+        log('User registered with socket: $userId');
+      }
     });
 
     _socket?.onDisconnect((_) {
       log('Socket Disconnected');
     });
+  }
+
+  void registerUser(String userId) {
+    if (_socket != null && _socket!.connected) {
+      _socket?.emit('register', userId);
+      log('User registered with socket: $userId');
+    }
   }
 
   void disconnect() {

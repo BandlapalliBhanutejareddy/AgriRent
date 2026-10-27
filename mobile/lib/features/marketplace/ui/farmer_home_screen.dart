@@ -1,3 +1,4 @@
+import '../../../core/localization/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,12 @@ import '../providers/marketplace_provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../farm/models/farm_model.dart';
 import '../../farm/providers/expenses_provider.dart';
+import '../../notifications/providers/notification_provider.dart';
+import '../../ai_assistant/ui/voice_interaction_modal.dart';
+import '../../weather/ui/weather_widget.dart';
+import '../../weather/providers/weather_provider.dart';
+import '../../farm/ui/next_operation_widget.dart';
+import 'widgets/search_suggestions_overlay.dart';
 
 const List<String> kCanonicalStages = [
   'SOWING',
@@ -36,8 +43,10 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   Map<String, dynamic>? _analytics;
   String _selectedAnalyticsPeriod = 'Last 30 days';
   bool _isLoadingAnalytics = false;
-  String? _selectedFarmId;
+  String? _analyticsError;
+  int _analyticsRequestId = 0;
   String? _selectedCropId;
+  int _selectedCategoryChipIndex = 0;
 
   String _getTimeGreeting() {
     final hour = DateTime.now().hour;
@@ -54,42 +63,65 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
         _fetchAnalytics();
       });
       ref.read(marketplaceProvider.notifier).fetchInitial();
+      ref.read(unreadNotificationsCountProvider.notifier).refresh();
     });
   }
 
   Future<void> _fetchAnalytics() async {
-    setState(() => _isLoadingAnalytics = true);
-    try {
-      final farms = ref.read(farmProvider).farms;
-      final currentFarm = farms.isNotEmpty
-          ? (_selectedFarmId != null
-              ? farms.firstWhere((f) => f.id == _selectedFarmId, orElse: () => farms.first)
-              : farms.first)
-          : null;
-      final currentCrop = currentFarm?.crops.isNotEmpty == true
-          ? (_selectedCropId != null
-              ? currentFarm!.crops.firstWhere((c) => c.id == _selectedCropId, orElse: () => currentFarm.crops.first)
-              : currentFarm!.crops.first)
-          : null;
+    final currentFarm = ref.read(farmProvider).selectedFarm;
+    if (currentFarm == null) {
+      if (mounted) {
+        setState(() {
+          _analytics = null;
+          _isLoadingAnalytics = false;
+          _analyticsError = null;
+        });
+      }
+      return;
+    }
 
-      final fId = currentFarm?.id;
-      final cId = currentCrop?.id;
-      final url = (fId != null && fId.isNotEmpty)
-          ? 'analytics/farmer?farmId=$fId${cId != null ? '&cropId=$cId' : ''}'
+    final currentCrop = currentFarm.crops.isNotEmpty == true
+        ? (_selectedCropId != null
+            ? currentFarm.crops.firstWhere((c) => c.id == _selectedCropId, orElse: () => currentFarm.crops.first)
+            : currentFarm.crops.first)
+        : null;
+
+    final fId = currentFarm.id;
+    final cId = currentCrop?.id;
+    final requestId = ++_analyticsRequestId;
+
+    setState(() {
+      _isLoadingAnalytics = true;
+      _analyticsError = null;
+      _analytics = null; // Clear stale farm data immediately
+    });
+
+    try {
+      final url = (fId.isNotEmpty)
+          ? 'analytics/farmer?farmId=$fId${cId != null && cId.isNotEmpty ? '&cropId=$cId' : ''}'
           : 'analytics/farmer';
 
       final response = await ApiClient().dio.get(url);
-      if (mounted) {
-        final dynamic raw = response.data;
+      if (mounted && requestId == _analyticsRequestId) {
+        final activeFarm = ref.read(farmProvider).selectedFarm;
+        if (activeFarm?.id == fId) {
+          final dynamic raw = response.data;
+          setState(() {
+            if (raw is Map<String, dynamic>) {
+              _analytics = raw['data'] is Map<String, dynamic> ? raw['data'] : raw;
+            }
+            _isLoadingAnalytics = false;
+            _analyticsError = null;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted && requestId == _analyticsRequestId) {
         setState(() {
-          if (raw is Map<String, dynamic>) {
-            _analytics = raw['data'] is Map<String, dynamic> ? raw['data'] : raw;
-          }
           _isLoadingAnalytics = false;
+          _analyticsError = e.toString();
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingAnalytics = false);
     }
   }
 
@@ -142,7 +174,8 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                       ),
                     ),
                     ...crops.map((c) {
-                      final isSelected = (_selectedFarmId == f.id || (_selectedFarmId == null && farms.first.id == f.id)) &&
+                      final currentSelectedFarmId = ref.read(farmProvider).selectedFarmId ?? farms.first.id;
+                      final isSelected = (currentSelectedFarmId == f.id) &&
                           (_selectedCropId == c.id || (_selectedCropId == null && (f.crops.isEmpty || f.crops.first.id == c.id)));
 
                       return ListTile(
@@ -163,16 +196,16 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                           ),
                         ),
                         subtitle: Text(
-                          '${c.season} Ã¢â‚¬Â¢ Stage: ${c.stage}',
+                          '${c.season} • Stage: ${c.stage}',
                           style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                         ),
                         trailing: isSelected ? const Icon(Icons.check_circle, color: AppTheme.primaryGreen) : null,
-                        onTap: () {
+                        onTap: () async {
                           Navigator.pop(ctx);
                           setState(() {
-                            _selectedFarmId = f.id;
                             _selectedCropId = c.id;
                           });
+                          await ref.read(farmProvider.notifier).selectFarm(f.id);
                           _fetchAnalytics();
                           ref.read(expensesProvider.notifier).fetchExpenses(f.id);
                         },
@@ -191,15 +224,24 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(languageProvider);
     final user = ref.watch(authProvider).user;
     final farmState = ref.watch(farmProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final farm = farmState.farms.isNotEmpty
-        ? (_selectedFarmId != null
-            ? farmState.farms.firstWhere((f) => f.id == _selectedFarmId, orElse: () => farmState.farms.first)
-            : farmState.farms.first)
-        : null;
+    ref.listen<FarmState>(farmProvider, (previous, next) {
+      if (previous?.selectedFarmId != next.selectedFarmId) {
+        setState(() {
+          _selectedCropId = null;
+        });
+        _fetchAnalytics();
+        if (next.selectedFarmId != null && next.selectedFarmId!.isNotEmpty) {
+          ref.read(expensesProvider.notifier).fetchExpenses(next.selectedFarmId!);
+        }
+      }
+    });
+
+    final farm = farmState.selectedFarm;
     final crop = farm?.crops.isNotEmpty == true
         ? (_selectedCropId != null
             ? farm!.crops.firstWhere((c) => c.id == _selectedCropId, orElse: () => farm.crops.first)
@@ -217,6 +259,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
           onRefresh: () async {
             await ref.read(farmProvider.notifier).fetchFarms();
             await ref.read(marketplaceProvider.notifier).fetchInitial();
+            await ref.read(unreadNotificationsCountProvider.notifier).refresh();
             await _fetchAnalytics();
           },
           child: SingleChildScrollView(
@@ -225,32 +268,48 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. TOP HEADER (Greeting + Slogan + Avatar + Notification)
-                _buildHeader(farmerName, initial, isDark),
+                // 1. TOP HEADER (Greeting + Location/Weather + Real Notification Badge + Avatar)
+                _buildHeader(farmerName, initial, isDark, farm, lang),
+                const SizedBox(height: 16),
+
+                // 2. VOICE-ENABLED SEARCH BAR (Tap to Talk + Overlay Suggestions)
+                _buildVoiceSearchBar(isDark, lang),
+                const SizedBox(height: 14),
+
+                // 3. 5 CATEGORY CHIPS (All, Crops, Equipment, Community, Learning)
+                _buildCategoryChips(isDark, lang),
                 const SizedBox(height: 18),
 
-                // 2. CURRENT CROP BANNER CARD
-                _buildCropBannerCard(crop, farm, farmState.farms, isDark),
-                const SizedBox(height: 16),
-
-                // 3. CURRENT STAGE & NEXT STAGE DUAL CARD
-                _buildStageProgressionCard(crop, farm, isDark),
-                const SizedBox(height: 16),
-
-                // 4. NEXT IMPORTANT OPERATIONS CARD
-                _buildNextOperationsCard(crop, farm, isDark),
+                // 4. 4 FARM STATUS SUMMARY CARDS (Weather, Today's Tasks, Crop Stage, Alerts)
+                _buildFarmStatusCards(farm, crop, isDark, lang),
                 const SizedBox(height: 20),
 
-                // 5. QUICK ACTIONS ROW
+                // 5. QUICK ACTIONS (My Farm, Book Equipment, Community, AI Farming Assistant)
                 _buildQuickActionsRow(isDark),
-                const SizedBox(height: 24),
+                const SizedBox(height: 22),
 
-                // 6. FARMER ANALYTICS (GRID OF 4 CARDS)
-                _buildFarmerAnalyticsSection(farm, crop, isDark),
-                const SizedBox(height: 24),
+                // 6. NEARBY EQUIPMENT (Real marketplace cards with [Book])
+                _buildNearbyEquipmentSection(isDark, lang),
+                const SizedBox(height: 22),
 
-                // 7. RECENT ACTIVITY TIMELINE
-                _buildRecentActivitySection(isDark),
+                // 7. CURRENT CROP BANNER CARD
+                _buildCropBannerCard(crop, farm, farmState.farms, isDark, lang),
+                const SizedBox(height: 18),
+
+                // 8. CURRENT STAGE & NEXT STAGE DUAL CARD
+                _buildStageProgressionCard(crop, farm, isDark, lang),
+                const SizedBox(height: 16),
+
+                // 9. NEXT IMPORTANT OPERATIONS CARD
+                _buildNextOperationsCard(crop, farm, isDark, lang),
+                const SizedBox(height: 20),
+
+                // 10. FARMER ANALYTICS (GRID OF 4 CARDS)
+                _buildFarmerAnalyticsSection(farm, crop, isDark, lang),
+                const SizedBox(height: 20),
+
+                // 11. RECENT ACTIVITY TIMELINE
+                _buildRecentActivitySection(isDark, lang),
                 const SizedBox(height: 30),
               ],
             ),
@@ -263,67 +322,78 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   // ---------------------------------------------------------------------------
   // 1. HEADER WIDGET
   // ---------------------------------------------------------------------------
-  Widget _buildHeader(String farmerName, String initial, bool isDark) {
+  Widget _buildHeader(String farmerName, String initial, bool isDark, FarmModel? farm, String lang) {
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
+    final loc = AppLocalizations.of(context);
+    final greeting = _getTimeGreeting();
+    final farmLoc = farm != null && farm.location.isNotEmpty ? farm.location : (farm?.name ?? loc.translate('no_farm_selected'));
+    String weatherText = '';
+    if (farm != null && farm.id.isNotEmpty) {
+      final weatherState = ref.watch(weatherProvider(farm.id));
+      final temp = weatherState.weatherData?.current.temperature;
+      if (temp != null) {
+        weatherText = ' • ${temp.round()}°C';
+      } else if (weatherState.isLoading) {
+        weatherText = ' • ...';
+      }
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '$greeting $farmerName',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                      letterSpacing: -0.3,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(width: 4),
+                  const Text('🌾', style: TextStyle(fontSize: 18)),
+                ],
               ),
-              child: const Icon(Icons.eco_rounded, color: AppTheme.primaryGreen, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getTimeGreeting(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  ),
-                ),
-                Text(
-                  farmerName,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Text(
-                      "Let's grow a better tomorrow ",
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Icon(Icons.location_on_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                  const SizedBox(width: 3),
+                  Flexible(
+                    child: Text(
+                      '$farmLoc$weatherText',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const Text('Ã°Å¸Å’Â¿', style: TextStyle(fontSize: 12)),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 8),
         Row(
           children: [
-            // Notification Bell with Badge
+            // Notification Bell with Real Badge
             Stack(
               clipBehavior: Clip.none,
               children: [
                 InkWell(
-                  onTap: () => context.push('/notifications'),
+                  onTap: () {
+                    context.push('/notifications');
+                    ref.read(unreadNotificationsCountProvider.notifier).refresh();
+                  },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.all(9),
@@ -345,23 +415,24 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                     ),
                   ),
                 ),
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE53935),
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                    child: const Text(
-                      '3',
-                      style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
+                if (unreadCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE53935),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(width: 10),
@@ -390,12 +461,722 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
+  // VOICE-ENABLED SEARCH BAR
+  // ---------------------------------------------------------------------------
+  Widget _buildVoiceSearchBar(bool isDark, String lang) {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                SearchSuggestionsOverlay.show(
+                  context,
+                  onSelected: (query) {
+                    context.push('/ai-assistant?query=${Uri.encodeComponent(query)}');
+                  },
+                );
+              },
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(26)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.search_rounded,
+                      color: isDark ? Colors.grey.shade400 : AppTheme.primaryGreen,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Ask AgroRent AI anything about your farm...',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 5),
+            child: InkWell(
+              onTap: () {
+                VoiceInteractionModal.show(context);
+              },
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x402E7D32),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.mic_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5 CATEGORY CHIPS
+  // ---------------------------------------------------------------------------
+  Widget _buildCategoryChips(bool isDark, String lang) {
+    final chips = [
+      {'title': 'all'.tr(lang), 'icon': Icons.grid_view_rounded},
+      {'title': 'crops'.tr(lang), 'icon': Icons.grass_rounded},
+      {'title': 'equipment'.tr(lang), 'icon': Icons.agriculture_rounded},
+      {'title': 'community'.tr(lang), 'icon': Icons.groups_rounded},
+      {'title': 'learning'.tr(lang), 'icon': Icons.menu_book_rounded},
+    ];
+
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: chips.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (ctx, idx) {
+          final chip = chips[idx];
+          final isSelected = _selectedCategoryChipIndex == idx;
+          return GestureDetector(
+            onTap: () {
+              setState(() => _selectedCategoryChipIndex = idx);
+              if (idx == 1) {
+                widget.onTabSelected?.call(1);
+              } else if (idx == 2) {
+                widget.onTabSelected?.call(2);
+              } else if (idx == 3) {
+                context.push('/community');
+              } else if (idx == 4) {
+                context.push('/knowledge');
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppTheme.primaryGreen
+                    : (isDark ? AppTheme.darkCard : Colors.white),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? AppTheme.primaryGreen
+                      : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    chip['icon'] as IconData,
+                    size: 16,
+                    color: isSelected ? Colors.white : (isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    chip['title'] as String,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? Colors.white : (isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4 FARM STATUS SUMMARY CARDS
+  // ---------------------------------------------------------------------------
+  Widget _buildFarmStatusCards(FarmModel? farm, FarmCropModel? crop, bool isDark, String lang) {
+    final loc = AppLocalizations.of(context);
+    final activeOps = (_analytics?['activeOperations'] as num?)?.toInt() ?? 0;
+    final totalTasks = (_analytics?['totalTasks'] as num?)?.toInt() ?? 0;
+    final completedTasks = (_analytics?['completedTasks'] as num?)?.toInt() ?? 0;
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
+
+    // Weather Card telemetry
+    String weatherMain = loc.translate('weather_unavailable');
+    String weatherSub = '--';
+    if (farm != null && farm.id.isNotEmpty) {
+      final weatherState = ref.watch(weatherProvider(farm.id));
+      final current = weatherState.weatherData?.current;
+      if (current?.temperature != null) {
+        weatherMain = '${current!.temperature!.round()}°C';
+        final hum = current.humidity != null ? '${current.humidity!.round()}% Hum' : '';
+        final wind = current.windSpeed != null ? '${current.windSpeed!.round()} km/h' : '';
+        weatherSub = [hum, wind].where((s) => s.isNotEmpty).join(' • ');
+        if (weatherSub.isEmpty) weatherSub = weatherState.weatherData?.source ?? 'Live Telemetry';
+      } else if (weatherState.isLoading) {
+        weatherMain = '...';
+        weatherSub = 'Loading weather...';
+      }
+    } else {
+      weatherMain = loc.translate('no_farm_selected');
+      weatherSub = loc.translate('weather_unavailable');
+    }
+
+    // Tasks Card telemetry
+    String taskMain = loc.translate('no_active_tasks');
+    String taskSub = '0 pending tasks';
+    if (farm != null) {
+      if (activeOps > 0) {
+        taskMain = '$activeOps Active Ops';
+        taskSub = totalTasks > 0 ? '$completedTasks of $totalTasks tasks done' : '$activeOps pending operations';
+      } else if (totalTasks > 0) {
+        taskMain = '$completedTasks / $totalTasks Done';
+        taskSub = '$totalTasks total tasks';
+      } else {
+        taskMain = loc.translate('no_active_tasks');
+        taskSub = '0 pending tasks';
+      }
+    }
+
+    // Crop Stage Card
+    String cropMain = loc.translate('no_crop_registered');
+    String cropSub = farm != null ? farm.name : loc.translate('no_farm_selected');
+    if (crop != null) {
+      final cName = crop.cropName.isNotEmpty ? crop.cropName : loc.translate('current_crop');
+      final cStage = crop.stage.isNotEmpty ? crop.stage.replaceAll('_', ' ') : loc.translate('current_stage');
+      cropMain = '$cName • $cStage';
+      if (crop.sowingDate != null) {
+        final days = DateTime.now().difference(crop.sowingDate!).inDays;
+        cropSub = 'Day $days since sowing';
+      } else if (crop.season.isNotEmpty) {
+        cropSub = '${crop.season} Season';
+      } else if (crop.variety?.isNotEmpty == true) {
+        cropSub = crop.variety!;
+      } else {
+        cropSub = 'Active Crop';
+      }
+    }
+
+    // Farm Alerts
+    final alertMain = unreadCount > 0 ? '$unreadCount Alert${unreadCount > 1 ? 's' : ''}' : loc.translate('all_clear');
+    final alertSub = unreadCount > 0 ? 'Action required' : 'No critical alerts';
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatusTile(
+                title: loc.translate('weather'),
+                mainText: weatherMain,
+                subText: weatherSub,
+                icon: Icons.wb_sunny_rounded,
+                iconColor: const Color(0xFFF57F17),
+                bgColor: const Color(0xFFFFF8E1),
+                isDark: isDark,
+                onTap: () {
+                  if (farm != null && farm.id.isNotEmpty) {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.darkCard : Colors.white,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        child: SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Weather Advisory',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              WeatherWidget(farmId: farm.id),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatusTile(
+                title: loc.translate('todays_tasks'),
+                mainText: taskMain,
+                subText: taskSub,
+                icon: Icons.assignment_turned_in_rounded,
+                iconColor: const Color(0xFF1976D2),
+                bgColor: const Color(0xFFE3F2FD),
+                isDark: isDark,
+                onTap: () => context.push('/farm-plan'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatusTile(
+                title: loc.translate('crop_stage'),
+                mainText: cropMain,
+                subText: cropSub,
+                icon: Icons.eco_rounded,
+                iconColor: const Color(0xFF2E7D32),
+                bgColor: const Color(0xFFE8F5E9),
+                isDark: isDark,
+                onTap: () => _showCropDetailsDialog(context, crop, farm, isDark),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatusTile(
+                title: loc.translate('farm_alerts'),
+                mainText: alertMain,
+                subText: alertSub,
+                icon: Icons.warning_amber_rounded,
+                iconColor: const Color(0xFFE65100),
+                bgColor: const Color(0xFFFFF3E0),
+                isDark: isDark,
+                onTap: () => context.push(
+                  crop != null
+                      ? '/ai-assistant?query=${Uri.encodeComponent("What farming advisories apply for ${crop.cropName} in ${crop.stage} stage?")}'
+                      : '/notifications',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusTile({
+    required String title,
+    required String mainText,
+    required String subText,
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: isDark ? iconColor.withValues(alpha: 0.15) : bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 16),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              mainText,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : AppTheme.textDarkNavy,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subText,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // NEARBY EQUIPMENT SECTION
+  // ---------------------------------------------------------------------------
+  Widget _buildNearbyEquipmentSection(bool isDark, String lang) {
+    final mpState = ref.watch(marketplaceProvider);
+    final items = mpState.equipment.take(4).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'recommended_equipment'.tr(lang),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                letterSpacing: -0.3,
+              ),
+            ),
+            InkWell(
+              onTap: () {
+                ref.read(marketplaceProvider.notifier).setCategory(null);
+                widget.onTabSelected?.call(2);
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  'view_all'.tr(lang),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (items.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              'no_equipment_found'.tr(lang),
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+            ),
+          )
+        else
+          SizedBox(
+            height: 215,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (ctx, idx) {
+                final eq = items[idx];
+                final hasPrice = eq.pricePerDay != null && eq.pricePerDay! > 0;
+                final price = hasPrice
+                    ? '${AppFormatters.currency(eq.pricePerDay, lang: lang)}/${'per_day'.tr(lang)}'
+                    : 'not_available'.tr(lang);
+                final ownerName = (eq.owner?.name.isNotEmpty == true)
+                    ? eq.owner!.name
+                    : 'verified_owner'.tr(lang);
+
+                return Container(
+                  width: 220,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkCard : Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE8ECEF)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                        child: Container(
+                          height: 90,
+                          width: double.infinity,
+                          color: isDark ? Colors.white12 : Colors.grey.shade100,
+                          child: eq.imageUrl.isNotEmpty
+                              ? Image.network(
+                                  eq.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => _buildEquipmentFallbackIcon(),
+                                )
+                              : _buildEquipmentFallbackIcon(),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              eq.title,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Icon(Icons.verified_rounded, size: 12, color: AppTheme.primaryGreen),
+                                const SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(
+                                    ownerName,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  price,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => context.push('/equipment/${eq.id}'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primaryGreen,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    minimumSize: const Size(0, 28),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  child: Text('rent_book'.tr(lang), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildEquipmentFallbackIcon() {
+    return Center(
+      child: Icon(Icons.agriculture_rounded, size: 40, color: AppTheme.primaryGreen.withValues(alpha: 0.6)),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // 2. CURRENT CROP BANNER CARD
   // ---------------------------------------------------------------------------
-  Widget _buildCropBannerCard(FarmCropModel? crop, FarmModel? farm, List<FarmModel> farms, bool isDark) {
-    final cropName = crop?.cropName.isNotEmpty == true ? crop!.cropName : 'Paddy (Rice)';
-    final stageName = crop?.stage.isNotEmpty == true ? crop!.stage.replaceAll('_', ' ') : 'Growing';
-    const progressVal = 0.65;
+  Widget _buildCropBannerCard(FarmCropModel? crop, FarmModel? farm, List<FarmModel> farms, bool isDark, String lang) {
+    final loc = AppLocalizations.of(context);
+
+    if (farm == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Colors.orange, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  loc.translate('no_farm_selected'),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Select or register a farm to view live crop progress and operations.',
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => context.push('/farm-setup?mode=create'),
+              icon: const Icon(Icons.add_location_alt_rounded, size: 18),
+              label: Text(loc.translate('set_up_farm')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (crop == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.grass_rounded, color: AppTheme.primaryGreen, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  loc.translate('no_crop_registered'),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${farm.name} has no active crop registered. Add a crop to track lifecycle stages.',
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => context.push('/farm-setup?mode=edit&farmId=${farm.id}'),
+              icon: const Icon(Icons.eco_rounded, size: 18),
+              label: Text(loc.translate('edit_farm')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final cropName = crop.cropName.isNotEmpty ? crop.cropName : loc.translate('current_crop');
+    final stageName = crop.stage.isNotEmpty ? crop.stage.replaceAll('_', ' ') : loc.translate('current_stage');
+    final totalTasks = (_analytics?['totalTasks'] as num?)?.toInt() ?? 0;
+    final completedTasks = (_analytics?['completedTasks'] as num?)?.toInt() ?? 0;
+    final progressVal = totalTasks > 0 ? (completedTasks / totalTasks).clamp(0.0, 1.0) : 0.0;
+    final progressPct = (progressVal * 100).toInt();
+    final progressText = totalTasks > 0 ? '$progressPct% Complete' : 'No tasks recorded';
 
     return Container(
       width: double.infinity,
@@ -416,7 +1197,6 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
       ),
       child: Stack(
         children: [
-          // Background decorative crop illustration
           Positioned(
             right: -10,
             bottom: -10,
@@ -430,9 +1210,9 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Current Crop',
-                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                Text(
+                  loc.translate('current_crop'),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 InkWell(
@@ -479,10 +1259,10 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(6),
-                            child: const LinearProgressIndicator(
+                            child: LinearProgressIndicator(
                               value: progressVal,
                               backgroundColor: Colors.white24,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                               minHeight: 6,
                             ),
                           ),
@@ -490,9 +1270,9 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
-                      '65% Complete',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
+                    Text(
+                      progressText,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),
@@ -506,9 +1286,9 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: const Text(
-                    'View Crop Details',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                  child: Text(
+                    loc.translate('view_crop_details'),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
                   ),
                 ),
               ],
@@ -522,9 +1302,27 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   // ---------------------------------------------------------------------------
   // 3. CURRENT STAGE & NEXT STAGE DUAL CARD
   // ---------------------------------------------------------------------------
-  Widget _buildStageProgressionCard(FarmCropModel? crop, FarmModel? farm, bool isDark) {
-    final currentStage = crop?.stage.isNotEmpty == true ? crop!.stage : 'Tillering';
-    const nextStage = 'Panicle Initiation';
+  Widget _buildStageProgressionCard(FarmCropModel? crop, FarmModel? farm, bool isDark, String lang) {
+    final loc = AppLocalizations.of(context);
+    if (crop == null) {
+      return const SizedBox.shrink();
+    }
+
+    final currentStage = crop.stage.isNotEmpty ? crop.stage.replaceAll('_', ' ') : loc.translate('current_stage');
+    final currentIdx = kCanonicalStages.indexOf(crop.stage);
+    final String nextStage;
+    if (currentIdx >= 0 && currentIdx + 1 < kCanonicalStages.length) {
+      nextStage = kCanonicalStages[currentIdx + 1].replaceAll('_', ' ');
+    } else if (currentIdx == kCanonicalStages.length - 1) {
+      nextStage = 'Harvest Complete';
+    } else {
+      nextStage = loc.translate('next_stage');
+    }
+
+    final currentSub = crop.sowingDate != null
+        ? 'Day ${DateTime.now().difference(crop.sowingDate!).inDays}'
+        : (crop.season.isNotEmpty ? crop.season : 'Active');
+    final nextSub = nextStage != 'Harvest Complete' ? 'Upcoming Stage' : 'Final Cycle';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -559,7 +1357,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Current Stage',
+                      loc.translate('current_stage'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -581,7 +1379,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Ã°Å¸â€œâ€¦ Day 25 Ã¢â‚¬â€œ 40',
+                  currentSub,
                   style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                 ),
                 const SizedBox(height: 8),
@@ -625,7 +1423,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Next Stage',
+                      loc.translate('next_stage'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -647,7 +1445,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Ã°Å¸â€œâ€¦ Day 41 Ã¢â‚¬â€œ 60',
+                  nextSub,
                   style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                 ),
                 const SizedBox(height: 8),
@@ -677,93 +1475,29 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   // ---------------------------------------------------------------------------
   // 4. NEXT IMPORTANT OPERATIONS CARD
   // ---------------------------------------------------------------------------
-  Widget _buildNextOperationsCard(FarmCropModel? crop, FarmModel? farm, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFDF2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFFFE082)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFF57F17).withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () => context.push('/farm-plan'),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFA000),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 14),
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Next important operations',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                        color: Color(0xFF424242),
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded, color: Color(0xFF757575), size: 22),
-                ],
-              ),
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFFFECB3)),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-            child: Column(
-              children: [
-                _buildOperationRow('Apply nitrogen top dressing', 'In 3 days'),
-                const SizedBox(height: 8),
-                _buildOperationRow('Maintain 2-5 cm water level', 'In 3 days'),
-                const SizedBox(height: 8),
-                _buildOperationRow('Pest monitoring (stem borer)', 'In 5 days'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildNextOperationsCard(FarmCropModel? crop, FarmModel? farm, bool isDark, String lang) {
+    if (farm == null || farm.id.isEmpty) {
+      final loc = AppLocalizations.of(context);
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : const Color(0xFFFFFDF2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFFFE082)),
+        ),
+        child: Text(
+          loc.translate('no_farm_selected'),
+          style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF424242)),
+        ),
+      );
+    }
 
-  Widget _buildOperationRow(String title, String dueIn) {
-    return Row(
-      children: [
-        const Icon(Icons.check_circle_rounded, color: Color(0xFFF57F17), size: 18),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF212121)),
-          ),
-        ),
-        Row(
-          children: [
-            const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF757575)),
-            const SizedBox(width: 4),
-            Text(
-              dueIn,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF616161)),
-            ),
-          ],
-        ),
-      ],
+    final targetCropId = crop?.id ?? (farm.crops.isNotEmpty ? farm.crops.first.id : '');
+    return NextOperationWidget(
+      farmId: farm.id,
+      cropId: targetCropId,
+      margin: EdgeInsets.zero,
     );
   }
 
@@ -773,39 +1507,38 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   Widget _buildQuickActionsRow(bool isDark) {
     final actions = [
       {
-        'title': 'Farm Plan',
+        'title': 'My Farm',
         'icon': Icons.grass_rounded,
         'color': const Color(0xFF2E7D32),
         'bg': const Color(0xFFE8F5E9),
-        'onTap': () => context.push('/farm-plan'),
+        'onTap': () => widget.onTabSelected?.call(1),
       },
       {
-        'title': 'Farm Copilot',
-        'icon': Icons.smart_toy_outlined,
-        'color': const Color(0xFF1976D2),
-        'bg': const Color(0xFFE3F2FD),
-        'onTap': () => context.push('/farm-copilot'),
-      },
-      {
-        'title': 'Add Task',
-        'icon': Icons.post_add_rounded,
-        'color': const Color(0xFF00796B),
-        'bg': const Color(0xFFE0F2F1),
-        'onTap': () => _showAddTaskDialog(context, isDark),
-      },
-      {
-        'title': 'Add Expense',
-        'icon': Icons.currency_rupee_rounded,
+        'title': 'Book Equipment',
+        'icon': Icons.agriculture_rounded,
         'color': const Color(0xFFE65100),
         'bg': const Color(0xFFFFF3E0),
-        'onTap': () => _showAddExpenseDialog(context, isDark),
+        'onTap': () => widget.onTabSelected?.call(2),
       },
       {
-        'title': 'Book\nEquipment',
-        'icon': Icons.agriculture_rounded,
-        'color': const Color(0xFF0288D1),
-        'bg': const Color(0xFFE1F5FE),
-        'onTap': () => widget.onTabSelected?.call(2),
+        'title': 'Community',
+        'icon': Icons.groups_rounded,
+        'color': const Color(0xFF1976D2),
+        'bg': const Color(0xFFE3F2FD),
+        'onTap': () => context.push('/community'),
+      },
+      {
+        'title': 'AI Copilot',
+        'icon': Icons.smart_toy_rounded,
+        'color': const Color(0xFF6A1B9A),
+        'bg': const Color(0xFFF3E5F5),
+        'onTap': () {
+          final farmState = ref.read(farmProvider);
+          final activeFarm = farmState.selectedFarm;
+          final fId = activeFarm?.id ?? '';
+          final cId = (activeFarm?.crops.isNotEmpty == true) ? activeFarm!.crops.first.id : '';
+          context.push('/farm-copilot?farmId=$fId&cropId=$cId');
+        },
       },
     ];
 
@@ -857,12 +1590,15 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   // ---------------------------------------------------------------------------
   // 6. FARMER ANALYTICS (GRID OF 4 INTERACTIVE CARDS)
   // ---------------------------------------------------------------------------
-  Widget _buildFarmerAnalyticsSection(FarmModel? farm, FarmCropModel? crop, bool isDark) {
-    final activeOps = _analytics?['activeOperations'] ?? 0;
-    final completedTasks = _analytics?['completedTasks'] ?? 0;
-    final totalRentals = _analytics?['totalRentals'] ?? (_analytics?['completedRentals'] ?? 0);
-    final totalSpent = (_analytics?['totalSpending'] ?? _analytics?['totalSpent'] ?? 0) as num;
-    final formattedSpent = NumberFormat.currency(locale: 'en_IN', symbol: 'Ã¢â€šÂ¹ ', decimalDigits: 0).format(totalSpent);
+  Widget _buildFarmerAnalyticsSection(FarmModel? farm, FarmCropModel? crop, bool isDark, String lang) {
+    final loc = AppLocalizations.of(context);
+    final activeOps = (_analytics?['activeOperations'] as num?)?.toInt() ?? 0;
+    final completedTasks = (_analytics?['completedTasks'] as num?)?.toInt() ?? 0;
+    final totalRentals = (_analytics?['totalRentals'] as num?)?.toInt() ?? ((_analytics?['completedRentals'] as num?)?.toInt() ?? 0);
+    final totalSpentNum = (_analytics?['totalSpending'] ?? _analytics?['totalSpent']) as num?;
+    final formattedSpent = totalSpentNum != null
+        ? NumberFormat.currency(locale: 'en_IN', symbol: '₹ ', decimalDigits: 0).format(totalSpentNum)
+        : (farm == null ? loc.translate('no_farm_selected') : (_analyticsError != null ? 'Unavailable' : '₹ 0'));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -870,14 +1606,38 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Farmer Analytics',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white : AppTheme.textDarkNavy,
-                letterSpacing: -0.3,
-              ),
+            Row(
+              children: [
+                Text(
+                  loc.translate('farmer_analytics'),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _showAddExpenseDialog(context, isDark),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white12 : const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 12, color: Color(0xFFE65100)),
+                        SizedBox(width: 2),
+                        Text('Expense', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFFE65100))),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             PopupMenuButton<String>(
               initialValue: _selectedAnalyticsPeriod,
@@ -886,6 +1646,14 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Row(
                 children: [
+                  if (_isLoadingAnalytics) ...[
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   Text(
                     _selectedAnalyticsPeriod,
                     style: TextStyle(
@@ -907,6 +1675,33 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             ),
           ],
         ),
+        if (_analyticsError != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, size: 16, color: Colors.red),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Failed to load latest analytics',
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.red.shade300 : Colors.red.shade700),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _fetchAnalytics,
+                  child: const Text('Retry', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
 
         // 2x2 Analytics Grid
@@ -915,7 +1710,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             // Active Operations Card
             Expanded(
               child: _buildAnalyticsCard(
-                title: 'Active Operations',
+                title: loc.translate('active_operations'),
                 value: '$activeOps',
                 icon: Icons.spa_rounded,
                 iconColor: const Color(0xFF2E7D32),
@@ -928,7 +1723,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             // Completed Tasks Card
             Expanded(
               child: _buildAnalyticsCard(
-                title: 'Completed Tasks',
+                title: loc.translate('completed_tasks'),
                 value: '$completedTasks',
                 icon: Icons.check_circle_rounded,
                 iconColor: const Color(0xFF1565C0),
@@ -945,7 +1740,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             // Total Rentals Card
             Expanded(
               child: _buildAnalyticsCard(
-                title: 'Total Rentals',
+                title: loc.translate('total_rentals'),
                 value: '$totalRentals',
                 icon: Icons.agriculture_rounded,
                 iconColor: const Color(0xFFE65100),
@@ -955,16 +1750,16 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            // Total Spent on Rentals Card
+            // Total Spending Card
             Expanded(
               child: _buildAnalyticsCard(
-                title: 'Total Spending',
+                title: loc.translate('total_spending'),
                 value: formattedSpent,
                 icon: Icons.currency_rupee_rounded,
                 iconColor: const Color(0xFF6A1B9A),
                 iconBg: const Color(0xFFF3E5F5),
                 isDark: isDark,
-                onTap: () => context.push('/all-expenses?farmId=${farm?.id ?? ''}'),
+                onTap: () => _showAnalyticsDetailScreen(context, isDark),
               ),
             ),
           ],
@@ -1045,30 +1840,9 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
   // ---------------------------------------------------------------------------
   // 7. RECENT ACTIVITY TIMELINE
   // ---------------------------------------------------------------------------
-  Widget _buildRecentActivitySection(bool isDark) {
-    final activities = [
-      {
-        'title': 'Tractor booked for land preparation',
-        'time': '2 days ago',
-        'icon': Icons.agriculture_rounded,
-        'color': const Color(0xFF1976D2),
-        'bg': const Color(0xFFE3F2FD),
-      },
-      {
-        'title': 'Completed field preparation task',
-        'time': '3 days ago',
-        'icon': Icons.check_circle_rounded,
-        'color': const Color(0xFF2E7D32),
-        'bg': const Color(0xFFE8F5E9),
-      },
-      {
-        'title': 'Fertilizer application planned',
-        'time': '5 days ago',
-        'icon': Icons.description_rounded,
-        'color': const Color(0xFFE65100),
-        'bg': const Color(0xFFFFF3E0),
-      },
-    ];
+  Widget _buildRecentActivitySection(bool isDark, String lang) {
+    final loc = AppLocalizations.of(context);
+    final recentBookings = List<dynamic>.from(_analytics?['recentBookings'] ?? []);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1077,7 +1851,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Recent Activity',
+              loc.translate('recent_activity'),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -1087,9 +1861,9 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             ),
             TextButton(
               onPressed: () => context.push('/farm-plan'),
-              child: const Text(
-                'View All',
-                style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold, fontSize: 13),
+              child: Text(
+                loc.translate('view_all'),
+                style: const TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),
           ],
@@ -1108,51 +1882,108 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
               ),
             ],
           ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: activities.length,
-            separatorBuilder: (_, __) => Divider(height: 1, indent: 64, color: isDark ? Colors.white10 : Colors.grey.shade100),
-            itemBuilder: (context, idx) {
-              final act = activities[idx];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isDark ? (act['bg'] as Color).withValues(alpha: 0.15) : act['bg'] as Color,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(act['icon'] as IconData, color: act['color'] as Color, size: 20),
+          child: recentBookings.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.history_rounded, size: 36, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+                        const SizedBox(height: 8),
+                        Text(
+                          loc.translate('no_recent_activity'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton(
+                          onPressed: () => widget.onTabSelected?.call(2),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppTheme.primaryGreen),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          ),
+                          child: const Text('Book Equipment', style: TextStyle(color: AppTheme.primaryGreen, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: recentBookings.take(4).length,
+                  separatorBuilder: (_, _) => Divider(height: 1, indent: 64, color: isDark ? Colors.white10 : Colors.grey.shade100),
+                  itemBuilder: (context, idx) {
+                    final b = recentBookings[idx];
+                    final title = b['equipment']?['title'] ?? 'Equipment Rental';
+                    final dateStr = b['createdAt'] != null
+                        ? DateFormat.yMMMd().format(DateTime.parse(b['createdAt']))
+                        : 'Recent';
+                    final status = (b['status'] ?? 'CONFIRMED').toString().toUpperCase();
+                    final price = b['totalPrice'] != null ? '₹ ${b['totalPrice']}' : 'Unavailable';
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
                         children: [
-                          Text(
-                            act['title'] as String,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.agriculture_rounded, color: AppTheme.primaryGreen, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$dateStr • $price',
+                                  style: TextStyle(fontSize: 11.5, color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            act['time'] as String,
-                            style: TextStyle(fontSize: 11.5, color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: status == 'COMPLETED'
+                                  ? const Color(0xFFE8F5E9)
+                                  : (status == 'PENDING' ? const Color(0xFFFFF3E0) : const Color(0xFFE3F2FD)),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: status == 'COMPLETED'
+                                    ? const Color(0xFF2E7D32)
+                                    : (status == 'PENDING' ? const Color(0xFFE65100) : const Color(0xFF1976D2)),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
@@ -1164,6 +1995,12 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
 
   // 1. CROP DETAILS SCREEN / DIALOG
   void _showCropDetailsDialog(BuildContext context, FarmCropModel? crop, FarmModel? farm, bool isDark) {
+    final totalTasks = (_analytics?['totalTasks'] as num?)?.toInt() ?? 0;
+    final completedTasks = (_analytics?['completedTasks'] as num?)?.toInt() ?? 0;
+    final progressVal = totalTasks > 0 ? (completedTasks / totalTasks).clamp(0.0, 1.0) : 0.0;
+    final progressPct = (progressVal * 100).toInt();
+    final progressLabel = totalTasks > 0 ? '$progressPct% Complete' : 'No tasks recorded';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1198,7 +2035,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            crop?.cropName.isNotEmpty == true ? crop!.cropName : 'Paddy (Rice)',
+                            crop?.cropName.isNotEmpty == true ? crop!.cropName : 'No Crop Registered',
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : AppTheme.textDarkNavy),
                           ),
                           Row(
@@ -1206,10 +2043,10 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(color: AppTheme.primaryGreen, borderRadius: BorderRadius.circular(6)),
-                                child: Text(crop?.stage.isNotEmpty == true ? crop!.stage : 'Growing', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                child: Text(crop?.stage.isNotEmpty == true ? crop!.stage.replaceAll('_', ' ') : 'Inactive', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                               ),
                               const SizedBox(width: 8),
-                              const Text('65% Complete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+                              Text(progressLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
                             ],
                           ),
                         ],
@@ -1237,46 +2074,92 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                     ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
-                        _buildDetailRow('Farm Name', farm?.name ?? 'Green Valley Farm', isDark),
-                        _buildDetailRow('Acreage', '${farm?.area ?? 5.0} Acres', isDark),
-                        _buildDetailRow('Soil Type', farm?.soilType ?? 'Loamy Soil', isDark),
-                        _buildDetailRow('Season', crop?.season ?? 'Kharif', isDark),
-                        _buildDetailRow('Sowing Date', '15 Jan 2025', isDark),
-                        _buildDetailRow('Expected Harvest', '15 May 2025', isDark),
+                        _buildDetailRow('Farm Name', farm?.name ?? 'Not selected', isDark),
+                        _buildDetailRow('Acreage', farm != null ? '${farm.area} ${farm.areaUnit}' : 'Unavailable', isDark),
+                        _buildDetailRow('Soil Type', farm?.soilType ?? 'Not specified', isDark),
+                        _buildDetailRow('Season', crop?.season.isNotEmpty == true ? crop!.season : 'Not specified', isDark),
+                        _buildDetailRow('Sowing Date', crop?.sowingDate != null ? DateFormat.yMMMd().format(crop!.sowingDate!) : 'Not configured', isDark),
+                        _buildDetailRow('Expected Harvest', crop?.expectedHarvestDate != null ? DateFormat.yMMMd().format(crop!.expectedHarvestDate!) : 'Not configured', isDark),
                       ],
                     ),
                     // Stages Tab
                     ListView(
                       padding: const EdgeInsets.all(20),
-                      children: [
-                        _buildStageItem('Land Preparation', 'Completed', Icons.check_circle, Colors.green, isDark),
-                        _buildStageItem('Sowing / Transplanting', 'Completed', Icons.check_circle, Colors.green, isDark),
-                        _buildStageItem('Tillering', 'Current Stage Ã¢â‚¬Â¢ Day 25-40', Icons.spa, Colors.blue, isDark),
-                        _buildStageItem('Panicle Initiation', 'Upcoming Ã¢â‚¬Â¢ Day 41-60', Icons.grain, Colors.orange, isDark),
-                        _buildStageItem('Flowering', 'Upcoming Ã¢â‚¬Â¢ Day 61-80', Icons.local_florist, Colors.grey, isDark),
-                      ],
+                      children: kCanonicalStages.map((st) {
+                        final currentIdx = crop != null ? kCanonicalStages.indexOf(crop.stage) : -1;
+                        final thisIdx = kCanonicalStages.indexOf(st);
+                        final String statusLabel;
+                        final IconData icon;
+                        final Color color;
+                        if (currentIdx != -1 && thisIdx < currentIdx) {
+                          statusLabel = 'Completed';
+                          icon = Icons.check_circle;
+                          color = Colors.green;
+                        } else if (currentIdx == thisIdx) {
+                          statusLabel = 'Current Stage';
+                          icon = Icons.spa;
+                          color = Colors.blue;
+                        } else {
+                          statusLabel = 'Upcoming';
+                          icon = Icons.grain;
+                          color = Colors.grey;
+                        }
+                        return _buildStageItem(st.replaceAll('_', ' '), statusLabel, icon, color, isDark);
+                      }).toList(),
                     ),
                     // Tasks Tab
                     ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
-                        _buildTaskItem('Apply basal fertilizer', true, isDark),
-                        _buildTaskItem('Initial bund weeding', true, isDark),
-                        _buildTaskItem('Apply nitrogen top dressing', false, isDark),
-                        _buildTaskItem('Maintain 2-5 cm standing water', false, isDark),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                            totalTasks > 0 ? '$completedTasks of $totalTasks tasks completed' : 'No task records found for this crop',
+                            style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            context.push('/farm-plan');
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
+                          child: const Text('View Full Farm Operations Plan'),
+                        ),
                       ],
                     ),
                     // Expenses Tab
-                    ListView(
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        _buildDetailRow('Seed Cost', 'Ã¢â€šÂ¹ 2,400', isDark),
-                        _buildDetailRow('Machinery Rentals', 'Ã¢â€šÂ¹ 11,250', isDark),
-                        _buildDetailRow('Fertilizer & Pesticides', 'Ã¢â€šÂ¹ 4,500', isDark),
-                        _buildDetailRow('Labor Expenses', 'Ã¢â€šÂ¹ 6,000', isDark),
-                        const Divider(),
-                        _buildDetailRow('Total Invested', 'Ã¢â€šÂ¹ 24,150', isDark, isBold: true),
-                      ],
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final totalSpentNum = (_analytics?['totalSpending'] ?? _analytics?['totalSpent']) as num?;
+                        final rentalSpentNum = (_analytics?['rentalSpending']) as num?;
+                        final otherSpentNum = (_analytics?['otherExpenses']) as num?;
+                        final expData = ref.watch(expensesProvider).farmExpenses[farm?.id ?? ''];
+                        final expItems = expData?.expenses ?? [];
+
+                        return ListView(
+                          padding: const EdgeInsets.all(20),
+                          children: [
+                            if (rentalSpentNum != null)
+                              _buildDetailRow('Machinery Rentals', '₹ ${rentalSpentNum.round()}', isDark),
+                            if (otherSpentNum != null)
+                              _buildDetailRow('Other Operations', '₹ ${otherSpentNum.round()}', isDark),
+                            ...expItems.take(5).map((e) => _buildDetailRow(e.title, '₹ ${e.amount.round()}', isDark)),
+                            if (rentalSpentNum == null && otherSpentNum == null && expItems.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                                child: Text('No expense records logged for this farm.', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+                              ),
+                            const Divider(),
+                            _buildDetailRow(
+                              'Total Spending',
+                              totalSpentNum != null ? '₹ ${totalSpentNum.round()}' : (expItems.isNotEmpty ? '₹ ${expData?.totalSpent.round()}' : 'Unavailable'),
+                              isDark,
+                              isBold: true,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -1290,6 +2173,10 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
 
   // 2. STAGE DETAILS SCREEN / DIALOG
   void _showStageDetailsDialog(BuildContext context, String stageName, FarmCropModel? crop, FarmModel? farm, bool isDark) {
+    final stageSub = (crop != null && crop.stage.replaceAll('_', ' ') == stageName.replaceAll('_', ' ') && crop.sowingDate != null)
+        ? 'Day ${DateTime.now().difference(crop.sowingDate!).inDays} since sowing'
+        : 'Recommended Stage Advisory';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1314,7 +2201,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                       stageName,
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: isDark ? Colors.white : AppTheme.textDarkNavy),
                     ),
-                    const Text('Day 25 Ã¢â‚¬â€œ 40', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    Text(stageSub, style: const TextStyle(color: Colors.grey, fontSize: 13)),
                   ],
                 ),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
@@ -1327,7 +2214,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Tillering is the vegetative stage where multiple shoots develop from the base of the plant, leading to maximum yield potential. Ensure optimal standing water and timely nitrogen application.',
+              _getStageDescription(stageName),
               style: TextStyle(fontSize: 13, height: 1.4, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
             ),
             const SizedBox(height: 18),
@@ -1336,9 +2223,9 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : AppTheme.textDarkNavy),
             ),
             const SizedBox(height: 8),
-            _buildOperationChecklist('Apply nitrogen top dressing (Urea @ 30kg/acre)'),
-            _buildOperationChecklist('Maintain 2-5 cm standing water level'),
-            _buildOperationChecklist('Pest monitoring for stem borer and leaf folder'),
+            _buildOperationChecklist('Follow localized nutrient scheduling and moisture monitoring'),
+            _buildOperationChecklist('Conduct regular pest scouting for early preventive management'),
+            _buildOperationChecklist('Verify equipment readiness for scheduled operations'),
             const Spacer(),
             SizedBox(
               width: double.infinity,
@@ -1363,6 +2250,30 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
     );
   }
 
+  String _getStageDescription(String stage) {
+    switch (stage.toLowerCase().replaceAll(' ', '_')) {
+      case 'land_preparation':
+        return 'Tillage, harrowing, leveling, and basal nutrient application to prepare fertile seedbed.';
+      case 'sowing':
+      case 'transplanting':
+        return 'Seed placement, seedling transplantation, and initial moisture management.';
+      case 'tillering':
+      case 'vegetative':
+        return 'Vegetative canopy development, shoot multiplication, and weed suppression.';
+      case 'panicle_initiation':
+      case 'flowering':
+        return 'Reproductive differentiation, flowering, and critical water/nutrient maintenance.';
+      case 'grain_filling':
+      case 'ripening':
+        return 'Grain development, starch deposition, and moisture taper before harvest.';
+      case 'harvesting':
+      case 'harvest':
+        return 'Crop maturity, cutting, threshing, and post-harvest storage management.';
+      default:
+        return 'Active crop growth stage. Maintain scheduled monitoring and nutrient applications.';
+    }
+  }
+
   // 3. STAGE RELATED EQUIPMENT SCREEN / DIALOG
   void _showStageRelatedEquipmentDialog(BuildContext context, String stageName, bool isDark) {
     showModalBottomSheet(
@@ -1371,6 +2282,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Consumer(
         builder: (context, ref, _) {
+          final lang = ref.watch(languageProvider);
           final mktState = ref.watch(marketplaceProvider);
           final allEquip = mktState.equipment;
 
@@ -1437,16 +2349,19 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                             children: [
                               Icon(Icons.agriculture_rounded, size: 48, color: Colors.grey.shade400),
                               const SizedBox(height: 12),
-                              const Text('No specific equipment listed for this stage.', style: TextStyle(color: Colors.grey)),
+                              Text('no_equipment_for_stage'.tr(lang), style: const TextStyle(color: Colors.grey)),
                             ],
                           ),
                         )
                       : ListView.separated(
                           itemCount: displayList.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          separatorBuilder: (_, _) => const SizedBox(height: 12),
                           itemBuilder: (context, idx) {
                         final eq = displayList[idx];
-                        final priceStr = eq.pricePerDay != null ? 'Ã¢â€šÂ¹ ${eq.pricePerDay!.toInt()} / day' : 'Contact for Price';
+                        final hasPrice = eq.pricePerDay != null && eq.pricePerDay! > 0;
+                        final priceStr = hasPrice
+                            ? '${AppFormatters.currency(eq.pricePerDay, lang: lang)}/${'per_day'.tr(lang)}'
+                            : 'not_available'.tr(lang);
                         return InkWell(
                           onTap: () {
                             Navigator.pop(ctx);
@@ -1566,7 +2481,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                     )
                   : ListView.separated(
                       itemCount: recentBookings.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, idx) {
                         final b = recentBookings[idx];
                         final title = b['equipment']?['title'] ?? 'Farm Machinery';
@@ -1603,7 +2518,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : AppTheme.textDarkNavy),
                                     ),
                                     Text(
-                                      '$dateStr Ã¢â‚¬Â¢ 1 day',
+                                      '$dateStr • 1 day',
                                       style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                                     ),
                                   ],
@@ -1613,7 +2528,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    'Ã¢â€šÂ¹ $amount',
+                                    '₹ $amount',
                                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: isDark ? Colors.white : AppTheme.textDarkNavy),
                                   ),
                                   const SizedBox(height: 4),
@@ -1648,14 +2563,12 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
 
   // 5. ANALYTICS DETAIL SCREEN (SPENDING ON RENTALS)
   void _showAnalyticsDetailScreen(BuildContext context, bool isDark) {
-    final monthly = List<dynamic>.from(_analytics?['monthlySpending'] ?? []);
-    final totalSpent = (_analytics?['totalSpent'] ?? 11250) as num;
-    final categories = Map<String, dynamic>.from(_analytics?['categoryBreakdown'] ?? {
-      'TRACTOR': 6500,
-      'SPRAYER': 2000,
-      'POWER_WEEDER': 1750,
-      'OTHER': 1000,
-    });
+    final monthly = List<dynamic>.from(_analytics?['monthlySpending'] ?? (_analytics?['spendingGraph'] ?? []));
+    final totalSpent = (_analytics?['totalSpending'] ?? _analytics?['totalSpent']) as num?;
+    final categories = Map<String, dynamic>.from(_analytics?['categoryBreakdown'] ?? {});
+    final formattedSpent = totalSpent != null
+        ? NumberFormat.currency(locale: 'en_IN', symbol: '₹ ', decimalDigits: 0).format(totalSpent)
+        : 'Unavailable';
 
     showModalBottomSheet(
       context: context,
@@ -1684,7 +2597,7 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Monthly Bar Chart
+              // Monthly Bar Chart or Empty State
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -1698,47 +2611,64 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Monthly Spending Breakdown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: const Color(0xFF1976D2), borderRadius: BorderRadius.circular(8)),
-                          child: const Text('Ã¢â€šÂ¹ 3,200 (Apr)', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
+                        if (monthly.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: const Color(0xFF1976D2), borderRadius: BorderRadius.circular(8)),
+                            child: Text(
+                              '${monthly.length} Months',
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: (monthly.isNotEmpty ? monthly : [
-                        {'month': 'Jan', 'amount': 1500},
-                        {'month': 'Feb', 'amount': 2200},
-                        {'month': 'Mar', 'amount': 1800},
-                        {'month': 'Apr', 'amount': 3200},
-                        {'month': 'May', 'amount': 1250},
-                        {'month': 'Jun', 'amount': 1300},
-                      ]).map((m) {
-                        final mName = m['month'] as String;
-                        final amt = (m['amount'] as num).toDouble();
-                        final maxH = 100.0;
-                        final barH = (amt / 4000.0 * maxH).clamp(15.0, maxH);
-                        final isPeak = mName == 'Apr';
+                    if (monthly.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Text(
+                            'No monthly spending breakdown recorded yet.',
+                            style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                          ),
+                        ),
+                      )
+                    else
+                      Builder(
+                        builder: (context) {
+                          double maxAmt = 1.0;
+                          for (final m in monthly) {
+                            final a = (m['amount'] as num?)?.toDouble() ?? 0.0;
+                            if (a > maxAmt) maxAmt = a;
+                          }
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: monthly.map((m) {
+                              final mName = (m['month'] ?? m['name'] ?? '').toString();
+                              final amt = ((m['amount'] as num?) ?? 0).toDouble();
+                              const maxH = 100.0;
+                              final barH = (amt / maxAmt * maxH).clamp(12.0, maxH);
+                              final isPeak = amt == maxAmt && maxAmt > 0;
 
-                        return Column(
-                          children: [
-                            Container(
-                              width: 24,
-                              height: barH,
-                              decoration: BoxDecoration(
-                                color: isPeak ? const Color(0xFF1976D2) : const Color(0xFF81D4FA),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(mName, style: TextStyle(fontSize: 11, fontWeight: isPeak ? FontWeight.bold : FontWeight.normal)),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+                              return Column(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: barH,
+                                    decoration: BoxDecoration(
+                                      color: isPeak ? const Color(0xFF1976D2) : const Color(0xFF81D4FA),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(mName, style: TextStyle(fontSize: 11, fontWeight: isPeak ? FontWeight.bold : FontWeight.normal)),
+                                ],
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -1749,182 +2679,146 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Total Spent', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                  Text('Ã¢â€šÂ¹ $totalSpent', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryGreen)),
+                  Text(formattedSpent, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryGreen)),
                 ],
               ),
               const SizedBox(height: 12),
 
               // Category-wise list
-              ...categories.entries.map((e) {
-                final cat = e.key.replaceAll('_', ' ');
-                final val = e.value;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('$cat Rentals', style: TextStyle(fontSize: 13.5, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700)),
-                      Text('Ã¢â€šÂ¹ $val', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                    ],
+              if (categories.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No category-wise rental expenses recorded yet.',
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                   ),
-                );
-              }),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 6. ADD TASK DIALOG
-  void _showAddTaskDialog(BuildContext context, bool isDark) {
-    final titleController = TextEditingController();
-    final farmState = ref.read(farmProvider);
-    final farm = farmState.farms.isNotEmpty ? farmState.farms.first : null;
-    final crop = farm?.crops.isNotEmpty == true ? farm!.crops.first : null;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Add Farm Task', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Task Title',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy,
-                ),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: titleController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'e.g. Inspect soil moisture before irrigation',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final text = titleController.text.trim();
-              if (text.isEmpty) return;
-              Navigator.pop(ctx);
-              if (farm != null && crop != null) {
-                try {
-                  final opRes = await ApiClient().dio.get('farms/${farm.id}/crops/${crop.id}/operations');
-                  final opList = opRes.data['data'] ?? opRes.data;
-                  final opId = (opList is List && opList.isNotEmpty) ? opList[0]['id'] : 'default_op';
-
-                  await ApiClient().dio.post(
-                    'farms/${farm.id}/crops/${crop.id}/operations/$opId/tasks',
-                    data: {'title': text, 'status': 'PENDING'},
+                )
+              else
+                ...categories.entries.map((e) {
+                  final cat = e.key.replaceAll('_', ' ');
+                  final val = e.value;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('$cat Rentals', style: TextStyle(fontSize: 13.5, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700)),
+                        Text('₹ $val', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
                   );
-                  ref.read(farmProvider.notifier).fetchFarms();
-                  _fetchAnalytics();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Task added successfully!'), backgroundColor: AppTheme.primaryGreen),
-                    );
-                  }
-                } catch (_) {}
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
-            child: const Text('Add Task'),
+                }),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // 7. ADD EXPENSE DIALOG
+  // 6. ADD EXPENSE DIALOG
   void _showAddExpenseDialog(BuildContext context, bool isDark) {
     final titleController = TextEditingController();
     final amountController = TextEditingController();
     final farmState = ref.read(farmProvider);
-    final farm = farmState.farms.isNotEmpty ? farmState.farms.first : null;
+    final farm = farmState.selectedFarm;
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Add Farm Expense', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Expense Description',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Add Farm Expense', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Expense Description',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(hintText: 'e.g. Organic fertilizer bags', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Amount (Ã¢â€šÂ¹)',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy,
+                const SizedBox(height: 6),
+                TextField(
+                  controller: titleController,
+                  enabled: !isSubmitting,
+                  decoration: const InputDecoration(hintText: 'e.g. Organic fertilizer bags', border: OutlineInputBorder()),
                 ),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(hintText: 'e.g. 2500', border: OutlineInputBorder()),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Text(
+                  'Amount (₹)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.grey.shade300 : AppTheme.textDarkNavy,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  enabled: !isSubmitting,
+                  decoration: const InputDecoration(hintText: 'e.g. 2500', border: OutlineInputBorder()),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      final title = titleController.text.trim();
+                      final amount = double.tryParse(amountController.text.trim()) ?? 0;
+                      if (title.isEmpty || amount <= 0) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      if (farm == null) {
+                        Navigator.pop(ctx);
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Please select or set up a farm first.')),
+                        );
+                        return;
+                      }
+                      setDialogState(() => isSubmitting = true);
+                      try {
+                        await ApiClient().dio.post(
+                          'farms/${farm.id}/financials/expense',
+                          data: {'title': title, 'amount': amount, 'category': 'OTHER'},
+                        );
+                        _fetchAnalytics();
+                        if (!mounted) return;
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Expense recorded successfully!'), backgroundColor: AppTheme.primaryGreen),
+                        );
+                      } catch (_) {
+                        if (!mounted) return;
+                        if (ctx.mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Failed to record expense. Please try again.'), backgroundColor: Colors.red),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
+              child: isSubmitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save Expense'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final title = titleController.text.trim();
-              final amount = double.tryParse(amountController.text.trim()) ?? 0;
-              if (title.isEmpty || amount <= 0) return;
-              Navigator.pop(ctx);
-              if (farm != null) {
-                try {
-                  await ApiClient().dio.post(
-                    'farms/${farm.id}/financials/expense',
-                    data: {'title': title, 'amount': amount, 'category': 'OTHER'},
-                  );
-                  _fetchAnalytics();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Expense recorded successfully!'), backgroundColor: AppTheme.primaryGreen),
-                    );
-                  }
-                } catch (_) {}
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
-            child: const Text('Save Expense'),
-          ),
-        ],
       ),
     );
   }
@@ -1976,33 +2870,6 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
     );
   }
 
-  Widget _buildTaskItem(String title, bool isCompleted, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAF9),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(isCompleted ? Icons.check_circle : Icons.radio_button_unchecked, color: isCompleted ? Colors.green : Colors.grey, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                decoration: isCompleted ? TextDecoration.lineThrough : null,
-                color: isDark ? Colors.white : AppTheme.textDarkNavy,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildOperationChecklist(String text) {
     return Padding(

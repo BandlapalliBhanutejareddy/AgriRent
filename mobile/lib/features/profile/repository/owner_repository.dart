@@ -112,4 +112,19 @@ class OwnerRepository {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
   }
+
+  Future<Booking> updateBookingStatus(String bookingId, String status, {String? note}) async {
+    try {
+      final payload = <String, dynamic>{'status': status};
+      if (note != null && note.trim().isNotEmpty) {
+        payload['note'] = note.trim();
+      }
+      final response = await _apiClient.dio.put('${ApiConstants.bookings}/$bookingId/status', data: payload);
+      final dynamic raw = response.data;
+      final dynamic responseData = (raw is Map && raw['data'] is Map) ? raw['data'] : (raw is Map ? raw : {});
+      return Booking.fromJson(Map<String, dynamic>.from(responseData));
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
 }

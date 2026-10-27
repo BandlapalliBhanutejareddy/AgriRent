@@ -4,6 +4,19 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient()
+const dbUrl = process.env.DATABASE_URL;
+let adjustedUrl = dbUrl;
+if (adjustedUrl) {
+  if (!adjustedUrl.includes('connect_timeout')) {
+    adjustedUrl = `${adjustedUrl}${adjustedUrl.includes('?') ? '&' : '?'}connect_timeout=15`;
+  }
+  if (!adjustedUrl.includes('pool_timeout')) {
+    adjustedUrl = `${adjustedUrl}${adjustedUrl.includes('?') ? '&' : '?'}pool_timeout=20`;
+  }
+}
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  datasources: adjustedUrl ? { db: { url: adjustedUrl } } : undefined
+})
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

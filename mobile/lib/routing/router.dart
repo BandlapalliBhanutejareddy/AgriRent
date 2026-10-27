@@ -1,21 +1,27 @@
+import '../features/profile/ui/owner_booking_detail_screen.dart';
+import '../features/profile/ui/owner_analytics_dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/auth/ui/splash_screen.dart';
 import '../features/auth/ui/login_screen.dart';
+import '../features/auth/ui/welcome_screen.dart';
 import '../features/auth/ui/register_screen.dart';
 import '../features/auth/ui/otp_screen.dart';
 import '../features/auth/ui/role_select_screen.dart';
 import '../features/auth/ui/forgot_password_screen.dart';
 import '../features/auth/ui/reset_password_screen.dart';
 import '../features/marketplace/ui/farmer_main_screen.dart';
+import '../features/marketplace/ui/farmer_marketplace_screen.dart';
 import '../features/marketplace/ui/crop_advisor_screen.dart';
 import '../features/marketplace/ui/knowledge_base_screen.dart';
 import '../features/profile/ui/owner_main_screen.dart';
 import '../features/profile/ui/add_equipment_screen.dart';
+import '../features/profile/ui/edit_equipment_screen.dart';
 import '../features/feedback/ui/feedback_screen.dart';
 import '../features/admin/ui/admin_dashboard_screen.dart';
+import '../features/profile/ui/about_profile_screen.dart';
 import '../features/profile/ui/edit_profile_screen.dart';
 import '../features/profile/ui/change_password_screen.dart';
 import '../features/farm/ui/farm_setup_screen.dart';
@@ -25,15 +31,25 @@ import '../features/farm/ui/crop_lifecycle_screen.dart';
 import '../features/farm/ui/stage_operations_screen.dart';
 import '../features/farm/ui/operation_detail_screen.dart';
 import '../features/farm/ui/farm_copilot_screen.dart';
+import '../features/farm/ui/stage_details_screen.dart';
 import '../features/notifications/ui/notification_screen.dart';
 import '../features/marketplace/ui/saved_equipment_screen.dart';
 import '../features/marketplace/ui/chat_screen.dart';
+import '../features/community/ui/community_screen.dart';
+import '../features/community/ui/crop_trends_screen.dart';
+import '../features/community/ui/farmer_public_profile_screen.dart';
 import '../features/marketplace/ui/receipt_screen.dart';
 import '../features/marketplace/ui/my_rentals_screen.dart';
 import '../features/marketplace/ui/equipment_details_screen.dart';
 import '../features/marketplace/ui/equipment_loader_screen.dart';
 import '../features/farm/ui/all_expenses_screen.dart';
 import '../features/farm/ui/completed_tasks_screen.dart';
+import '../features/payments/models/payment_record.dart';
+import '../features/payments/ui/farmer_payment_history_screen.dart';
+import '../features/payments/ui/owner_payments_received_screen.dart';
+import '../features/payments/ui/payment_detail_screen.dart';
+import '../features/ai_assistant/ui/ai_assistant_screen.dart';
+import '../features/ai_assistant/services/ai_assistant_service.dart';
 import '../models/booking.dart';
 import '../models/equipment.dart';
 
@@ -52,7 +68,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = notifier.value;
-      final isLoggingIn = state.matchedLocation == '/login' ||
+      final isLoggingIn = state.matchedLocation == '/welcome' ||
+          state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/otp' ||
           state.matchedLocation == '/splash' ||
@@ -64,10 +81,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (authState.isLoading && authState.user == null) return null;
 
       if (authState.user == null) {
-        return isLoggingIn ? null : '/login';
+        return isLoggingIn ? null : '/welcome';
       }
 
       final userRole = (authState.user?.role ?? '').toUpperCase().trim();
+
+      final roleRedirect = AppRouter.testRoleRedirect(userRole: userRole, targetPath: state.matchedLocation);
+      if (roleRedirect != null) {
+        return roleRedirect;
+      }
 
       if (isLoggingIn || isRoot || state.matchedLocation == '/role-select') {
         if (userRole == 'BOTH') {
@@ -93,14 +115,86 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       return null;
     },
-    routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const SplashScreen(),
-      ),
+    routes: AppRouter.routes,
+  );
+});
+
+class AppRouter {
+  static String? testRoleRedirect({required String userRole, required String targetPath}) {
+    final role = userRole.toUpperCase().trim();
+    if (targetPath.startsWith('/admin') && role != 'ADMIN') {
+      return (role == 'OWNER') ? '/owner' : '/farmer';
+    }
+    if (role == 'OWNER') {
+      final farmerOnlyPaths = [
+        '/farmer',
+        '/farm',
+        '/farm-plan',
+        '/farm-setup',
+        '/crop-lifecycle',
+        '/stage-details',
+        '/operations',
+        '/operation-detail',
+        '/crop-advisor',
+        '/advisor',
+        '/farm-copilot',
+        '/ai-assistant',
+      ];
+      if (farmerOnlyPaths.any((p) => targetPath == p || targetPath.startsWith('$p/') || targetPath.startsWith('$p?'))) {
+        return '/owner';
+      }
+    }
+    if (role == 'FARMER' || role == 'ENTREPRENEUR') {
+      final ownerOnlyPaths = [
+        '/owner',
+        '/add-equipment',
+        '/edit-equipment',
+        '/payments-received',
+        '/owner-booking-detail',
+        '/owner-analytics',
+      ];
+      if (ownerOnlyPaths.any((p) => targetPath == p || targetPath.startsWith('$p/') || targetPath.startsWith('$p?'))) {
+        return '/farmer';
+      }
+    }
+    if (targetPath.startsWith('/owner') && role != 'OWNER' && role != 'BOTH' && role != 'ADMIN') {
+      return '/farmer';
+    }
+    return null;
+  }
+
+  static Map<String, String?> parseMarketplaceParams(Uri uri) {
+    final cat = uri.queryParameters['category'];
+    final id = uri.queryParameters['id'] ?? uri.queryParameters['equipmentId'];
+    final bookId = uri.queryParameters['bookId'];
+    final search = uri.queryParameters['search'];
+    final sort = uri.queryParameters['sort'];
+    return {
+      'category': cat,
+      'targetEquipmentId': id,
+      'bookId': bookId,
+      'search': search,
+      'sort': sort,
+    };
+  }
+
+  static GoRouter get router => GoRouter(
+    initialLocation: '/',
+    routes: routes,
+  );
+
+  static final List<RouteBase> routes = [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const SplashScreen(),
+    ),
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/welcome',
+        builder: (context, state) => const WelcomeScreen(),
       ),
       GoRoute(
         path: '/login',
@@ -141,6 +235,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const FarmerMainScreen(),
       ),
       GoRoute(
+        path: '/marketplace',
+        builder: (context, state) {
+          final params = AppRouter.parseMarketplaceParams(state.uri);
+          return FarmerMarketplaceScreen(
+            initialCategory: params['category'],
+            initialEquipmentId: params['targetEquipmentId'],
+            initialBookId: params['bookId'],
+          );
+        },
+      ),
+      GoRoute(
         path: '/farm',
         builder: (context, state) => const MyFarmScreen(),
       ),
@@ -151,6 +256,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/crop-lifecycle',
         builder: (context, state) => const CropLifecycleScreen(),
+      ),
+      GoRoute(
+        path: '/stage-details',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final cropName = extra['cropName']?.toString() ?? state.uri.queryParameters['cropName'] ?? 'Rice';
+          final stage = extra['stage']?.toString() ?? state.uri.queryParameters['stage'] ?? 'VEGETATIVE';
+          final farmId = extra['farmId']?.toString() ?? state.uri.queryParameters['farmId'];
+          final cropId = extra['cropId']?.toString() ?? state.uri.queryParameters['cropId'];
+          return StageDetailsScreen(
+            cropName: cropName,
+            stage: stage,
+            farmId: farmId,
+            cropId: cropId,
+          );
+        },
       ),
       GoRoute(
         path: '/operations',
@@ -171,8 +292,31 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CropAdvisorScreen(),
       ),
       GoRoute(
+        path: '/advisor',
+        builder: (context, state) => const CropAdvisorScreen(),
+      ),
+      GoRoute(
+        path: '/ai-assistant',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final query = extra['query'] as String? ?? state.uri.queryParameters['query'] ?? 'Farming Guidance';
+          final result = extra['result'] as AiAssistantResponse?;
+          return AiAssistantScreen(query: query, initialResult: result);
+        },
+      ),
+      GoRoute(
         path: '/knowledge',
-        builder: (context, state) => const KnowledgeBaseScreen(),
+        builder: (context, state) {
+          final crop = state.uri.queryParameters['crop'];
+          return KnowledgeBaseScreen(initialCrop: crop);
+        },
+      ),
+      GoRoute(
+        path: '/knowledge-base',
+        builder: (context, state) {
+          final crop = state.uri.queryParameters['crop'];
+          return KnowledgeBaseScreen(initialCrop: crop);
+        },
       ),
       GoRoute(
         path: '/owner',
@@ -191,6 +335,40 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AddEquipmentScreen(),
       ),
       GoRoute(
+        path: '/edit-equipment',
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Equipment) {
+            return EditEquipmentScreen(equipment: extra);
+          }
+          final id = state.uri.queryParameters['id'] ?? (extra is Map ? extra['id']?.toString() : null);
+          return EditEquipmentScreen(equipmentId: id);
+        },
+      ),
+      GoRoute(
+        path: '/owner-booking-detail',
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Booking) {
+            return OwnerBookingDetailScreen(booking: extra);
+          }
+          final id = state.uri.queryParameters['id'] ?? (extra is Map ? extra['id']?.toString() : null);
+          return OwnerBookingDetailScreen(bookingId: id);
+        },
+      ),
+      GoRoute(
+        path: '/owner-analytics',
+        builder: (context, state) => const OwnerAnalyticsDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/about-profile',
+        builder: (context, state) => const AboutProfileScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const AboutProfileScreen(),
+      ),
+      GoRoute(
         path: '/edit-profile',
         builder: (context, state) => const EditProfileScreen(),
       ),
@@ -200,7 +378,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/farm-setup',
-        builder: (context, state) => const FarmSetupScreen(),
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode'];
+          final farmId = state.uri.queryParameters['farmId'] ?? (state.extra as Map<String, dynamic>?)?['farmId']?.toString();
+          final isCreate = mode == 'create' || (state.extra as Map<String, dynamic>?)?['isCreate'] == true;
+          return FarmSetupScreen(
+            farmId: farmId,
+            isCreate: isCreate,
+          );
+        },
       ),
       GoRoute(
         path: '/farm-copilot',
@@ -219,15 +405,54 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SavedEquipmentScreen(),
       ),
       GoRoute(
+        path: '/saved-equipment',
+        builder: (context, state) => const SavedEquipmentScreen(),
+      ),
+      GoRoute(
+        path: '/payment-history',
+        builder: (context, state) => const FarmerPaymentHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/payments-received',
+        builder: (context, state) => const OwnerPaymentsReceivedScreen(),
+      ),
+      GoRoute(
+        path: '/payment-detail',
+        builder: (context, state) {
+          final payment = state.extra as PaymentRecord;
+          final isOwner = state.uri.queryParameters['isOwner'] == 'true';
+          return PaymentDetailScreen(payment: payment, isOwnerView: isOwner);
+        },
+      ),
+      GoRoute(
+        path: '/community',
+        builder: (context, state) => const CommunityScreen(),
+      ),
+      GoRoute(
+        path: '/crop-trends',
+        builder: (context, state) => const CropTrendsScreen(),
+      ),
+      GoRoute(
+        path: '/farmer-profile/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return FarmerPublicProfileScreen(memberId: id);
+        },
+      ),
+      GoRoute(
         path: '/chat',
         builder: (context, state) {
           final booking = state.extra as Booking?;
-          return ChatScreen(booking: booking);
+          final bookingId = state.uri.queryParameters['bookingId'];
+          return ChatScreen(booking: booking, bookingId: bookingId);
         },
       ),
       GoRoute(
         path: '/guides',
-        builder: (context, state) => const KnowledgeBaseScreen(),
+        builder: (context, state) {
+          final crop = state.uri.queryParameters['crop'];
+          return KnowledgeBaseScreen(initialCrop: crop);
+        },
       ),
       GoRoute(
         path: '/my-rentals',
@@ -243,8 +468,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/equipment-detail',
         builder: (context, state) {
-          final eq = state.extra as Equipment;
-          return EquipmentDetailsScreen(equipment: eq);
+          final extra = state.extra;
+          if (extra is Equipment) {
+            return EquipmentDetailsScreen(equipment: extra);
+          }
+          final id = state.uri.queryParameters['id'] ?? '';
+          if (id.isNotEmpty) {
+            return EquipmentLoaderScreen(equipmentId: id);
+          }
+          return const FarmerMarketplaceScreen();
         },
       ),
       GoRoute(
@@ -273,6 +505,5 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CompletedTasksScreen(farmId: farmId, cropId: cropId);
         },
       ),
-    ],
-  );
-});
+    ];
+}

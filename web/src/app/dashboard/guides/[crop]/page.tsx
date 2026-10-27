@@ -61,7 +61,7 @@ export default function CropGuideDetail() {
       // but we can use a hardcoded list for demonstration or derive it from the schedule.
       // Let's call the scheduler to get operations if a farm exists, otherwise mock the canonical stages.
 
-      let allStages = ['SOWING', 'GERMINATION', 'SEEDLING', 'VEGETATIVE', 'FLOWERING', 'FRUITING', 'MATURITY', 'HARVEST'];
+      const allStages = ['SOWING', 'GERMINATION', 'SEEDLING', 'VEGETATIVE', 'FLOWERING', 'FRUITING', 'MATURITY', 'HARVEST'];
       if (crop.toLowerCase() === 'rice' || crop.toLowerCase() === 'wheat' || crop.toLowerCase() === 'maize') {
          setStages(allStages);
       } else {

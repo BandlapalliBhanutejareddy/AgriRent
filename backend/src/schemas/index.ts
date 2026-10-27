@@ -93,3 +93,16 @@ export const updateBookingStatusSchema = z.object({
     note: z.string().optional(),
   }),
 });
+
+export const returnInspectionSchema = z.object({
+  body: z.object({
+    condition: z.enum(['EXCELLENT', 'GOOD', 'FAIR', 'DAMAGED'], {
+      message: 'Condition must be EXCELLENT, GOOD, FAIR, or DAMAGED',
+    }),
+    deductionAmount: z.union([
+      z.number({ message: 'deductionAmount must be a finite number' }).finite().nonnegative({ message: 'deductionAmount cannot be negative' }),
+      z.string().regex(/^\d+(\.\d+)?$/, { message: 'deductionAmount must be a non-negative number' }).transform(v => Number(v)),
+    ]).optional().nullable(),
+    notes: z.string().max(2000).optional().nullable(),
+  }),
+});

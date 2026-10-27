@@ -172,17 +172,24 @@ export class OperationSchedulerService {
     const requiredOpsNames = rules.requiredOperations[lifecycle.currentStage] || ['Land Preparation & Puddling', 'Transplanting'];
 
     // Step 2 & 3: Parallelized Sub-Service Integration for maximum speed
-    const [nbaResponse, eqDecision, financialAnalysis, riskAssessment, activeBookings] = await Promise.all([
-      nextBestActionService.getNextBestActions(farmId, ownerId, targetCrop?.id, lang, isAdmin).catch(() => null),
-      equipmentDecisionService.evaluateEquipmentDecision(farmId, ownerId, { language: lang }, isAdmin).catch(() => null),
-      farmFinancialService.getFinancialAnalysis(farmId, ownerId, lang, isAdmin),
-      farmRiskEngineService.getRiskAssessment(farmId, ownerId, lang, isAdmin),
+    const [financialAnalysis, riskAssessment, activeBookings] = await Promise.all([
+      farmFinancialService.getFinancialAnalysis(farmId, ownerId, lang, isAdmin).catch(() => null),
+      farmRiskEngineService.getRiskAssessment(farmId, ownerId, lang, isAdmin).catch(() => null),
       prisma.booking.findMany({
         where: {
           status: { in: ['APPROVED', 'CONFIRMED', 'ACTIVE', 'PENDING'] }
         }
       })
     ]);
+
+    // Step 3b: Evaluate Equipment Decision reusing already fetched financial and risk context
+    const eqDecision = await equipmentDecisionService.evaluateEquipmentDecision(farmId, ownerId, {
+      language: lang,
+      nextActionTitle: requiredOpsNames[0] || 'Land Preparation & Puddling',
+      activeRisks: riskAssessment?.preventionItems || [],
+      financialState: financialAnalysis?.financialState,
+      skipSubservices: true
+    }, isAdmin).catch(() => null);
 
     // Step 4: Schedule Operations Construction & Topological Ordering
     const now = new Date();
@@ -349,7 +356,7 @@ export class OperationSchedulerService {
         type: 'LOWEST_COST',
         qualityScore: Math.max(0, totalQualityScore - 8),
         totalEstimatedCost: Math.round(totalScheduledCost * 0.8),
-        riskScore: riskAssessment.riskScore - 10,
+        riskScore: Math.max(0, baseRiskScore - 10),
         advantages: [`Saves ₹${Math.round(totalScheduledCost * 0.2)} in equipment rental`],
         disadvantages: ['Slightly lower HP equipment rating'],
         reason: 'Cost-optimized alternative selecting lower-tier equipment options.'
@@ -358,7 +365,7 @@ export class OperationSchedulerService {
         type: 'LOWEST_RISK',
         qualityScore: Math.min(100, totalQualityScore + 3),
         totalEstimatedCost: Math.round(totalScheduledCost * 1.1),
-        riskScore: Math.max(0, riskAssessment.riskScore - 25),
+        riskScore: Math.max(0, baseRiskScore - 25),
         advantages: ['Zero booking conflict overlap', 'Maximum risk reduction buffer'],
         disadvantages: ['Higher rental price per day'],
         reason: 'Risk-averse schedule ensuring zero delay buffer across all operations.'

@@ -88,7 +88,7 @@ app.use(compression());
 // Granular Rate Limiters (increased for testing)
 const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_SERVER_EXTERNAL || true;
 const isPlaywright = process.env.PLAYWRIGHT_TEST === 'true';
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, message: 'Too many auth requests' });
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: isPlaywright ? 10000 : 15, message: 'Too many auth requests' });
 const otpLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, message: 'Too many OTP requests' });
 const aiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10000, message: 'AI request limit reached' });
 const paymentsLimiter = rateLimit({ windowMs: 60 * 1000, max: 10000, message: 'Too many payment requests' });
@@ -119,6 +119,7 @@ app.get('/api/ready', async (req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ status: 'ready', database: 'connected' });
   } catch (error) {
+    console.error('Ready check error:', error);
     res.status(503).json({ status: 'unready', database: 'disconnected' });
   }
 });
@@ -143,6 +144,9 @@ import reviewRoutes from './routes/reviews';
 import complaintRoutes from './routes/complaints';
 import farmRoutes from './routes/farms';
 import devRoutes from './routes/dev';
+import callRoutes from './routes/calls';
+import communityRoutes from './routes/community';
+import ownerRoutes from './routes/owner';
 
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -160,6 +164,9 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/farms', farmRoutes);
 app.use('/api/dev', devRoutes);
+app.use('/api/calls', callRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/owner', ownerRoutes);
 
 // Centralized Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import ChatModal from '@/components/ChatModal';
 import BookingTrackingTimeline from '@/components/BookingTrackingTimeline';
+import EquipmentLocationMap from '@/components/EquipmentLocationMap';
 import ReviewModal from '@/components/ReviewModal';
 import ComplaintModal from '@/components/ComplaintModal';
 import {
@@ -180,20 +181,20 @@ export default function MyRentalsPage() {
                           booking.status === 'REJECTED' || booking.status === 'CANCELLED' ? 'bg-red-50 text-red-600 border-red-200' :
                           'bg-blue-50 text-blue-600 border-blue-200'
                         }`}>
-                          {booking.status === 'PENDING' ? 'Ã¢ÂÂ³ Pending Approval' : booking.status}
+                          {booking.status === 'PENDING' ? '⏳ Pending Approval' : booking.status}
                         </span>
                       </div>
 
                       <p className="text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
                         <span>Owner: <strong className="text-slate-700 dark:text-slate-300">{booking.equipment?.owner?.name || 'Verified Owner'}</strong></span>
-                        <span>Ã¢â‚¬Â¢</span>
+                        <span>•</span>
                         <span>Dates: <strong className="text-indigo-600 dark:text-indigo-400">{new Date(booking.startDate).toLocaleDateString()} &rarr; {new Date(booking.endDate).toLocaleDateString()}</strong></span>
                       </p>
 
                       <div className="flex items-center gap-3 mt-2 text-xs font-bold">
                         <span className="text-emerald-600 dark:text-emerald-400">Total: {formatCurrency(booking.totalPrice)}</span>
                         {booking.securityDeposit > 0 && (
-                          <span className="text-slate-400">Deposit: Ã¢â€šÂ¹{booking.securityDeposit}</span>
+                          <span className="text-slate-400">Deposit: ₹{booking.securityDeposit}</span>
                         )}
                         <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-md text-[9px] uppercase tracking-wider font-black">
                           {booking.paymentStatus}
@@ -284,15 +285,23 @@ export default function MyRentalsPage() {
                   </div>
                 </div>
 
-                {/* Collapsible Tracking Timeline */}
+                {/* Collapsible Tracking Timeline & Pickup Location */}
                 {isExpanded && (
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 duration-300">
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-in slide-in-from-top-2 duration-300">
                     <BookingTrackingTimeline
                       status={booking.status}
                       statusHistory={booking.statusHistory}
                       startDate={booking.startDate}
                       endDate={booking.endDate}
                       returnInspection={booking.returnInspection}
+                    />
+                    <EquipmentLocationMap
+                      equipmentId={booking.equipment?.id}
+                      title={booking.equipment?.title || 'Machinery'}
+                      location={booking.equipment?.location}
+                      latitude={booking.equipment?.latitude}
+                      longitude={booking.equipment?.longitude}
+                      isOwner={false}
                     />
                   </div>
                 )}

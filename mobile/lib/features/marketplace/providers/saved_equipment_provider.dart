@@ -33,10 +33,20 @@ class SavedEquipmentState {
 }
 
 class SavedEquipmentNotifier extends StateNotifier<SavedEquipmentState> {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient;
+  final Set<String> _pendingToggles = {};
 
-  SavedEquipmentNotifier() : super(SavedEquipmentState()) {
-    Future.microtask(() => loadSavedEquipment());
+  SavedEquipmentNotifier({ApiClient? apiClient, bool autoLoad = true})
+      : _apiClient = apiClient ?? ApiClient(),
+        super(SavedEquipmentState()) {
+    if (autoLoad) {
+      Future.microtask(() => loadSavedEquipment());
+    }
+  }
+
+  void clear() {
+    _pendingToggles.clear();
+    state = SavedEquipmentState();
   }
 
   Future<void> loadSavedEquipment() async {
@@ -87,6 +97,15 @@ class SavedEquipmentNotifier extends StateNotifier<SavedEquipmentState> {
 
   Future<bool> toggleSave(Equipment equipment) async {
     final equipmentId = equipment.id;
+    if (equipmentId.isEmpty) return false;
+
+    // Prevent rapid repeated actions from producing duplicate requests
+    if (_pendingToggles.contains(equipmentId)) {
+      return state.savedIds.contains(equipmentId);
+    }
+    _pendingToggles.add(equipmentId);
+
+    final previousState = state;
     final currentlySaved = state.savedIds.contains(equipmentId);
 
     // Optimistic UI update
@@ -108,11 +127,14 @@ class SavedEquipmentNotifier extends StateNotifier<SavedEquipmentState> {
     try {
       final response = await _apiClient.dio.post('saved/$equipmentId');
       final isSavedNow = response.data?['saved'] == true;
-      
-      // Sync if server differs
+
+      // Sync if server response differs from optimistic expectation
       if (isSavedNow != !currentlySaved) {
         if (isSavedNow) {
           newIds.add(equipmentId);
+          if (!newItems.any((e) => e.id == equipmentId)) {
+            newItems.insert(0, equipment);
+          }
         } else {
           newIds.remove(equipmentId);
           newItems.removeWhere((e) => e.id == equipmentId);
@@ -121,9 +143,11 @@ class SavedEquipmentNotifier extends StateNotifier<SavedEquipmentState> {
       }
       return isSavedNow;
     } catch (e) {
-      // Revert on error
-      loadSavedEquipment();
+      // Revert immediately to previous confirmed state on failure
+      state = previousState;
       rethrow;
+    } finally {
+      _pendingToggles.remove(equipmentId);
     }
   }
 }

@@ -11,6 +11,9 @@ class MarketplaceState {
   final String? error;
   final int currentPage;
   final bool hasMore;
+  final String? selectedCategory;
+  final String? searchQuery;
+  final String? selectedSort;
 
   MarketplaceState({
     this.equipment = const [],
@@ -19,6 +22,9 @@ class MarketplaceState {
     this.error,
     this.currentPage = 1,
     this.hasMore = true,
+    this.selectedCategory,
+    this.searchQuery,
+    this.selectedSort,
   });
 
   MarketplaceState copyWith({
@@ -29,6 +35,12 @@ class MarketplaceState {
     int? currentPage,
     bool? hasMore,
     bool clearError = false,
+    String? selectedCategory,
+    bool clearCategory = false,
+    String? searchQuery,
+    bool clearSearch = false,
+    String? selectedSort,
+    bool clearSort = false,
   }) {
     return MarketplaceState(
       equipment: equipment ?? this.equipment,
@@ -37,6 +49,9 @@ class MarketplaceState {
       error: clearError ? null : (error ?? this.error),
       currentPage: currentPage ?? this.currentPage,
       hasMore: hasMore ?? this.hasMore,
+      selectedCategory: clearCategory ? null : (selectedCategory ?? this.selectedCategory),
+      searchQuery: clearSearch ? null : (searchQuery ?? this.searchQuery),
+      selectedSort: clearSort ? null : (selectedSort ?? this.selectedSort),
     );
   }
 }
@@ -44,31 +59,97 @@ class MarketplaceState {
 class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
   final MarketplaceRepository _repository;
 
+  // Request counter to protect against stale asynchronous responses
+  int _currentRequestId = 0;
+
   // Filters
   String? category;
   String? search;
   String? sort;
 
-  MarketplaceNotifier(this._repository) : super(MarketplaceState()) {
-    Future.microtask(() => fetchInitial());
+  MarketplaceNotifier(this._repository, {bool autoFetch = true})
+      : super(MarketplaceState(isLoading: autoFetch)) {
+    if (autoFetch) {
+      Future.microtask(() => fetchInitial());
+    }
   }
 
-  void updateFilters({String? newCategory, String? newSearch, String? newSort}) {
-    category = newCategory ?? category;
-    search = newSearch ?? search;
-    sort = newSort ?? sort;
-    fetchInitial();
+  Future<void> setCategory(String? newCategory) {
+    if (newCategory == null || newCategory == 'ALL' || newCategory == 'All Categories' || newCategory.trim().isEmpty) {
+      category = null;
+      state = state.copyWith(clearCategory: true);
+    } else {
+      category = newCategory.trim();
+      state = state.copyWith(selectedCategory: category);
+    }
+    return fetchInitial();
   }
 
-  void clearFilters() {
+  Future<void> updateFilters({
+    String? newCategory,
+    bool clearCategory = false,
+    String? newSearch,
+    bool clearSearch = false,
+    String? newSort,
+    bool clearSort = false,
+  }) {
+    if (clearCategory || newCategory == 'ALL' || newCategory == 'All Categories') {
+      category = null;
+    } else if (newCategory != null) {
+      category = newCategory.trim().isEmpty ? null : newCategory.trim();
+    }
+
+    if (clearSearch) {
+      search = null;
+    } else if (newSearch != null) {
+      search = newSearch.trim().isEmpty ? null : newSearch.trim();
+    }
+
+    if (clearSort) {
+      sort = null;
+    } else if (newSort != null) {
+      sort = newSort.trim().isEmpty ? null : newSort.trim();
+    }
+
+    state = state.copyWith(
+      selectedCategory: category,
+      clearCategory: category == null,
+      searchQuery: search,
+      clearSearch: search == null,
+      selectedSort: sort,
+      clearSort: sort == null,
+    );
+
+    return fetchInitial();
+  }
+
+  Future<void> clearFilters() {
     category = null;
     search = null;
     sort = null;
-    fetchInitial();
+    state = state.copyWith(
+      clearCategory: true,
+      clearSearch: true,
+      clearSort: true,
+    );
+    return fetchInitial();
   }
 
+  Future<void> refresh() => fetchInitial();
+
   Future<void> fetchInitial() async {
-    state = state.copyWith(isLoading: true, clearError: true, currentPage: 1, hasMore: true);
+    final requestId = ++_currentRequestId;
+
+    state = state.copyWith(
+      equipment: [],
+      isLoading: true,
+      clearError: true,
+      currentPage: 1,
+      hasMore: true,
+      selectedCategory: category,
+      searchQuery: search,
+      selectedSort: sort,
+    );
     try {
       final result = await _repository.fetchEquipment(
         page: 1,
@@ -77,6 +158,11 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         sort: sort,
       );
 
+      // Discard stale response if a newer search or filter was initiated
+      if (requestId != _currentRequestId) {
+        return;
+      }
+
       final equipment = result['equipment'] as List<Equipment>;
       final totalPages = result['pagination']['totalPages'] as int;
 
@@ -84,15 +170,22 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         equipment: equipment,
         isLoading: false,
         hasMore: 1 < totalPages,
+        selectedCategory: category,
+        searchQuery: search,
+        selectedSort: sort,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      if (requestId != _currentRequestId) {
+        return;
+      }
+      state = state.copyWith(equipment: [], isLoading: false, error: e.toString());
     }
   }
 
   Future<void> fetchMore() async {
     if (state.isLoading || state.isFetchingMore || !state.hasMore) return;
 
+    final requestId = _currentRequestId;
     state = state.copyWith(isFetchingMore: true);
     final nextPage = state.currentPage + 1;
 
@@ -104,6 +197,11 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         sort: sort,
       );
 
+      // Discard if a new query generation has taken place
+      if (requestId != _currentRequestId) {
+        return;
+      }
+
       final newEquipment = result['equipment'] as List<Equipment>;
       final totalPages = result['pagination']['totalPages'] as int;
 
@@ -114,6 +212,9 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         hasMore: nextPage < totalPages,
       );
     } catch (e) {
+      if (requestId != _currentRequestId) {
+        return;
+      }
       state = state.copyWith(isFetchingMore: false, error: e.toString());
     }
   }

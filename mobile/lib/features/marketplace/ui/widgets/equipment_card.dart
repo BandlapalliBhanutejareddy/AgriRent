@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../models/equipment.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../auth/providers/auth_provider.dart';
 import '../../providers/saved_equipment_provider.dart';
 import '../equipment_details_screen.dart';
 
@@ -24,9 +25,7 @@ class EquipmentCard extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final hasPrice = equipment.pricePerDay != null && equipment.pricePerDay! > 0;
-    final priceString = hasPrice
-        ? '₹${equipment.pricePerDay!.toStringAsFixed(equipment.pricePerDay! % 1 == 0 ? 0 : 2)}'
-        : 'not_available'.tr(lang);
+    final priceString = AppFormatters.currency(equipment.pricePerDay, lang: lang);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -49,13 +48,14 @@ class EquipmentCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => EquipmentDetailsScreen(equipment: equipment),
               ),
             );
+            onSaveToggled?.call();
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -122,7 +122,7 @@ class EquipmentCard extends ConsumerWidget {
                           border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Text(
-                          equipment.category.toUpperCase(),
+                          AppLocalizations.localizedEquipmentCategory(equipment.category, lang),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -141,6 +141,19 @@ class EquipmentCard extends ConsumerWidget {
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () async {
+                          final user = ref.read(authProvider).user;
+                          if (user == null) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('please_login_to_save'.tr(lang)),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return;
+                          }
                           try {
                             final savedNow = await ref.read(savedEquipmentProvider.notifier).toggleSave(equipment);
                             if (context.mounted) {
@@ -158,9 +171,9 @@ class EquipmentCard extends ConsumerWidget {
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Failed to update favorite status'),
-                                  duration: Duration(seconds: 2),
+                                SnackBar(
+                                  content: Text('failed_to_update_favorite'.tr(lang)),
+                                  duration: const Duration(seconds: 2),
                                 ),
                               );
                             }

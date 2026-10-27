@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { startTestServer, stopTestServer, request } = require('./utils');
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 

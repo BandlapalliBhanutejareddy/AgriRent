@@ -1,6 +1,25 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../models/schedule_model.dart';
+
+class ScheduleParams {
+  final String farmId;
+  final String lang;
+
+  const ScheduleParams({required this.farmId, required this.lang});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ScheduleParams &&
+          runtimeType == other.runtimeType &&
+          farmId == other.farmId &&
+          lang == other.lang;
+
+  @override
+  int get hashCode => farmId.hashCode ^ lang.hashCode;
+}
 
 class ScheduleState {
   final MasterScheduleModel? schedule;
@@ -37,7 +56,13 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   Future<void> fetchSchedule() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiClient().dio.get('/farms/$farmId/schedule?lang=$lang');
+      final response = await ApiClient().dio.get(
+        '/farms/$farmId/schedule?lang=$lang',
+        options: Options(
+          sendTimeout: const Duration(seconds: 12),
+          receiveTimeout: const Duration(seconds: 12),
+        ),
+      );
       if (response.statusCode == 200) {
         final schedule = MasterScheduleModel.fromJson(response.data);
         state = state.copyWith(schedule: schedule, isLoading: false);
@@ -50,8 +75,6 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   }
 }
 
-final scheduleProvider = StateNotifierProvider.family<ScheduleNotifier, ScheduleState, Map<String, String>>((ref, params) {
-  final farmId = params['farmId']!;
-  final lang = params['lang']!;
-  return ScheduleNotifier(farmId, lang);
+final scheduleProvider = StateNotifierProvider.family<ScheduleNotifier, ScheduleState, ScheduleParams>((ref, params) {
+  return ScheduleNotifier(params.farmId, params.lang);
 });

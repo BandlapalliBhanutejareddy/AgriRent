@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/user.dart';
 import '../repository/auth_repository.dart';
 import '../../../core/localization/app_localizations.dart';
+import '../../profile/providers/owner_provider.dart';
+import '../../marketplace/providers/saved_equipment_provider.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository();
@@ -29,6 +31,7 @@ class AuthState {
       activeRole: activeRole ?? this.activeRole,
     );
   }
+  bool get isAuthenticated => user != null;
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
@@ -48,10 +51,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _init() async {
     try {
       final user = await _repository.restoreSession();
+      if (!mounted) return;
       _syncLanguage(user);
       state = state.copyWith(user: user, isLoading: false);
+      if (user != null) {
+        _ref.read(savedEquipmentProvider.notifier).loadSavedEquipment();
+      }
+      final normRole = user?.role.toUpperCase() ?? '';
+      if (user != null && (normRole == 'OWNER' || normRole == 'EQUIPMENT_OWNER' || normRole == 'BOTH' || normRole == 'ADMIN')) {
+        _ref.read(ownerProvider.notifier).fetchDashboardData();
+      }
     } catch (e) {
-      state = state.copyWith(isLoading: false);
+      if (mounted) {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 
@@ -59,15 +72,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _init();
   }
 
+  String _cleanErrorMessage(dynamic e) {
+    String msg = e.toString();
+    if (msg.startsWith('Exception: ')) {
+      msg = msg.substring(11);
+    }
+    return msg;
+  }
+
   Future<bool> login(String email, String password, {String? role}) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final user = await _repository.login(email, password, role: role);
       _syncLanguage(user);
+      _ref.read(savedEquipmentProvider.notifier).clear();
+      _ref.read(savedEquipmentProvider.notifier).loadSavedEquipment();
       state = state.copyWith(user: user, isLoading: false);
+      final loginRole = user.role.toUpperCase();
+      if (loginRole == 'OWNER' || loginRole == 'EQUIPMENT_OWNER' || loginRole == 'BOTH' || loginRole == 'ADMIN') {
+        _ref.read(ownerProvider.notifier).fetchDashboardData();
+      }
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: _cleanErrorMessage(e));
       return false;
     }
   }
@@ -86,7 +113,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(user: user, isLoading: false);
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: _cleanErrorMessage(e));
+      return false;
+    }
+  }
+
+  Future<bool> continueWithGoogle({String? idToken, required String role}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final user = await _repository.continueWithGoogle(idToken: idToken, role: role);
+      _syncLanguage(user);
+      _ref.read(savedEquipmentProvider.notifier).clear();
+      _ref.read(savedEquipmentProvider.notifier).loadSavedEquipment();
+      state = state.copyWith(user: user, isLoading: false);
+      final normRole = user.role.toUpperCase();
+      if (normRole == 'OWNER' || normRole == 'EQUIPMENT_OWNER' || normRole == 'BOTH' || normRole == 'ADMIN') {
+        _ref.read(ownerProvider.notifier).fetchDashboardData();
+      }
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _cleanErrorMessage(e));
       return false;
     }
   }
@@ -103,7 +149,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: _cleanErrorMessage(e));
       return false;
     }
   }
@@ -115,7 +161,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: _cleanErrorMessage(e));
       return false;
     }
   }
@@ -147,6 +193,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
     await _repository.logout();
+    _ref.read(savedEquipmentProvider.notifier).clear();
     state = AuthState(); // Reset state
   }
 
@@ -156,6 +203,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void setActiveRole(String role) {
     state = state.copyWith(activeRole: role);
+  }
+
+  void setUser(User? user) {
+    if (user == null || (state.user != null && state.user!.id != user.id)) {
+      _ref.read(savedEquipmentProvider.notifier).clear();
+      if (user != null) {
+        _ref.read(savedEquipmentProvider.notifier).loadSavedEquipment();
+      }
+    }
+    state = state.copyWith(user: user);
   }
 }
 

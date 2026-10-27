@@ -50,7 +50,7 @@ async function main() {
     console.log(`ACCOUNT: ${u.name} | EMAIL: ${u.email} | ROLE: ${u.role} | VERIFIED STATUS: ${u.isVerified}`);
   }
 
-  console.log('Ã¢Å“â€¦ Database seeded with Secure Demo Users and all old equipment removed.');
+  console.log('✅ Database seeded with Secure Demo Users and all old equipment removed.');
 }
 
 main()

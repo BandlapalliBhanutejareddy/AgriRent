@@ -90,7 +90,7 @@ export default function GuidesHub() {
                 <div className="flex justify-between items-center relative z-10">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-3xl border border-slate-100 group-hover:scale-105 transition-transform">
-                      {crop === 'Rice' ? 'Ã°Å¸Å’Â¾' : crop === 'Wheat' ? 'Ã°Å¸Å’Â¾' : crop === 'Corn' ? 'Ã°Å¸Å’Â½' : crop === 'Potato' ? 'Ã°Å¸Â¥â€' : 'Ã°Å¸Å’Â±'}
+                      {crop === 'Rice' ? '🌾' : crop === 'Wheat' ? '🌾' : crop === 'Corn' ? '🌽' : crop === 'Potato' ? '🥔' : '🌱'}
                     </div>
                     <div>
                       <h3 className="font-black text-slate-900 text-xl tracking-tight group-hover:text-emerald-600 transition-colors">{crop}</h3>

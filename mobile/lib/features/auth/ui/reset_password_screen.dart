@@ -25,9 +25,27 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   bool _obscureConfirm = true;
 
   void _resetPassword() async {
-    if (_newPasswordController.text.isEmpty || _confirmPasswordController.text.isEmpty) return;
+    final newPass = _newPasswordController.text;
+    final confirmPass = _confirmPasswordController.text;
 
-    if (_newPasswordController.text != _confirmPasswordController.text) {
+    if (newPass.isEmpty || confirmPass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter and confirm your new password')),
+      );
+      return;
+    }
+
+    if (newPass.length < 8 ||
+        !RegExp(r'[A-Z]').hasMatch(newPass) ||
+        !RegExp(r'[a-z]').hasMatch(newPass) ||
+        !RegExp(r'[0-9]').hasMatch(newPass)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 8 characters and contain 1 uppercase, 1 lowercase, and 1 number')),
+      );
+      return;
+    }
+
+    if (newPass != confirmPass) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Passwords do not match')),
       );
@@ -37,7 +55,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     final success = await ref.read(authProvider.notifier).resetPassword(
       widget.email,
       widget.resetToken,
-      _newPasswordController.text,
+      newPass,
     );
 
     if (success && mounted) {

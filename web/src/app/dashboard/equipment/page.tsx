@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/components/ToastProvider';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/formatters';
+import EquipmentLocationMap from '@/components/EquipmentLocationMap';
 
 export default function EquipmentManagement() {
   const { t } = useTranslation();
@@ -250,7 +251,7 @@ export default function EquipmentManagement() {
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{item.category}</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-lg">Ã¢â€šÂ¹{item.pricePerDay}</span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-lg">₹{item.pricePerDay}</span>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{t('per_day', { defaultValue: 'Per Day' })}</p>
                   </div>
                 </div>
@@ -486,7 +487,7 @@ export default function EquipmentManagement() {
                     </div>
                   )}
                   <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/10 text-white font-bold text-xs uppercase tracking-wide">
-                    Ã¢â€šÂ¹{selectedItem.pricePerDay}{t('day')}</div>
+                    ₹{selectedItem.pricePerDay}{t('day')}</div>
                 </div>
 
                 <div className="space-y-4">
@@ -500,6 +501,24 @@ export default function EquipmentManagement() {
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
                     {selectedItem.description || 'No description listed by the owner.'}
                   </p>
+                </div>
+
+                {/* Registered Pickup Location Component */}
+                <div className="pt-2">
+                  <EquipmentLocationMap
+                    equipmentId={selectedItem.id}
+                    title={selectedItem.title}
+                    location={selectedItem.location}
+                    latitude={selectedItem.latitude}
+                    longitude={selectedItem.longitude}
+                    isOwner={true}
+                    onCoordinatesUpdated={(newLat, newLng) => {
+                      setEquipment((prev) =>
+                        prev.map((e) => (e.id === selectedItem.id ? { ...e, latitude: newLat, longitude: newLng } : e))
+                      );
+                      setSelectedItem((prev: any) => ({ ...prev, latitude: newLat, longitude: newLng }));
+                    }}
+                  />
                 </div>
 
                 {/* Stats indicators */}

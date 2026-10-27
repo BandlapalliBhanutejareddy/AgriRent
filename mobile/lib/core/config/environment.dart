@@ -2,14 +2,18 @@ class Environment {
   // Using const top-level fields ensures --dart-define evaluates correctly at compile-time globally.
   static const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'development');
 
-  static String activeDevHost = '127.0.0.1';
-  static const String fallbackDevHost = '10.73.129.66';
+  static const String _defaultDevHost = String.fromEnvironment('DEV_HOST', defaultValue: '127.0.0.1');
+  static const String _defaultFallbackDevHost = String.fromEnvironment('FALLBACK_DEV_HOST', defaultValue: '10.0.2.2');
+
+  static String activeDevHost = _defaultDevHost;
+  static String fallbackDevHost = _defaultFallbackDevHost;
 
   static void switchDevHost() {
-    if (activeDevHost == '127.0.0.1') {
-      activeDevHost = fallbackDevHost;
+    if (flavor != 'development') return;
+    if (activeDevHost == _defaultDevHost && _defaultFallbackDevHost != _defaultDevHost) {
+      activeDevHost = _defaultFallbackDevHost;
     } else {
-      activeDevHost = '127.0.0.1';
+      activeDevHost = _defaultDevHost;
     }
   }
 

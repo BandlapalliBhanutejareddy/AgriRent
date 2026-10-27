@@ -1,92 +1,227 @@
-# AgroRent AI Platform
+# AgroRent AI — Agricultural Machinery Rental & Agronomic Digital Twin Platform
 
-A comprehensive agricultural equipment rental platform with AI-powered features, built with modern web and mobile technologies. This repository contains the full production-ready release of AgroRent AI (v1.0.0).
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue.svg)](https://www.typescriptlang.org/)
+[![Flutter](https://img.shields.io/badge/Flutter-3.38.5-blue.svg)](https://flutter.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.5-black.svg)](https://nextjs.org/)
+[![Express](https://img.shields.io/badge/Express-5.2.1-lightgrey.svg)](https://expressjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-5.22.0-2D3748.svg)](https://www.prisma.io/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4.19-38B2AC.svg)](https://tailwindcss.com/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.60.0-green.svg)](https://playwright.dev/)
 
-## 🚀 Live Applications
+An enterprise-grade, multi-role agricultural machinery rental marketplace and AI-powered agronomic digital twin platform designed for modern Indian agriculture. AgroRent AI connects smallholder farmers with equipment owners, provides ICAR/KVK-grounded agronomic advisory, and orchestrates end-to-end rental lifecycles.
 
-### 🌐 Web Application
-[Open AgroRent AI Web App](https://agri-rent-two.vercel.app)
+---
 
-### 📱 Mobile Application
-Android APK — build locally using `flutter build apk --release`
+## 🏛️ System Architecture
 
-### 🔗 Backend API
-[AgroRent AI API](https://agrirent-5qpx.onrender.com)
-- Health Endpoint: [https://agrirent-5qpx.onrender.com/api/health](https://agrirent-5qpx.onrender.com/api/health)
-- Ready Endpoint: [https://agrirent-5qpx.onrender.com/api/ready](https://agrirent-5qpx.onrender.com/api/ready)
+AgroRent AI is engineered as a unified monorepo containing three core applications:
 
-### 📂 GitHub Repository
-[https://github.com/BandlapalliBhanutejareddy/AgriRent](https://github.com/BandlapalliBhanutejareddy/AgriRent)
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        AGRORENT AI PLATFORM                            │
+├───────────────────────────────┬────────────────────────────────────────┤
+│     Next.js 16 Web Portal     │          Flutter Mobile App            │
+│  (Desktop, Tablet & Mobile)   │      (Android & Cross-Platform)        │
+│    30 App Router Routes       │     98 Dart Files / 16 Features        │
+│   Tailwind Design Tokens      │   Riverpod 2.6 / GoRouter 17.5         │
+└───────────────┬───────────────┴────────────────────┬───────────────────┘
+                │                                    │
+                │        REST / JSON & WebSockets    │
+                ▼                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Express 5.2.1 Backend                           │
+│     20 Domain Routers • RBAC Middleware • Socket.IO Gateway            │
+│   Deterministic Farm Engines • Farm Copilot AI • Call Relay Service    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Supabase Managed PostgreSQL                          │
+│     Prisma ORM 5.22 • 30 Database Models • Row-Level Isolation         │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
-## 🧪 Demo / Test Accounts
+---
 
-> **WARNING:** These credentials are for demonstration/testing only. Never use production credentials in this repository.
+## 📱 Subsystems & Portals
 
-| Role | Email | Password |
-|------|-------|----------|
-| Farmer | `farmer_test@example.com` | `Password123!` |
-| Owner | `owner_test@example.com` | `Password123!` |
-| BOTH | `both_202608281720@test.com` | `Password123!` |
+### 1. 🌾 Farmer Portal
+- **Machinery Marketplace:** Multi-language catalog search (English, Telugu, Hindi, Tamil, Kannada), 14 agricultural equipment categories, daily rental rate filtering (`₹/day`), and distance-based sorting.
+- **Farm Digital Twin & Journey:** Multi-farm acreage setup, soil typing, canonical 8-stage lifecycle tracking (SOWING, GERMINATION, SEEDLING, VEGETATIVE, FLOWERING, FRUITING, MATURITY, HARVEST), and "Today's Work" task execution.
+- **Agronomic Stage Intelligence:** 81KB deterministic agronomic guidance dataset providing checklists, precautions, and equipment rationales grounded in ICAR/KVK principles.
+- **Booking & Lifecycle Tracking:** Date range picker, delivery address selection, availability validation, real-time rental tracking (Dispatched -> Active -> Returned -> Completed), and return inspection reports.
+- **Community Agrarian Network:** Discussion forums, peer farmer public profiles, and district-level crop trends analytics to prevent regional crop over-supply.
+- **AI Farm Copilot & Voice Assistant:** Spoken speech-to-text queries, natural text-to-speech synthesis, and one-tap task scheduling (`POST /api/ai/farm-copilot/add-to-plan`).
+- **Financial Ledger & Wishlist:** Budget utilization progress bars, manual expense logging, transaction history, and bookmarked machinery lists.
 
-## 📋 Features
+### 2. 🚜 Owner Portal
+- **Fleet Inventory Management:** Create, edit, and delist machinery with high-resolution image uploads, daily pricing, and instant availability toggles.
+- **Booking Requests Decision Hub:** Accept (`CONFIRMED`) or reject (`REJECTED`) pending rental requests with notification dispatches.
+- **Rental Lifecycle Management:** Advance equipment status through Dispatch, Active Handover, Return, and submit return inspection condition reports.
+- **Maintenance & Downtime Tracker:** Log servicing events (oil changes, repairs, blade replacements) and track equipment downtime.
+- **Financial Ledger & Payouts:** Gross rental revenues, platform fee deductions, net payout summaries, and masked bank account management (`•••• •••• 1234`).
+- **Fleet Analytics:** Utilization rates, top performing machinery rankings, and 6-month earnings charts.
 
-- **Multi-Role Authentication System**: Secure JWT-based auth separating Farmer and Owner portals, with a unique `BOTH` role capability that allows seamless role-switching.
-- **Secure Password Recovery**: Robust OTP-to-Hash password recovery utilizing cryptographically secure single-use database tokens, rate limiting, and zero account enumeration.
-- **AI Service**: Intelligent equipment recommendations and farming insights via local Ollama and Qwen3.5:9b.
-- **Booking & Payments**: End-to-end sandbox-verified payment orchestration with Razorpay.
-- **Cross-Platform Experience**: fully synchronized UI/UX state between the Vercel-hosted Next.js web application and the Flutter mobile client.
+### 3. 🛡️ Admin Portal
+- **Platform Analytics & GMV:** Real-time metrics for total registered users, active machinery listings, gross merchandise value (GMV), and booking volumes.
+- **User Moderation:** Farmer and Owner identity verification, suspension toggles (`isSuspended`), and account activation.
+- **Equipment Moderation:** Inspect machinery listings, verify safety documents, and delist non-compliant assets.
+- **Feedback & Complaints Center:** Triage dispute tickets, review attached evidence, and log resolution notes.
+- **System Health & Audit Logs:** Server memory usage, database query latency, Socket.IO connections count, data quality scores, and append-only security audit logs.
+
+---
+
+## 📁 Repository Directory Structure
+
+```
+D:\AgriRent_AI\
+├── backend/                       # Node.js / Express / TypeScript API
+│   ├── prisma/                    # Prisma Schema (30 models) & seeders
+│   ├── src/                       # Routes, services, middlewares
+│   │   ├── routes/                # 20 Express route modules
+│   │   ├── services/              # Agronomic, financial, AI services
+│   │   ├── middlewares/           # Auth, RBAC, sanitizer, rate limiters
+│   │   └── lib/                   # Prisma client, Supabase, Socket.IO
+│   └── tests/                     # 38 unit and integration test suites
+├── mobile/                        # Flutter Mobile Application
+│   ├── lib/                       # 98 Dart source files
+│   │   ├── core/                  # ApiClient, localizations, socket, storage
+│   │   ├── features/              # 16 domain feature modules
+│   │   ├── models/                # Typed data models (User, Equipment, Booking)
+│   │   └── routing/               # GoRouter configuration & role guards
+│   └── test/                      # 30 widget/unit test suites (538 assertions)
+├── web/                           # Next.js 16 Web Application
+│   ├── src/                       # App Router architecture
+│   │   ├── app/                   # 30 compiled static & dynamic routes
+│   │   ├── components/            # Reusable UI widgets & modals
+│   │   ├── lib/                   # Axios API client, i18n, formatters
+│   │   └── store/                 # Zustand persistent client store
+│   └── tests/e2e/                 # Playwright E2E suites (encoding, responsive)
+├── docs/                          # Architecture specs & verification spreadsheets
+├── reports/                       # Formal technical audit & parity reports
+├── scripts/                       # Maintenance & encoding validation scripts
+├── .env.example                   # Safe environment template
+├── docker-compose.yml             # Containerized orchestration
+└── README.md                      # Master Documentation
+```
+
+---
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Node.js, Express, TypeScript, Prisma ORM
-- **Web**: Next.js 16, React, Tailwind CSS, Zustand
-- **Mobile**: Flutter, Riverpod, GoRouter
-- **Security**: bcrypt, JWT, Rate Limiting, Helmet, XSS Protection
+| Domain | Technologies |
+|---|---|
+| **Web Frontend** | Next.js 16.2.5 (App Router, Turbopack), React 19, TypeScript, TailwindCSS 3.4, Zustand, Framer Motion, Lucide Icons |
+| **Mobile Frontend** | Flutter 3.38.5, Dart 3.10.4, Riverpod 2.6.1, GoRouter 17.5.0, Dio 5.11.0, SpeechToText, FlutterTTS, OpenStreetMap / Google Maps |
+| **Backend API** | Node.js 24.x, Express 5.2.1, TypeScript 6.0.3, Socket.IO 4.8.3, Helmet, Compression, Zod |
+| **Database & ORM** | PostgreSQL on Supabase, Prisma ORM 5.22.0, Connection Pooling |
+| **AI Advisory** | ICAR/KVK Grounded Agronomic Fallback, Ollama / Qwen3.5:9b, FarmCopilotService |
+| **Testing & QA** | Playwright 1.60.0 (Chromium E2E), Flutter Test (538 assertions), Node Test Runner |
 
-## 🚀 Development Setup
+---
 
-1. Clone the repository
-2. Install dependencies for each service:
-   - Backend: `cd backend && npm install`
-   - Mobile: `cd mobile && flutter pub get`
-   - Web: `cd web && npm install`
-3. Configure environment variables (`.env`) for Backend and Web.
-4. Start development servers:
-   - Backend: `npm run dev`
-   - Web: `npm run dev`
+## 🚀 Local Development Setup
 
-## 📁 Project Structure
+### Prerequisites
+- **Node.js** >= 18.0.0 (Node 24 recommended)
+- **Flutter SDK** >= 3.13.1 (Dart >= 3.10)
+- **PostgreSQL** or Supabase Database URL
 
+### 1. Environment Configuration
+Copy `.env.example` to create local environment files:
+- `backend/.env`
+- `web/.env.local`
+
+```env
+# Database & Supabase
+DATABASE_URL="postgresql://user:password@host:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://user:password@host:5432/postgres"
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_ANON_KEY="your-anon-key"
+SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+
+# Server Configuration
+PORT=4000
+NODE_ENV=development
+JWT_SECRET="your-cryptographic-jwt-secret"
+CORS_ORIGIN="http://localhost:3000"
+
+# AI Configuration (Optional Local LLM)
+AI_PROVIDER="fallback" # or "ollama"
+OLLAMA_URL="http://localhost:11434"
+OLLAMA_MODEL="qwen3.5:9b"
 ```
-AgriRent_AI/
-├── backend/             # Node.js API with Prisma
-├── mobile/              # Flutter app
-├── web/                 # Next.js web application
-└── README.md            # Project Documentation
+
+### 2. Start the Backend API
+```powershell
+cd D:\AgriRent_AI\backend
+npm install
+npm run build
+npm run start
+# Server starts on http://localhost:4000
+# Verify via: curl http://localhost:4000/api/health
 ```
 
-## 🔒 Security Best Practices Implemented
+### 3. Start the Next.js Web App
+```powershell
+cd D:\AgriRent_AI\web
+npm install
+npm run dev
+# Web application starts on http://localhost:3000
+```
 
-- All sensitive credentials are removed from the repository.
-- Password recovery tokens are hashed securely before storing.
-- JWT and session caching correctly isolates the Farmer, Owner, and BOTH dashboards.
-- Hardened server configuration with Helmet, CORS, and Rate limiting.
+### 4. Run the Flutter Mobile App
+```powershell
+cd D:\AgriRent_AI\mobile
+flutter pub get
+flutter run
+```
 
-## 🌐 Repository
+---
 
-**GitHub**: https://github.com/BandlapalliBhanutejareddy/AgriRent.git
+## 🧪 Automated Testing & Validation
 
-## 🤖 Setting up Local AI (Ollama + Qwen3.5:9b)
+### Backend Tests
+```powershell
+cd D:\AgriRent_AI\backend
+node tests/ai_fallback_safety.test.js      # 10/10 AI safety assertions
+node tests/verify_owner_portal_live.js      # Live owner fleet & booking isolation
+```
 
-1. **Install Ollama**: Download from [ollama.com](https://ollama.com)
-2. **Download Model**: Run `ollama run qwen3.5:9b` in your terminal. This model requires at least 8GB of RAM.
-3. **Configure Backend**: Ensure your `backend/.env` file points to local Ollama:
-   ```env
-   AI_PROVIDER=ollama
-   OLLAMA_URL=http://localhost:11434
-   OLLAMA_MODEL=qwen3.5:9b
-   ```
+### Web Playwright E2E Tests
+```powershell
+cd D:\AgriRent_AI\web
+npx playwright test tests/e2e/encoding.spec.ts --project=chromium    # Multi-language UTF-8 tests
+npx playwright test tests/e2e/responsive.spec.ts --project=chromium  # 5 viewport layout tests
+```
 
-> [!WARNING]
-> **Production GPU Requirement**
-> Do NOT use `http://localhost:11434` for cloud deployments (Vercel/Render). Production deployments MUST use a secure, HTTPS-enabled cloud GPU instance (e.g. RunPod, AWS EC2 with GPU, or managed Ollama) for acceptable inference speeds. Local CPU inference takes ~60 seconds per query, which is unsuited for production load.
+### Mobile Tests & Code Analysis
+```powershell
+cd D:\AgriRent_AI\mobile
+flutter analyze                             # 0 errors, 0 warnings
+flutter test                                # 538 unit & widget test assertions
+```
+
+---
+
+## 📄 Audit Reports & Documentation
+
+Formal engineering audit reports are maintained in the [`reports/`](reports/) directory:
+- [`project_cleanup_inventory.md`](reports/project_cleanup_inventory.md) — Pre-cleanup directory inventory and asset audit.
+- [`mobile_app_feature_inventory.md`](reports/mobile_app_feature_inventory.md) — Complete 60-feature mobile inventory.
+- [`mobile_backend_integration_map.md`](reports/mobile_backend_integration_map.md) — 10 end-to-end traced integration flows.
+- [`mobile_web_feature_parity.md`](reports/mobile_web_feature_parity.md) — Mobile-to-Web parity comparison matrix.
+- [`web_ui_defects.md`](reports/web_ui_defects.md) — Documented UI and functional defects with root causes.
+- [`recommended_implementation_order.md`](reports/recommended_implementation_order.md) — 8-tier prioritized engineering roadmap.
+- [`next_phase_test_results.md`](reports/next_phase_test_results.md) — Comprehensive test results across all suites.
+- [`github_cleanup_and_sync_report.md`](reports/github_cleanup_and_sync_report.md) — Final cleanup and GitHub sync log.
+
+---
+
+## 🔒 Security & Privacy Practices
+
+- **Zero Credential Tracking:** `.env`, `.env.local`, and test payloads are strictly excluded via `.gitignore`.
+- **Private Calling Relay:** Real phone numbers are masked and protected behind `POST /api/calls/initiate`.
+- **Strict Role-Based Access Control:** Middleware validates JWT claims on all mutations; unauthorized users receive HTTP 403 Forbidden.
+- **Masked Payout Data:** Bank account numbers are stored securely and masked in the UI (`•••• •••• 1234`).
+- **Grounded AI Guardrails:** Zero fabricated farm acreages, zero arbitrary chemical quantities, and zero unverified savings claims.

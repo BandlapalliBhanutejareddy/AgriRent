@@ -2,7 +2,7 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 
-const PORT = 4012; // Use a different port for testing to avoid conflicts
+const PORT = process.env.PORT || 4012; // Use a different port for testing to avoid conflicts
 const API_URL = `http://localhost:${PORT}`;
 
 let serverProcess = null;
@@ -41,7 +41,7 @@ async function startTestServer() {
     // Timeout
     setTimeout(() => {
       if (!isReady) reject(new Error('Server start timeout'));
-    }, 15000);
+    }, 35000);
   });
 }
 
@@ -55,11 +55,11 @@ function stopTestServer() {
 async function request(path, options = {}) {
   const url = `${API_URL}${path}`;
   const response = await fetch(url, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
+      ...(options.headers || {})
+    }
   });
 
   const contentType = response.headers.get('content-type');

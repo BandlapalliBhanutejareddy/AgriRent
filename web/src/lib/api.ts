@@ -79,7 +79,7 @@ api.interceptors.response.use(
           const cached = localStorage.getItem(`@cache_${error.config.url}`);
           if (cached) {
             import('react-hot-toast').then(({ toast }) => {
-               toast.error('Offline Mode Active: Loading cached data.', { icon: 'Ã°Å¸â€œÂ¡' });
+               toast.error('Offline Mode Active: Loading cached data.', { icon: '📡' });
             }).catch(()=>{});
             return Promise.resolve({ data: JSON.parse(cached), status: 200, isOffline: true });
           }

@@ -30,6 +30,7 @@ model User {
   sessions          Session[]
   feedbacks         Feedback[]
   farms             Farm[]
+  communityMessages CommunityMessage[]
 }
 
 model Equipment {
@@ -333,7 +334,7 @@ model Feedback {
 }
 
 // ============================================================
-// PHASE 5.0 Ã¢â‚¬â€ AI FARM DIGITAL TWIN CORE MODELS
+// PHASE 5.0 — AI FARM DIGITAL TWIN CORE MODELS
 // ============================================================
 
 model Farm {
@@ -563,4 +564,16 @@ model FarmScheduleItem {
   schedule         FarmSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@index([scheduleId])
+}
+
+model CommunityMessage {
+  id        String   @id @default(cuid())
+  senderId  String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([createdAt])
 }

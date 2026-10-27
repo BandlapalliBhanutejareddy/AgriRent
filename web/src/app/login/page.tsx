@@ -356,43 +356,48 @@ export default function LoginPage() {
   const IconComponent = activeConf.icon;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-[#F6F8F6] dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="max-w-md w-full space-y-6">
 
         {/* Logo/Header */}
         <div className="text-center">
-          <div className="flex justify-center mb-2">
-            <span className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
-              {t('agrorent_ai')}</span>
+          <div className="inline-flex items-center justify-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-2xl bg-[#163A2D] flex items-center justify-center text-[#84CC16] shadow-sm">
+              <Tractor size={26} />
+            </div>
+            <div className="text-left">
+              <span className="text-2xl font-bold tracking-tight text-[#163A2D] dark:text-white block leading-none">
+                AgroRent <span className="text-[#16845B] dark:text-[#84CC16]">AI</span>
+              </span>
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block mt-1 tracking-wide">
+                Smart Agriculture Platform
+              </span>
+            </div>
           </div>
-          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-            {t('commercial_agritech_ecosystem')}</p>
         </div>
 
         {/* Outer Login Box */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 p-8 rounded-[32px] shadow-xl dark:shadow-2xl/30 relative overflow-hidden transition-all duration-300">
-
-          {/* Decorative Corner Glow */}
-          <div className={`absolute -top-12 -right-12 w-24 h-24 rounded-full blur-2xl opacity-10 bg-${activeConf.color}-500 transition-all duration-500`} />
+        <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 p-8 rounded-2xl shadow-card transition-all duration-300">
 
           {/* Portal Selector Tabs */}
-          <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/50 rounded-2xl mb-8">
+          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl mb-6">
             {(['FARMER', 'OWNER', 'ADMIN'] as PortalRole[]).map((portalKey) => {
               const conf = portals[portalKey];
               const isSelected = activePortal === portalKey;
+              const displayName = portalKey === 'FARMER' ? 'Farmer' : portalKey === 'OWNER' ? 'Fleet Owner' : 'Admin';
               return (
                 <button
                   key={portalKey}
                   type="button"
                   onClick={() => handlePortalChange(portalKey)}
-                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl transition-all duration-300 ${
+                  className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
                     isSelected
-                      ? 'bg-white dark:bg-slate-800 shadow-md text-slate-900 dark:text-white font-bold'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 hover:bg-white/50 dark:hover:bg-slate-800/30'
+                      ? 'bg-white dark:bg-slate-900 text-[#163A2D] dark:text-white shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <conf.icon size={18} className={isSelected ? conf.textAccentClass : 'text-slate-400'} />
-                  <span className="text-[10px] uppercase font-black tracking-wider mt-1.5">{portalKey}</span>
+                  <conf.icon size={15} className={isSelected ? 'text-[#16845B] dark:text-[#84CC16]' : 'text-slate-400'} />
+                  <span>{displayName}</span>
                 </button>
               );
             })}
@@ -400,43 +405,48 @@ export default function LoginPage() {
 
           {/* Portal Context Title */}
           <div className="text-center mb-6">
-            <h2 className={`text-2xl font-black tracking-tight flex items-center justify-center gap-2 ${activeConf.textAccentClass}`}>
-              <IconComponent size={22} className="animate-pulse" />
-              {t(activeConf.titleKey, { defaultValue: activeConf.defaultTitle })}
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              {activePortal === 'FARMER' ? 'Farmer Portal' : activePortal === 'OWNER' ? 'Equipment Owner Portal' : 'Administrator Control'}
             </h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 font-medium px-4">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 font-normal">
               {t(activeConf.subtitleKey, { defaultValue: activeConf.defaultSubtitle })}
             </p>
           </div>
 
           {/* Toggle Login / Register */}
           {activePortal !== 'ADMIN' && (
-            <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1 mb-6">
+            <div className="flex bg-slate-100 dark:bg-slate-800/60 rounded-xl p-1 mb-6">
               <button
                 type="button"
                 data-testid="login-tab"
                 onClick={() => { setIsLoginMode(true); setError(''); }}
-                className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
-                  isLoginMode ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700'
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  isLoginMode
+                    ? 'bg-white dark:bg-slate-900 shadow-sm text-slate-900 dark:text-white font-bold'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                {t('sign_in')}</button>
+                Sign In
+              </button>
               <button
                 type="button"
                 data-testid="register-tab"
                 onClick={() => { setIsLoginMode(false); setError(''); }}
-                className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
-                  !isLoginMode ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700'
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  !isLoginMode
+                    ? 'bg-white dark:bg-slate-900 shadow-sm text-slate-900 dark:text-white font-bold'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                {t('sign_up')}</button>
+                Create Account
+              </button>
             </div>
           )}
 
           {/* Error Banner */}
           {error && (
-            <div className="bg-red-50 dark:bg-red-950/20 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl">
-              <p className="text-xs text-red-700 dark:text-red-400 font-semibold">{error}</p>
+            <div className="bg-red-50 dark:bg-red-950/20 border-l-4 border-[#B42318] p-3.5 mb-6 rounded-r-xl">
+              <p className="text-xs text-[#B42318] dark:text-red-400 font-medium">{error}</p>
             </div>
           )}
 
@@ -447,71 +457,75 @@ export default function LoginPage() {
               {!isLoginMode && (
                 <>
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
-                      {t('full_name')}</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 ml-0.5">
+                      Full name
+                    </label>
                     <div className="relative">
                       <input
                         type="text"
                         required
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 placeholder-slate-400 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 transition-all text-sm font-medium"
-                        placeholder={t('john_doe')}
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 placeholder-slate-400 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#16845B]/20 focus:border-[#16845B] transition-all text-sm font-normal"
+                        placeholder="e.g. Ramesh Patel"
                         value={registerName}
                         onChange={(e) => setRegisterName(e.target.value)}
                       />
-                      <UserIcon size={18} className="absolute left-3 top-3.5 text-slate-400" />
+                      <UserIcon size={16} className="absolute left-3.5 top-3 text-slate-400" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
-                      {t('phone_number', { defaultValue: 'PHONE NUMBER' })}</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 ml-0.5">
+                      Phone number
+                    </label>
                     <div className="relative">
                       <input
                         type="text"
                         required
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 placeholder-slate-400 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 transition-all text-sm font-medium"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 placeholder-slate-400 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#16845B]/20 focus:border-[#16845B] transition-all text-sm font-normal"
                         placeholder="+91 9876543210"
                         value={registerPhone}
                         onChange={(e) => setRegisterPhone(e.target.value)}
                       />
-                      <Phone size={18} className="absolute left-3 top-3.5 text-slate-400" />
+                      <Phone size={16} className="absolute left-3.5 top-3 text-slate-400" />
                     </div>
                   </div>
                 </>
               )}
 
               <div>
-                <label htmlFor="email" className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
-                  {t('email_address')}</label>
+                <label htmlFor="email" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 ml-0.5">
+                  Email address
+                </label>
                 <input
                   id="email"
                   type="email"
                   required
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-medium"
-                  placeholder={t('e_g_user_agrorent_ai')}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#16845B]/20 focus:border-[#16845B] transition-all text-sm font-normal"
+                  placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
-                  {t('password')}</label>
+                <label htmlFor="password" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 ml-0.5">
+                  Password
+                </label>
                 <div className="relative">
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     required
-                    className="w-full pl-4 pr-12 py-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm font-medium"
-                    placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢"
+                    className="w-full pl-3.5 pr-11 py-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#16845B]/20 focus:border-[#16845B] transition-all text-sm font-normal"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
@@ -519,7 +533,7 @@ export default function LoginPage() {
 
             {/* Forgot Password Action Trigger */}
             {isLoginMode && (
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-0.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -528,9 +542,10 @@ export default function LoginPage() {
                     setForgotSuccessMsg('');
                     setShowForgotModal(true);
                   }}
-                  className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:underline hover:text-emerald-500"
+                  className="text-xs font-medium text-[#16845B] dark:text-[#84CC16] hover:underline"
                 >
-                  {t('forgot_password')}</button>
+                  Forgot password?
+                </button>
               </div>
             )}
 
@@ -539,9 +554,9 @@ export default function LoginPage() {
               type="submit"
               data-testid={isLoginMode ? "login-button" : "register-button"}
               disabled={loading || !mounted}
-              className={`w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-black rounded-xl text-white shadow-lg transition-all duration-300 disabled:opacity-50 ${activeConf.accentClass}`}
+              className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-[#163A2D] hover:bg-[#205140] transition-colors shadow-sm disabled:opacity-50 mt-2"
             >
-              {loading ? t('authenticating', { defaultValue: 'Authenticating...' }) : (isLoginMode ? t('sign_in', { defaultValue: 'Sign In' }) : t('create_account', { defaultValue: 'Create Account' }))}
+              {loading ? 'Authenticating...' : (isLoginMode ? 'Sign In' : 'Create Account')}
             </button>
           </form>
         </div>

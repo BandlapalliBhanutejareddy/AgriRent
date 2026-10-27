@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../../../core/api/api_client.dart';
@@ -6,43 +7,59 @@ import '../../../core/errors/api_error_handler.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../models/user.dart' as models;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthRepository {
   final ApiClient _apiClient = ApiClient();
-  final _supabaseAuth = supabase.Supabase.instance.client.auth;
+  supabase.GoTrueClient get _supabaseAuth => supabase.Supabase.instance.client.auth;
 
   Future<models.User> login(String email, String password, {String? role}) async {
-    try {
-      try {
-        final dataMap = <String, dynamic>{
-          'email': email.trim().toLowerCase(),
-          'password': password,
-        };
-        if (role != null) {
-          dataMap['role'] = role;
-        }
-        final backendRes = await _apiClient.dio.post(ApiConstants.login, data: dataMap);
-        if (backendRes.data != null && backendRes.data['success'] == true) {
-          final token = backendRes.data['token']?.toString() ?? backendRes.data['session']?['access_token']?.toString();
-          if (token != null && token.isNotEmpty) {
-            await SecureStorage.saveAccessToken(token);
-            final refreshToken = backendRes.data['session']?['refresh_token']?.toString();
-            if (refreshToken != null) {
-              await SecureStorage.saveTokens(token, refreshToken);
-              try {
-                await _supabaseAuth.setSession(refreshToken);
-              } catch (_) {}
-            }
-          }
-          if (backendRes.data['user'] != null) {
-            final user = models.User.fromJson(backendRes.data['user']);
-            await SecureStorage.saveUser(jsonEncode(backendRes.data['user']));
-            return user;
-          }
-        }
-      } catch (_) {}
+    final dataMap = <String, dynamic>{
+      'email': email.trim().toLowerCase(),
+      'password': password,
+    };
+    if (role != null) {
+      dataMap['role'] = role;
+    }
 
-      // 2. Direct Supabase authentication fallback
+    // 1. Primary: Authenticate via AgroRent Backend
+    try {
+      final backendRes = await _apiClient.dio.post(ApiConstants.login, data: dataMap);
+      if (backendRes.data != null && backendRes.data['success'] == true) {
+        final token = backendRes.data['token']?.toString() ?? backendRes.data['session']?['access_token']?.toString();
+        if (token != null && token.isNotEmpty) {
+          await SecureStorage.saveAccessToken(token);
+          final refreshToken = backendRes.data['refreshToken']?.toString() ?? backendRes.data['session']?['refresh_token']?.toString();
+          if (refreshToken != null) {
+            await SecureStorage.saveTokens(token, refreshToken);
+            try {
+              await _supabaseAuth.setSession(refreshToken);
+            } catch (_) {}
+          }
+        }
+        if (backendRes.data['user'] != null) {
+          final user = models.User.fromJson(backendRes.data['user']);
+          await SecureStorage.saveUser(jsonEncode(backendRes.data['user']));
+          return user;
+        }
+      }
+    } on DioException catch (dioErr) {
+      // If the backend returned an actual HTTP response (e.g. 400, 401, 403, 500, 503), surface its error message!
+      if (dioErr.response != null) {
+        if (dioErr.response?.data is Map) {
+          final errData = dioErr.response!.data as Map;
+          final msg = errData['error'] ?? errData['message'];
+          if (msg != null && msg.toString().isNotEmpty) {
+            throw Exception(msg.toString());
+          }
+        }
+        throw Exception(ApiErrorHandler.getMessage(dioErr));
+      }
+      // If backend was completely unreachable (connection error/timeout), fall through to direct Supabase
+    }
+
+    // 2. Direct Supabase authentication fallback (only if backend was completely unreachable)
+    try {
       final response = await _supabaseAuth.signInWithPassword(
         email: email.trim().toLowerCase(),
         password: password,
@@ -95,6 +112,51 @@ class AuthRepository {
       } else {
         throw Exception(response.data['error'] ?? 'Registration failed');
       }
+    } catch (e) {
+      throw Exception(ApiErrorHandler.getMessage(e));
+    }
+  }
+
+  Future<models.User> continueWithGoogle({
+    String? idToken,
+    required String role,
+  }) async {
+    try {
+      if (idToken != null && idToken.isNotEmpty) {
+        final res = await _apiClient.dio.post(ApiConstants.googleAuth, data: {
+          'idToken': idToken,
+          'role': role,
+        });
+        if (res.data != null && res.data['success'] == true) {
+          final token = res.data['token']?.toString();
+          if (token != null && token.isNotEmpty) {
+            await SecureStorage.saveAccessToken(token);
+          }
+          final userData = res.data['user'];
+          await SecureStorage.saveUser(jsonEncode(userData));
+          return models.User.fromJson(userData);
+        }
+        throw Exception(res.data?['error'] ?? 'Google authentication failed');
+      }
+
+      final isOAuthTriggered = await _supabaseAuth.signInWithOAuth(
+        supabase.OAuthProvider.google,
+        redirectTo: 'io.supabase.agrorentai://login-callback',
+      );
+      if (!isOAuthTriggered) {
+        throw Exception('Could not launch Google authentication window.');
+      }
+
+      final session = _supabaseAuth.currentSession;
+      if (session != null) {
+        await SecureStorage.saveAccessToken(session.accessToken);
+        final meRes = await _apiClient.dio.get(ApiConstants.me);
+        final raw = meRes.data;
+        final userData = raw is Map && raw['data'] != null ? raw['data'] : raw;
+        await SecureStorage.saveUser(jsonEncode(userData));
+        return models.User.fromJson(userData);
+      }
+      throw Exception('Google sign-in waiting for browser confirmation.');
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
@@ -168,17 +230,46 @@ class AuthRepository {
     } catch (e) {
       // Ignore errors on logout
     } finally {
-      await SecureStorage.clearAll();
+      // Preserve device-level preferences: app_language and user_theme_mode
+      const storage = FlutterSecureStorage();
+      final savedLang = await storage.read(key: 'app_language');
+
       final prefs = await SharedPreferences.getInstance();
+      final savedTheme = prefs.getString('user_theme_mode');
+
+      // Clear all secure storage credentials and cached tokens
+      await SecureStorage.clearAuthTokens();
+      await storage.deleteAll();
+
+      // Clear user-specific shared preferences cache
       await prefs.clear();
+
+      // Restore device-level preferences
+      if (savedLang != null && savedLang.isNotEmpty) {
+        await storage.write(key: 'app_language', value: savedLang);
+      }
+      if (savedTheme != null && savedTheme.isNotEmpty) {
+        await prefs.setString('user_theme_mode', savedTheme);
+      }
     }
   }
 
   Future<models.User?> restoreSession() async {
     try {
       final session = _supabaseAuth.currentSession;
-      final savedToken = await SecureStorage.getAccessToken();
+      var savedToken = await SecureStorage.getAccessToken();
+      final refreshToken = await SecureStorage.getRefreshToken();
       if (session == null && (savedToken == null || savedToken.isEmpty)) return null;
+
+      if (_supabaseAuth.currentSession == null && refreshToken != null && refreshToken.isNotEmpty) {
+        try {
+          final res = await _supabaseAuth.setSession(refreshToken);
+          if (res.session != null) {
+            savedToken = res.session!.accessToken;
+            await SecureStorage.saveTokens(savedToken, res.session!.refreshToken ?? refreshToken);
+          }
+        } catch (_) {}
+      }
 
       final response = await _apiClient.dio.get(ApiConstants.me);
       if (response.statusCode == 200) {
@@ -189,12 +280,7 @@ class AuthRepository {
       }
       return null;
     } catch (e) {
-      final cachedUserStr = await SecureStorage.getUser();
-      if (cachedUserStr != null) {
-        try {
-          return models.User.fromJson(jsonDecode(cachedUserStr));
-        } catch (_) {}
-      }
+      await SecureStorage.clearAll();
       return null;
     }
   }

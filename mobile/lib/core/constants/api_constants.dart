@@ -7,10 +7,15 @@ class ApiConstants {
   // Auth
   static const String login = 'auth/login';
   static const String register = 'auth/register';
+  static const String googleAuth = 'auth/google';
   static const String verifyOtp = 'auth/verify-otp';
   static const String refresh = 'auth/refresh';
   static const String logout = 'auth/logout';
   static const String me = 'auth/me';
+  static const String userProfilePhoto = 'auth/profile-photo';
+
+  // Upload
+  static const String upload = 'upload';
 
   // Equipment
   static const String equipment = 'equipment';
@@ -29,4 +34,11 @@ class ApiConstants {
 
   // Analytics
   static const String analytics = 'analytics';
+
+  // Community
+  static const String community = 'community';
+  static const String communityMessages = 'community/messages';
+  static const String communityMembers = 'community/members';
+  static const String communityMyCrops = 'community/my-crops';
+  static const String communityCropTrends = 'community/crop-trends';
 }

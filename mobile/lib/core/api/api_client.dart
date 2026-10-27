@@ -62,24 +62,25 @@ class ApiClient {
           print('Message: ${e.message}');
         }
 
-        // Automatic dev failover between 127.0.0.1 (reverse) and LAN IP (10.73.129.66)
-        if (e.requestOptions.extra['retried_fallback'] != true &&
+        // Automatic dev failover between candidate hosts (127.0.0.1, LAN IP 10.109.99.66, 10.0.2.2)
+        final retryCount = (e.requestOptions.extra['retried_count'] as int?) ?? 0;
+        if (retryCount < 3 &&
             (e.type == DioExceptionType.connectionError ||
              e.type == DioExceptionType.connectionTimeout ||
              e.type == DioExceptionType.unknown)) {
           Environment.switchDevHost();
           if (kDebugMode) {
-            print('Ã°Å¸â€â€ž [ApiClient] Network error encountered. Switching dev host to ${Environment.activeDevHost} and retrying...');
+            print('[ApiClient] Network error encountered. Switching dev host to ${Environment.activeDevHost} and retrying (attempt ${retryCount + 1})...');
           }
           final newOptions = e.requestOptions;
-          newOptions.extra['retried_fallback'] = true;
+          newOptions.extra['retried_count'] = retryCount + 1;
           newOptions.baseUrl = ApiConstants.baseUrl;
           try {
             final response = await _dio.fetch(newOptions);
             return handler.resolve(response);
           } catch (retryErr) {
             if (kDebugMode) {
-              print('Ã¢ÂÅ’ [ApiClient] Failover retry also failed: $retryErr');
+              print('[ApiClient] Failover retry ($retryCount) failed: $retryErr');
             }
           }
         }

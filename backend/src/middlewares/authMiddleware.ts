@@ -71,11 +71,16 @@ export const requireRole = (role: 'FARMER' | 'OWNER' | 'ADMIN') => {
       return;
     }
 
-    const userRole = req.prismaUser.role;
+    const userRole = String(req.prismaUser.role || '').toUpperCase();
+    const isOwnerRole = role === 'OWNER' && (userRole === 'EQUIPMENT_OWNER' || userRole === 'OWNER' || userRole === 'BOTH' || userRole.includes('OWNER'));
+    const isFarmerRole = role === 'FARMER' && (userRole === 'FARMER' || userRole === 'BOTH' || userRole.includes('FARMER'));
+
     const hasRequiredRole =
       userRole === 'ADMIN' ||
       userRole === role ||
       userRole === 'BOTH' ||
+      isOwnerRole ||
+      isFarmerRole ||
       (typeof userRole === 'string' && userRole.split(',').map((r: string) => r.trim()).includes(role));
 
     if (!hasRequiredRole) {

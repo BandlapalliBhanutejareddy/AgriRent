@@ -27,7 +27,10 @@ import {
   CalendarDays,
   CreditCard,
   History,
-  MessageSquare
+  MessageSquare,
+  Bookmark,
+  CloudSun,
+  Landmark
 } from 'lucide-react';
 import { useStore, useThemeStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
@@ -39,7 +42,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
   const pathname = usePathname();
   const { user, activeRole, setActiveRole, logout } = useStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
@@ -76,15 +79,30 @@ export default function DashboardLayout({
     }
 
     if (role === 'FARMER') {
-      if (pathname === '/dashboard' || pathname.startsWith('/dashboard/equipment') || pathname.startsWith('/dashboard/admin')) {
+      if (
+        pathname === '/dashboard' ||
+        pathname.startsWith('/dashboard/equipment') ||
+        pathname.startsWith('/dashboard/admin') ||
+        pathname === '/dashboard/history' ||
+        pathname === '/dashboard/bank-details' ||
+        pathname === '/dashboard/analytics'
+      ) {
         window.location.href = '/dashboard/farmer';
       }
     } else if (role === 'OWNER') {
-      if (pathname.startsWith('/dashboard/farmer') || pathname.startsWith('/dashboard/ai-advisor') || pathname.startsWith('/dashboard/admin')) {
+      if (
+        pathname.startsWith('/dashboard/farmer') ||
+        pathname.startsWith('/dashboard/admin') ||
+        pathname === '/dashboard/saved'
+      ) {
         window.location.href = '/dashboard';
       }
     } else if (role === 'ADMIN') {
-      if (pathname === '/dashboard' || pathname.startsWith('/dashboard/farmer') || pathname.startsWith('/dashboard/ai-advisor') || pathname.startsWith('/dashboard/equipment')) {
+      if (
+        pathname === '/dashboard' ||
+        pathname.startsWith('/dashboard/farmer') ||
+        pathname.startsWith('/dashboard/equipment')
+      ) {
         window.location.href = '/dashboard/admin';
       }
     }
@@ -93,7 +111,6 @@ export default function DashboardLayout({
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('agrorent_dev_session');
-    // Clear any cached API responses to prevent cross-user data exposure
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith('@cache_')) {
@@ -111,18 +128,21 @@ export default function DashboardLayout({
       case 'ADMIN':
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 shadow-sm backdrop-blur-md">
-            <ShieldAlert size={14} /> {t('admin')}</span>
+            <ShieldAlert size={14} /> {t('admin')}
+          </span>
         );
       case 'FARMER':
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 shadow-sm backdrop-blur-md">
-            <Sparkles size={14} /> {t('farmer')}</span>
+            <Sparkles size={14} /> {t('farmer')}
+          </span>
         );
       case 'OWNER':
       default:
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 shadow-sm backdrop-blur-md">
-            <Tractor size={14} /> {t('fleet_owner')}</span>
+            <Tractor size={14} /> {t('fleet_owner')}
+          </span>
         );
     }
   };
@@ -132,15 +152,15 @@ export default function DashboardLayout({
     return (
       <Link
         href={href}
-        className={`flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all duration-300 ${
+        className={`flex items-center space-x-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
           isActive
-            ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 dark:from-emerald-500/20 dark:to-teal-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/20 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)]'
-            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200'
+            ? 'bg-[#163A2D]/10 dark:bg-[#163A2D]/40 text-[#163A2D] dark:text-[#84CC16] font-semibold border border-[#16845B]/20 shadow-sm'
+            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200 font-normal'
         }`}
         onClick={() => setIsMobileMenuOpen(false)}
       >
-        <Icon size={20} className={isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'} />
-        <span className="text-[13px] tracking-wide">{label}</span>
+        <Icon size={18} className={isActive ? 'text-[#16845B] dark:text-[#84CC16]' : 'text-slate-400'} />
+        <span className="text-[13px]">{label}</span>
       </Link>
     );
   };
@@ -165,8 +185,10 @@ export default function DashboardLayout({
           <NavLink href="/dashboard/farmer" icon={LayoutDashboard} label={t('dashboard')} exact />
           <NavLink href="/dashboard/marketplace" icon={Search} label={t('marketplace')} />
           <NavLink href="/dashboard/rentals" icon={CalendarDays} label={t('my_rentals')} />
+          <NavLink href="/dashboard/saved" icon={Bookmark} label="Saved Machinery" />
+          <NavLink href="/dashboard/weather" icon={CloudSun} label="Weather & Mandi" />
           <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides')} />
-          <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label={t('ai_advisor')} />
+          <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label="Farmer Assistant" />
           <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
           <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
         </>
@@ -179,6 +201,9 @@ export default function DashboardLayout({
         <NavLink href="/dashboard/equipment" icon={Tractor} label={t('fleet_management')} exact />
         <NavLink href="/dashboard/equipment/new" icon={PlusCircle} label={t('add_equipment')} />
         <NavLink href="/dashboard/bookings" icon={ClipboardList} label={t('booking_requests')} />
+        <NavLink href="/dashboard/history" icon={History} label="Rental History" />
+        <NavLink href="/dashboard/analytics" icon={BarChart3} label="Analytics & Yield" />
+        <NavLink href="/dashboard/bank-details" icon={Landmark} label="Bank & Payouts" />
         <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
         <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
       </>
@@ -215,9 +240,13 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans selection:bg-emerald-500/30">
         <header className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl h-20 flex items-center justify-between px-6 md:px-10 z-30 border-b border-slate-200/50 dark:border-slate-800/50">
-          <Link href="/" className="flex flex-col">
-            <span className="text-2xl font-black bg-gradient-to-r from-emerald-500 to-blue-600 bg-clip-text text-transparent tracking-tight">
-              {t('agrorent_ai')}</span>
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-md">
+              <Tractor size={22} />
+            </div>
+            <span className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent tracking-tight">
+              AgroRent<span className="text-emerald-500">.</span>AI
+            </span>
           </Link>
           <div className="flex items-center space-x-3 md:space-x-5">
             <LanguageSwitcher />
@@ -253,12 +282,18 @@ export default function DashboardLayout({
         isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
       } md:block flex flex-col`}>
         <div className="h-20 px-6 border-b border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
-          <Link href="/" className="flex flex-col">
-            <span className="text-2xl font-black bg-gradient-to-r from-emerald-500 to-blue-600 bg-clip-text text-transparent tracking-tight">
-              {t('agrorent_ai')}</span>
-            <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mt-0.5">
-              {role === 'ADMIN' ? t('admin_portal', {defaultValue: 'Admin Portal'}) : role === 'FARMER' ? t('farmer_portal', {defaultValue: 'Farmer Portal'}) : t('owner_portal', {defaultValue: 'Owner Portal'})}
-            </span>
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#163A2D] text-[#84CC16] flex items-center justify-center shadow-sm">
+              <Tractor size={22} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold tracking-tight text-[#163A2D] dark:text-white leading-none">
+                AgroRent <span className="text-[#16845B] dark:text-[#84CC16]">AI</span>
+              </span>
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-1">
+                {role === 'ADMIN' ? 'Admin Portal' : role === 'FARMER' ? 'Farmer Portal' : 'Owner Portal'}
+              </span>
+            </div>
           </Link>
           <button
             className="md:hidden p-2 text-slate-400 hover:text-slate-700 bg-slate-100 dark:bg-slate-800 rounded-xl transition-all"

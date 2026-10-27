@@ -374,7 +374,7 @@ export default function AdminDashboard() {
                     <td className="p-4">
                       {['OWNER', 'BOTH'].includes(u.role) ? (
                         <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${u.isVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {u.isVerified ? 'Ã¢Å“â€œ Verified' : 'Unverified'}
+                          {u.isVerified ? '✓ Verified' : 'Unverified'}
                         </span>
                       ) : <span className="text-xs text-slate-400">-</span>}
                     </td>
@@ -447,7 +447,7 @@ export default function AdminDashboard() {
                       {eq.owner?.name || 'Owner'}
                       <div className="text-[10px] text-slate-400">{eq.owner?.email}</div>
                     </td>
-                    <td className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300">Ã¢â€šÂ¹{eq.pricePerDay}/day</td>
+                    <td className="p-4 text-xs font-bold text-slate-700 dark:text-slate-300">₹{eq.pricePerDay}/day</td>
                     <td className="p-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{new Date(eq.createdAt).toLocaleDateString()}</td>
                     <td className="p-4">
                       <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${eq.available ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>

@@ -10,8 +10,14 @@ import '../../../shared/theme/app_theme.dart';
 import '../providers/owner_provider.dart';
 
 class EditEquipmentScreen extends ConsumerStatefulWidget {
-  final Equipment equipment;
-  const EditEquipmentScreen({super.key, required this.equipment});
+  final Equipment? equipment;
+  final String? equipmentId;
+
+  const EditEquipmentScreen({
+    super.key,
+    this.equipment,
+    this.equipmentId,
+  });
 
   @override
   ConsumerState<EditEquipmentScreen> createState() => _EditEquipmentScreenState();
@@ -29,34 +35,76 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
   File? _newSelectedImageFile;
   bool _isSaving = false;
   bool _isDeleting = false;
+  Equipment? _currentEquipment;
+  bool _notFound = false;
 
   final List<String> _categories = [
+    'TRACTORS_AND_POWER_UNITS',
+    'LAND_PREPARATION',
+    'SEEDING_AND_PLANTING',
+    'CROP_CARE_AND_INTERCULTURE',
+    'IRRIGATION_EQUIPMENT',
+    'HARVESTING_EQUIPMENT',
+    'THRESHING_AND_POST_HARVEST',
+    'MATERIAL_HANDLING_AND_TRANSPORT',
+    'SOIL_TESTING_AND_TOOLS',
+    'CROP_PROCESSING',
+    'STORAGE_EQUIPMENT',
+    'HAND_TOOLS',
+    'SPECIALIZED_CROP_EQUIPMENT',
+    'SAFETY_AND_ACCESSORIES',
     'TRACTOR',
     'HARVESTER',
     'SEEDER',
     'PLOUGH',
     'CULTIVATOR',
     'SPRAYER',
-    'OTHER'
+    'OTHER',
   ];
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.equipment.title);
-    _descriptionController = TextEditingController(text: widget.equipment.description);
-    _priceController = TextEditingController(
-      text: widget.equipment.pricePerDay != null
-          ? widget.equipment.pricePerDay!.toStringAsFixed(0)
-          : '',
-    );
-    _locationController = TextEditingController(text: widget.equipment.location ?? '');
-    _existingImageUrl = widget.equipment.imageUrl;
-    _selectedCategory = widget.equipment.category.toUpperCase();
-    if (!_categories.contains(_selectedCategory)) {
-      _selectedCategory = 'OTHER';
+    _initEquipment();
+  }
+
+  void _initEquipment() {
+    if (widget.equipment != null) {
+      _currentEquipment = widget.equipment;
+    } else if (widget.equipmentId != null && widget.equipmentId!.isNotEmpty) {
+      final myEq = ref.read(ownerProvider).myEquipment;
+      try {
+        _currentEquipment = myEq.firstWhere((e) => e.id == widget.equipmentId);
+      } catch (_) {
+        _currentEquipment = null;
+      }
     }
-    _available = widget.equipment.available;
+
+    if (_currentEquipment != null) {
+      _titleController = TextEditingController(text: _currentEquipment!.title);
+      _descriptionController = TextEditingController(text: _currentEquipment!.description);
+      _priceController = TextEditingController(
+        text: _currentEquipment!.pricePerDay != null
+            ? _currentEquipment!.pricePerDay!.toStringAsFixed(0)
+            : '',
+      );
+      _locationController = TextEditingController(text: _currentEquipment!.location ?? '');
+      _existingImageUrl = _currentEquipment!.imageUrl;
+      _selectedCategory = _currentEquipment!.category.toUpperCase();
+      if (!_categories.contains(_selectedCategory)) {
+        _categories.add(_selectedCategory);
+      }
+      _available = _currentEquipment!.available;
+      _notFound = false;
+    } else {
+      _titleController = TextEditingController();
+      _descriptionController = TextEditingController();
+      _priceController = TextEditingController();
+      _locationController = TextEditingController();
+      _selectedCategory = 'TRACTOR';
+      _available = true;
+      _notFound = true;
+    }
   }
 
   @override
@@ -78,8 +126,23 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
         imageQuality: 85,
       );
       if (pickedFile != null) {
+        final file = File(pickedFile.path);
+        final fileBytes = await file.length();
+        if (fileBytes > 5 * 1024 * 1024) {
+          if (mounted) {
+            final lang = ref.read(languageProvider);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('image_size_exceeded'.tr(lang)),
+                backgroundColor: const Color(0xFFC62828),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
         setState(() {
-          _newSelectedImageFile = File(pickedFile.path);
+          _newSelectedImageFile = file;
         });
       }
     } catch (e) {
@@ -160,6 +223,9 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSaving || _isDeleting || _currentEquipment == null) return;
+    if (ref.read(ownerProvider).isEquipmentActionPending(_currentEquipment!.id)) return;
+
     final lang = ref.read(languageProvider);
     if (!_formKey.currentState!.validate()) return;
 
@@ -167,7 +233,7 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
     if (price == null || price <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('fill_required_fields'.tr(lang)),
+          content: Text('enter_valid_price'.tr(lang)),
           backgroundColor: const Color(0xFFC62828),
           behavior: SnackBarBehavior.floating,
         ),
@@ -179,7 +245,7 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
 
     String finalImageUrl = _existingImageUrl;
 
-    // 1. Upload new image if selected
+    // 1. Upload new image if selected (preserve existing if upload fails)
     if (_newSelectedImageFile != null) {
       try {
         final fileName = _newSelectedImageFile!.path.split(Platform.pathSeparator).last;
@@ -201,7 +267,7 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
 
         final dynamic resData = uploadResponse.data;
         if (resData is Map) {
-          finalImageUrl = resData['url'] ?? resData['data']?['url'] ?? '';
+          finalImageUrl = resData['url'] ?? resData['data']?['url'] ?? _existingImageUrl;
         }
       } catch (uploadError) {
         if (mounted) {
@@ -218,7 +284,7 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
       }
     }
 
-    // 2. Update Equipment in DB
+    // 2. Update Equipment in DB - only send editable fields per API schema
     final data = {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
@@ -231,10 +297,11 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
 
     final success = await ref
         .read(ownerProvider.notifier)
-        .updateEquipment(widget.equipment.id, data);
+        .updateEquipment(_currentEquipment!.id, data);
+    if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (success && mounted) {
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -247,12 +314,12 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
         ),
       );
       Navigator.pop(context);
-    } else if (!success && mounted) {
+    } else {
       final err = ref.read(ownerProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            err ?? 'unable_to_load_messages'.tr(lang),
+            err ?? 'failed_to_update_equipment'.tr(lang),
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           backgroundColor: const Color(0xFFC62828),
@@ -263,6 +330,9 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
   }
 
   Future<void> _delete() async {
+    if (_isSaving || _isDeleting || _currentEquipment == null) return;
+    if (ref.read(ownerProvider).isEquipmentActionPending(_currentEquipment!.id)) return;
+
     final lang = ref.read(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -275,12 +345,14 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
           children: [
             const Icon(Icons.warning_amber_rounded, color: Color(0xFFD32F2F), size: 24),
             const SizedBox(width: 10),
-            Text(
-              'delete_equipment'.tr(lang),
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : AppTheme.textDarkNavy,
+            Expanded(
+              child: Text(
+                'delete_equipment'.tr(lang),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                ),
               ),
             ),
           ],
@@ -310,7 +382,10 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: Text('reject'.tr(lang)),
+            child: Text(
+              'delete'.tr(lang),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -320,10 +395,11 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
       setState(() => _isDeleting = true);
       final success = await ref
           .read(ownerProvider.notifier)
-          .deleteEquipment(widget.equipment.id);
+          .deleteEquipment(_currentEquipment!.id);
+      if (!mounted) return;
       setState(() => _isDeleting = false);
 
-      if (success && mounted) {
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -336,6 +412,18 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
           ),
         );
         Navigator.pop(context);
+      } else {
+        final err = ref.read(ownerProvider).error;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              err ?? 'failed_to_delete_equipment'.tr(lang),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: const Color(0xFFC62828),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -344,6 +432,67 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
   Widget build(BuildContext context) {
     final lang = ref.watch(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_notFound || _currentEquipment == null) {
+      return Scaffold(
+        backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+        appBar: AppBar(
+          title: Text(
+            'edit_equipment'.tr(lang),
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              color: isDark ? Colors.white : AppTheme.textDarkNavy,
+            ),
+          ),
+          backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 20,
+              color: isDark ? Colors.white : AppTheme.textDarkNavy,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.search_off_rounded,
+                  size: 64,
+                  color: isDark ? Colors.white38 : AppTheme.textMutedGray,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'equipment_not_found'.tr(lang),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text('return_to_fleet'.tr(lang)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
@@ -419,9 +568,18 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
                       label: '${'title'.tr(lang)} *',
                       hint: 'e.g. John Deere 5050D 4WD',
                       isDark: isDark,
-                      validator: (val) => (val == null || val.trim().isEmpty)
-                          ? 'fill_required_fields'.tr(lang)
-                          : null,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'fill_required_fields'.tr(lang);
+                        }
+                        if (val.trim().length < 3) {
+                          return 'enter_valid_title'.tr(lang);
+                        }
+                        if (val.trim().length > 100) {
+                          return 'Maximum 100 characters allowed';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -434,7 +592,7 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
                         color: isDark ? Colors.white : AppTheme.textDarkNavy,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'category'.tr(lang),
+                        labelText: '${'category'.tr(lang)} *',
                         labelStyle: TextStyle(
                           color: isDark ? Colors.white60 : AppTheme.textMutedGray,
                           fontSize: 13,
@@ -468,7 +626,7 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
                       items: _categories
                           .map((c) => DropdownMenuItem(
                                 value: c,
-                                child: Text(c),
+                                child: Text(AppLocalizations.localizedEquipmentCategory(c, lang)),
                               ))
                           .toList(),
                       onChanged: (val) {
@@ -480,17 +638,17 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
                     // Price
                     _buildTextField(
                       controller: _priceController,
-                      label: '${'rental_rate'.tr(lang)} (Ã¢â€šÂ¹ / ${'day'.tr(lang)}) *',
+                      label: '${'rental_rate'.tr(lang)} (₹/${'day'.tr(lang)}) *',
                       hint: 'e.g. 2500',
                       isDark: isDark,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) {
                           return 'fill_required_fields'.tr(lang);
                         }
                         final num = double.tryParse(val.trim());
                         if (num == null || num <= 0) {
-                          return 'fill_required_fields'.tr(lang);
+                          return 'enter_valid_price'.tr(lang);
                         }
                         return null;
                       },
@@ -547,7 +705,9 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
                           Switch(
                             value: _available,
                             activeTrackColor: AppTheme.primaryGreen,
-                            onChanged: (val) => setState(() => _available = val),
+                            onChanged: (_isSaving || _isDeleting)
+                                ? null
+                                : (val) => setState(() => _available = val),
                           ),
                         ],
                       ),
@@ -561,6 +721,12 @@ class _EditEquipmentScreenState extends ConsumerState<EditEquipmentScreen> {
                       hint: 'Provide details about power, attachments, condition...',
                       isDark: isDark,
                       maxLines: 3,
+                      validator: (val) {
+                        if (val != null && val.trim().length > 1000) {
+                          return 'Maximum 1000 characters allowed';
+                        }
+                        return null;
+                      },
                     ),
                   ],
                 ),

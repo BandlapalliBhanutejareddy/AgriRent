@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { startTestServer, stopTestServer, request } = require('./utils');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 test('AuditLog Verification Suite', async (t) => {
   let serverStarted = false;

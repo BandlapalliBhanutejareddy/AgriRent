@@ -1,8 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/localization/app_localizations.dart';
 import '../../../shared/theme/app_theme.dart';
+import '../models/farm_model.dart';
 import '../providers/farm_provider.dart';
+import 'next_operation_widget.dart';
+
+const List<String> kCanonicalStages = [
+  'SOWING',
+  'GERMINATION',
+  'SEEDLING',
+  'VEGETATIVE',
+  'FLOWERING',
+  'FRUITING',
+  'MATURITY',
+  'HARVEST'
+];
 
 class MyFarmScreen extends ConsumerStatefulWidget {
   const MyFarmScreen({super.key});
@@ -20,16 +34,164 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
     });
   }
 
+  void _showFarmSelectorBottomSheet(
+    BuildContext context,
+    List<FarmModel> farms,
+    String selectedId,
+    bool isDark,
+    String lang,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'select_farm'.tr(lang),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      context.push('/farm-setup?mode=create');
+                    },
+                    icon: const Icon(Icons.add, size: 18, color: AppTheme.primaryGreen),
+                    label: Text(
+                      'add'.tr(lang),
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryGreen),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: farms.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final f = farms[index];
+                    final isSelected = f.id == selectedId;
+                    final cropInfo = f.crops.isNotEmpty ? f.crops.first.cropName : 'No crop registered';
+
+                    return InkWell(
+                      onTap: () {
+                        ref.read(farmProvider.notifier).selectFarm(f.id);
+                        Navigator.pop(ctx);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppTheme.primaryGreen.withValues(alpha: 0.12)
+                              : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.grey.shade50),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppTheme.primaryGreen
+                                : (isDark ? Colors.white10 : Colors.grey.shade200),
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppTheme.primaryGreen
+                                    : (isDark ? Colors.white12 : Colors.grey.shade200),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.landscape_rounded,
+                                color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    f.name.isNotEmpty ? f.name : 'Farm #${index + 1}',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${f.area} ${f.areaUnit} • ${f.location} • $cropInfo',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(Icons.check_circle_rounded, color: AppTheme.primaryGreen, size: 22),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final farmState = ref.watch(farmProvider);
+    final lang = ref.watch(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (farmState.isLoading && farmState.farms.isEmpty) {
       return Scaffold(
         backgroundColor: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
         appBar: AppBar(
-          title: const Text('My Farm', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
+          title: Text('my_farm'.tr(lang), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
           backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
           foregroundColor: isDark ? Colors.white : AppTheme.textDarkNavy,
           elevation: 0,
@@ -44,7 +206,7 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
       return Scaffold(
         backgroundColor: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
         appBar: AppBar(
-          title: const Text('My Farm', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
+          title: Text('my_farm'.tr(lang), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
           backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
           foregroundColor: isDark ? Colors.white : AppTheme.textDarkNavy,
           elevation: 0,
@@ -65,7 +227,7 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No farm added yet',
+                  'no_farm_added'.tr(lang),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
@@ -80,9 +242,9 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  onPressed: () => context.push('/farm-setup'),
+                  onPressed: () => context.push('/farm-setup?mode=create'),
                   icon: const Icon(Icons.add),
-                  label: const Text('Set Up Farm', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text('set_up_farm'.tr(lang), style: const TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryGreen,
                     foregroundColor: Colors.white,
@@ -97,37 +259,58 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
       );
     }
 
-    final farm = farmState.farms.first;
+    final farm = farmState.selectedFarm ?? farmState.farms.first;
+    final hasMultipleFarms = farmState.farms.length > 1;
     final crop = farm.crops.isNotEmpty ? farm.crops.first : null;
 
     final farmName = farm.name.isNotEmpty ? farm.name : 'My Farm';
     final areaText = '${farm.area} ${farm.areaUnit}';
-    final locationText = farm.location.isNotEmpty ? farm.location : 'Karnataka';
-    final soilText = farm.soilType.isNotEmpty ? farm.soilType : 'Loamy';
-    final cropName = crop?.cropName.isNotEmpty == true ? crop!.cropName : 'Active Crop';
-    final seasonText = crop?.season.isNotEmpty == true ? crop!.season : 'Kharif';
-    final currentStage = (crop?.stage.isNotEmpty == true ? crop!.stage : 'VEGETATIVE').toUpperCase();
-    final stageFormatted = currentStage.isNotEmpty ? '${currentStage[0]}${currentStage.substring(1).toLowerCase()}' : 'Active';
+    final locationText = farm.location.isNotEmpty ? farm.location : farm.name;
+    final soilText = farm.soilType.isNotEmpty ? farm.soilType : 'Not specified';
+    final cropName = crop?.cropName.isNotEmpty == true ? crop!.cropName : 'no_crop_registered'.tr(lang);
+    final seasonText = crop?.season.isNotEmpty == true ? crop!.season : 'N/A';
+    final currentStage = (crop != null && crop.stage.isNotEmpty ? crop.stage : 'ACTIVE').toUpperCase();
+    final stageFormatted = crop != null ? currentStage.replaceAll('_', ' ') : 'no_crop_registered'.tr(lang);
+    final dayStr = crop != null
+        ? (crop.sowingDate != null
+            ? 'Day ${DateTime.now().difference(crop.sowingDate!).inDays.clamp(0, 999)}'
+            : (crop.season.isNotEmpty ? 'Season: ${crop.season}' : 'Status: ${crop.status}'))
+        : 'no_crop_registered'.tr(lang);
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('My Farm', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
+        title: Text('my_farm'.tr(lang), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         foregroundColor: isDark ? Colors.white : AppTheme.textDarkNavy,
         elevation: 0,
         actions: [
+          if (hasMultipleFarms)
+            Padding(
+              padding: const EdgeInsets.only(right: 6.0),
+              child: ActionChip(
+                avatar: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppTheme.primaryGreen),
+                label: Text(
+                  'switch_field'.tr(lang),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen),
+                ),
+                backgroundColor: isDark ? Colors.white12 : AppTheme.primaryGreen.withValues(alpha: 0.1),
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                onPressed: () => _showFarmSelectorBottomSheet(context, farmState.farms, farm.id, isDark, lang),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
             child: TextButton(
-              onPressed: () => context.push('/farm-setup'),
+              onPressed: () => context.push('/farm-setup?mode=edit&farmId=${farm.id}'),
               style: TextButton.styleFrom(
                 backgroundColor: AppTheme.primaryGreen,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               ),
-              child: const Text('Edit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              child: Text('edit'.tr(lang), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             ),
           ),
         ],
@@ -310,7 +493,7 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          'Day 28 of 120',
+                                          dayStr,
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -325,27 +508,62 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
                             ),
                             const SizedBox(height: 16),
 
-                            // Mini Horizontal Progression Line
-                            Row(
-                              children: [
-                                _buildMiniStageNode('Sowing', true, isDark),
-                                _buildMiniStageLine(true, isDark),
-                                _buildMiniStageNode('Germination', true, isDark),
-                                _buildMiniStageLine(true, isDark),
-                                _buildMiniStageNode('Seedling', true, isDark),
-                                _buildMiniStageLine(true, isDark),
-                                _buildMiniStageNode('Vegetative', false, isDark, isCurrent: true),
-                              ],
-                            ),
+                            // Dynamic Horizontal Progression Line
+                            if (crop != null) ...[
+                              Builder(
+                                builder: (context) {
+                                  final currentIndex = kCanonicalStages.contains(currentStage)
+                                      ? kCanonicalStages.indexOf(currentStage)
+                                      : 0;
+                                  return SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: [
+                                        for (int i = 0; i < kCanonicalStages.length; i++) ...[
+                                          _buildMiniStageNode(
+                                            kCanonicalStages[i][0] + kCanonicalStages[i].substring(1).toLowerCase(),
+                                            i < currentIndex,
+                                            isDark,
+                                            isCurrent: i == currentIndex,
+                                          ),
+                                          if (i < kCanonicalStages.length - 1)
+                                            Container(
+                                              width: 24,
+                                              height: 2,
+                                              margin: const EdgeInsets.only(bottom: 12),
+                                              color: i < currentIndex
+                                                  ? AppTheme.primaryGreen
+                                                  : (isDark ? Colors.white12 : Colors.grey.shade300),
+                                            ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ]
+                            else
+                              Text(
+                                'no_crop_registered'.tr(lang),
+                                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                              ),
                           ],
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Next Operation Card
+                    NextOperationWidget(
+                      farmId: farm.id,
+                      cropId: crop?.id ?? '',
+                      margin: EdgeInsets.zero,
                     ),
                     const SizedBox(height: 20),
 
                     // Actions List
                     _buildFarmNavTile(
-                      title: 'Farm Plan & Operations',
+                      title: 'farm_plan_operations'.tr(lang),
                       subtitle: 'Comprehensive schedule, tasks, and budget',
                       icon: Icons.assignment_rounded,
                       isDark: isDark,
@@ -354,7 +572,7 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
                     const SizedBox(height: 10),
 
                     _buildFarmNavTile(
-                      title: 'Farm Copilot',
+                      title: 'farm_copilot'.tr(lang),
                       subtitle: 'Ask AI agronomic questions for $cropName',
                       icon: Icons.smart_toy_rounded,
                       isDark: isDark,
@@ -466,15 +684,6 @@ class _MyFarmScreenState extends ConsumerState<MyFarmScreen> {
     );
   }
 
-  Widget _buildMiniStageLine(bool isCompleted, bool isDark) {
-    return Expanded(
-      child: Container(
-        height: 2,
-        margin: const EdgeInsets.only(bottom: 14),
-        color: isCompleted ? AppTheme.primaryGreen : (isDark ? Colors.white12 : Colors.grey.shade300),
-      ),
-    );
-  }
 
   Widget _buildFarmNavTile({
     required String title,

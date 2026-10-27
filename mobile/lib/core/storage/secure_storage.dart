@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorage {
@@ -30,6 +31,23 @@ class SecureStorage {
 
   static Future<String?> getUser() async {
     return await _storage.read(key: _keyUser);
+  }
+
+  static Future<String?> getUserId() async {
+    final userJson = await getUser();
+    if (userJson == null) return null;
+    try {
+      final map = jsonDecode(userJson);
+      return map['id']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> clearAuthTokens() async {
+    await _storage.delete(key: _keyAccessToken);
+    await _storage.delete(key: _keyRefreshToken);
+    await _storage.delete(key: _keyUser);
   }
 
   static Future<void> clearAll() async {

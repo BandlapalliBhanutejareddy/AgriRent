@@ -1,42 +1,43 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../models/booking.dart';
+import '../models/payment_record.dart';
+import '../repositories/payment_repository.dart';
 
-final paymentProvider = StateNotifierProvider<PaymentNotifier, PaymentState>((ref) {
-  return PaymentNotifier();
+final paymentRepositoryProvider = Provider((ref) => PaymentRepository());
+
+final farmerPaymentHistoryProvider = FutureProvider.autoDispose<List<PaymentRecord>>((ref) async {
+  final repo = ref.watch(paymentRepositoryProvider);
+  return repo.fetchFarmerPaymentHistory();
+});
+
+final ownerPaymentsReceivedProvider = FutureProvider.autoDispose<List<PaymentRecord>>((ref) async {
+  final repo = ref.watch(paymentRepositoryProvider);
+  return repo.fetchOwnerPaymentsReceived();
 });
 
 class PaymentState {
   final bool isLoading;
-  final String? error;
   final bool isSuccess;
+  final String? error;
+  final String? transactionId;
 
-  PaymentState({this.isLoading = false, this.error, this.isSuccess = false});
-
-  PaymentState copyWith({bool? isLoading, String? error, bool? isSuccess}) {
-    return PaymentState(
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-      isSuccess: isSuccess ?? this.isSuccess,
-    );
-  }
+  PaymentState({
+    this.isLoading = false,
+    this.isSuccess = false,
+    this.error,
+    this.transactionId,
+  });
 }
 
 class PaymentNotifier extends StateNotifier<PaymentState> {
   PaymentNotifier() : super(PaymentState());
 
-  Future<void> initiatePayment(Booking booking) async {
-    state = state.copyWith(isLoading: true, error: null, isSuccess: false);
-
-    try {
-      // Simulate AgroRent Direct payment verification
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Since booking creation now handles payment atomically,
-      // we just simulate success here if needed, or this method can be bypassed entirely
-      // depending on the mobile UI implementation.
-      state = state.copyWith(isLoading: false, isSuccess: true);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
+  Future<void> initiatePayment(dynamic booking) async {
+    state = PaymentState(isLoading: true);
+    await Future.delayed(const Duration(seconds: 1));
+    state = PaymentState(isSuccess: true, transactionId: 'TXN-${DateTime.now().millisecondsSinceEpoch}');
   }
 }
+
+final paymentProvider = StateNotifierProvider<PaymentNotifier, PaymentState>((ref) {
+  return PaymentNotifier();
+});

@@ -82,13 +82,14 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+      labelStyle: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600, fontSize: 13),
       filled: true,
       fillColor: Colors.white,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      isDense: true,
     );
   }
 
@@ -100,6 +101,102 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
       case 'Possible Match': return Colors.orange.shade500;
       default: return Colors.grey.shade500;
     }
+  }
+
+
+  Widget _buildProgressionStepper(String lang) {
+    int currentStep = 1;
+    if (_plan != null) {
+      currentStep = 4;
+    } else if (_season.isNotEmpty && _acreage.isNotEmpty && _crop.isNotEmpty) {
+      currentStep = 3;
+    } else if (_crop.isNotEmpty) {
+      currentStep = 2;
+    }
+
+    final steps = [
+      {'title': 'Crop', 'icon': Icons.eco_rounded, 'step': 1},
+      {'title': 'Land Size', 'icon': Icons.square_foot_rounded, 'step': 2},
+      {'title': 'Season', 'icon': Icons.wb_sunny_rounded, 'step': 3},
+      {'title': 'Recommendation', 'icon': Icons.auto_awesome_rounded, 'step': 4},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          for (int i = 0; i < steps.length; i++) ...[
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: (steps[i]['step'] as int) <= currentStep
+                          ? AppTheme.primaryGreen
+                          : Colors.grey.shade100,
+                      border: Border.all(
+                        color: (steps[i]['step'] as int) <= currentStep
+                            ? AppTheme.primaryGreen
+                            : Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      steps[i]['icon'] as IconData,
+                      size: 16,
+                      color: (steps[i]['step'] as int) <= currentStep
+                          ? Colors.white
+                          : Colors.grey.shade500,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    steps[i]['title'] as String,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: (steps[i]['step'] as int) <= currentStep
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                      color: (steps[i]['step'] as int) <= currentStep
+                          ? AppTheme.primaryGreen
+                          : Colors.grey.shade600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (i < steps.length - 1)
+              Container(
+                width: 14,
+                height: 2,
+                margin: const EdgeInsets.only(bottom: 18),
+                color: (steps[i]['step'] as int) < currentStep
+                    ? AppTheme.primaryGreen
+                    : Colors.grey.shade300,
+              ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -136,7 +233,11 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              // Visual Reference Stepper: Crop -> Land Size -> Season -> Recommendation
+              _buildProgressionStepper(lang),
+              const SizedBox(height: 16),
 
               // Form
               Container(
@@ -157,12 +258,13 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
+                              isExpanded: true,
                               initialValue: _soilType,
                               decoration: _inputDecoration('soil_type'.tr(lang)),
                               items: [
-                                DropdownMenuItem(value: 'Black Soil', child: Text('black_soil'.tr(lang))),
-                                DropdownMenuItem(value: 'Red Soil', child: Text('red_soil'.tr(lang))),
-                                DropdownMenuItem(value: 'Alluvial Soil', child: Text('alluvial_soil'.tr(lang))),
+                                DropdownMenuItem(value: 'Black Soil', child: Text('black_soil'.tr(lang), overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'Red Soil', child: Text('red_soil'.tr(lang), overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'Alluvial Soil', child: Text('alluvial_soil'.tr(lang), overflow: TextOverflow.ellipsis)),
                               ],
                               onChanged: (v) => setState(() => _soilType = v!),
                             ),
@@ -189,12 +291,13 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
+                              isExpanded: true,
                               initialValue: _season,
                               decoration: _inputDecoration('season'.tr(lang)),
                               items: [
-                                DropdownMenuItem(value: 'Kharif', child: Text('kharif'.tr(lang))),
-                                DropdownMenuItem(value: 'Rabi', child: Text('rabi'.tr(lang))),
-                                DropdownMenuItem(value: 'Zaid', child: Text('zaid'.tr(lang))),
+                                DropdownMenuItem(value: 'Kharif', child: Text('kharif'.tr(lang), overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'Rabi', child: Text('rabi'.tr(lang), overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'Zaid', child: Text('zaid'.tr(lang), overflow: TextOverflow.ellipsis)),
                               ],
                               onChanged: (v) => setState(() => _season = v!),
                             ),
@@ -203,9 +306,10 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _farmingStage,
                         decoration: _inputDecoration('current_stage'.tr(lang)),
-                        items: stages.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                        items: stages.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
                         onChanged: (v) => setState(() => _farmingStage = v!),
                       ),
                       const SizedBox(height: 12),
@@ -213,12 +317,13 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
+                              isExpanded: true,
                               initialValue: _objective,
                               decoration: _inputDecoration('objective'.tr(lang)),
                               items: [
-                                DropdownMenuItem(value: 'Reduce Cost', child: Text('reduce_cost'.tr(lang))),
-                                DropdownMenuItem(value: 'Maximum Yield', child: Text('maximum_yield'.tr(lang))),
-                                DropdownMenuItem(value: 'Fast Execution', child: Text('fast_execution'.tr(lang))),
+                                DropdownMenuItem(value: 'Reduce Cost', child: Text('reduce_cost'.tr(lang), overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'Maximum Yield', child: Text('maximum_yield'.tr(lang), overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'Fast Execution', child: Text('fast_execution'.tr(lang), overflow: TextOverflow.ellipsis)),
                               ],
                               onChanged: (v) => setState(() => _objective = v!),
                             ),
@@ -357,7 +462,7 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text('est_rental_cost'.tr(lang), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
-                                Text('Ã¢â€šÂ¹${_plan!['estimatedCost']['totalEstimatedCost']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.green, fontSize: 18)),
+                                Text('₹${_plan!['estimatedCost']['totalEstimatedCost']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.green, fontSize: 18)),
                               ],
                             ),
                             if (_plan!['estimatedCost']['farmerBudget'] > 0) ...[
@@ -366,7 +471,7 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text('your_budget'.tr(lang), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
-                                  Text('Ã¢â€šÂ¹${_plan!['estimatedCost']['farmerBudget']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                                  Text('₹${_plan!['estimatedCost']['farmerBudget']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                                 ],
                               ),
                             ],
@@ -415,17 +520,17 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                                     decoration: BoxDecoration(color: _getTierColor(eq['matchTier']), borderRadius: BorderRadius.circular(12)),
                                     child: Text('${eq['matchTier']} (${eq['matchScore']}%)', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white)),
                                   ),
-                                  Text('Ã¢â€šÂ¹${eq['pricePerDay']}/day', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.green, fontSize: 16)),
+                                  Text('₹${eq['pricePerDay']}/day', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.green, fontSize: 16)),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Text(eq['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('${eq['category']} Ã¢â‚¬Â¢ ${eq['location'] ?? 'Local'}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              Text('${eq['category']} • ${eq['location'] ?? 'Local'}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                               const SizedBox(height: 8),
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                                child: Text('Ã°Å¸â€™Â¡ ${eq['matchReason']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                                child: Text('💡 ${eq['matchReason']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                               ),
                               const SizedBox(height: 12),
                               const Divider(),
@@ -434,7 +539,7 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text('${'owner'.tr(lang)}: ${eq['owner']['name']}', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-                                  Text('${'est_total'.tr(lang)}: Ã¢â€šÂ¹${eq['estimatedTotalCost']} (${eq['recommendedDays']} ${'days'.tr(lang)})', style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+                                  Text('${'est_total'.tr(lang)}: ₹${eq['estimatedTotalCost']} (${eq['recommendedDays']} ${'days'.tr(lang)})', style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -520,7 +625,7 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Ã¢â‚¬Â¢ ', style: TextStyle(color: Colors.orange.shade900)),
+                                  Text('• ', style: TextStyle(color: Colors.orange.shade900)),
                                   Expanded(child: Text(r, style: TextStyle(fontSize: 12, color: Colors.orange.shade900))),
                                 ],
                               ),
@@ -542,7 +647,7 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Ã¢â‚¬Â¢ ', style: TextStyle(color: Colors.green.shade900)),
+                                  Text('• ', style: TextStyle(color: Colors.green.shade900)),
                                   Expanded(child: Text(t, style: TextStyle(fontSize: 12, color: Colors.green.shade900))),
                                 ],
                               ),

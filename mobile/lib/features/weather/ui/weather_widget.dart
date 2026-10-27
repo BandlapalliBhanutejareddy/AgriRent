@@ -14,13 +14,14 @@ class WeatherWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lang = ref.watch(languageProvider);
     final weatherState = ref.watch(weatherProvider(farmId));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (weatherState.isLoading && weatherState.weatherData == null) {
-      return _buildLoadingState(lang);
+      return _buildLoadingState(lang, isDark);
     }
 
     if (weatherState.error != null) {
-      return _buildErrorState(context, ref, lang, weatherState.error!);
+      return _buildErrorState(context, ref, lang, weatherState.error!, isDark);
     }
 
     if (weatherState.weatherData == null) {
@@ -31,15 +32,18 @@ class WeatherWidget extends ConsumerWidget {
     final current = data.current;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: isDark ? const Color(0xFF1E3528) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -58,17 +62,17 @@ class WeatherWidget extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Text(
                       'weather'.tr(lang).toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
-                        color: Color(0xFF0F172A),
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                         letterSpacing: -0.5,
                       ),
                     ),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: Color(0xFF64748B)),
+                  icon: Icon(Icons.refresh, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
                   onPressed: () {
                     ref.read(weatherProvider(farmId).notifier).fetchWeather();
                   },
@@ -84,7 +88,7 @@ class WeatherWidget extends ConsumerWidget {
               minHeight: 2,
             )
           else
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Divider(height: 1, color: isDark ? Colors.white12 : const Color(0xFFF1F5F9)),
 
           Padding(
             padding: const EdgeInsets.all(20.0),
@@ -93,13 +97,13 @@ class WeatherWidget extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 14, color: Color(0xFF64748B)),
+                    Icon(Icons.location_on, size: 14, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         data.location.name,
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : const Color(0xFF64748B),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -122,19 +126,19 @@ class WeatherWidget extends ConsumerWidget {
                       children: [
                         Text(
                           current.temperature != null ? '${current.temperature}°C' : 'not_available'.tr(lang),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                             letterSpacing: -1,
                           ),
                         ),
                         Text(
                           _getWeatherConditionKey(current.weatherCode).tr(lang),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF64748B),
+                            color: isDark ? Colors.white70 : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -144,27 +148,27 @@ class WeatherWidget extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text(
                   '${'feels_like'.tr(lang)} ${current.apparentTemperature != null ? '${current.apparentTemperature}°C' : 'not_available'.tr(lang)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF475569),
+                    color: isDark ? Colors.white60 : const Color(0xFF475569),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildWeatherDetail('humidity'.tr(lang), current.humidity != null ? '${current.humidity}%' : '-', Icons.water_drop_outlined),
-                    _buildWeatherDetail('rain'.tr(lang), current.rain != null ? '${current.rain} mm' : '-', Icons.umbrella_outlined),
-                    _buildWeatherDetail('wind'.tr(lang), current.windSpeed != null ? '${current.windSpeed} km/h' : '-', Icons.air_outlined),
+                    _buildWeatherDetail('humidity'.tr(lang), current.humidity != null ? '${current.humidity}%' : '-', Icons.water_drop_outlined, isDark),
+                    _buildWeatherDetail('rain'.tr(lang), current.rain != null ? '${current.rain} mm' : '-', Icons.umbrella_outlined, isDark),
+                    _buildWeatherDetail('wind'.tr(lang), current.windSpeed != null ? '${current.windSpeed} km/h' : '-', Icons.air_outlined, isDark),
                   ],
                 ),
                 const SizedBox(height: 20),
                 Text(
                   '${'updated'.tr(lang)} ${_formatDate(data.fetchedAt)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF94A3B8),
+                    color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
                   ),
                 ),
               ],
@@ -172,7 +176,7 @@ class WeatherWidget extends ConsumerWidget {
           ),
           
           if (data.forecast.isNotEmpty) ...[
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Divider(height: 1, color: isDark ? Colors.white12 : const Color(0xFFF1F5F9)),
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -180,10 +184,10 @@ class WeatherWidget extends ConsumerWidget {
                 children: [
                   Text(
                     'forecast'.tr(lang).toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
-                      color: Color(0xFF64748B),
+                      color: isDark ? Colors.white70 : const Color(0xFF64748B),
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -196,7 +200,7 @@ class WeatherWidget extends ConsumerWidget {
                       separatorBuilder: (context, index) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         final day = data.forecast[index];
-                        return _buildForecastCard(day, lang);
+                        return _buildForecastCard(day, lang, isDark);
                       },
                     ),
                   ),
@@ -209,7 +213,7 @@ class WeatherWidget extends ConsumerWidget {
     );
   }
 
-  Widget _buildForecastCard(DailyForecast day, String lang) {
+  Widget _buildForecastCard(DailyForecast day, String lang, bool isDark) {
     DateTime? date;
     try {
       date = DateTime.parse(day.date);
@@ -219,19 +223,19 @@ class WeatherWidget extends ConsumerWidget {
       width: 100,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: isDark ? const Color(0xFF16281E) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFF1F5F9)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             date != null ? DateFormat('MMM d').format(date) : '-',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF475569),
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
             ),
           ),
           const SizedBox(height: 8),
@@ -243,23 +247,23 @@ class WeatherWidget extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             '${day.maxTemperature?.round() ?? '-'}° / ${day.minTemperature?.round() ?? '-'}°',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
           ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.water_drop, size: 10, color: Color(0xFF64748B)),
+              Icon(Icons.water_drop, size: 10, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
               const SizedBox(width: 2),
               Text(
                 '${day.precipitationProbability ?? 0}%',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
-                  color: Color(0xFF64748B),
+                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
                 ),
               ),
             ],
@@ -269,57 +273,57 @@ class WeatherWidget extends ConsumerWidget {
     );
   }
 
-  Widget _buildWeatherDetail(String label, String value, IconData icon) {
+  Widget _buildWeatherDetail(String label, String value, IconData icon, bool isDark) {
     return Column(
       children: [
-        Icon(icon, size: 20, color: const Color(0xFF64748B)),
+        Icon(icon, size: 20, color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF64748B)),
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF0F172A),
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
-            color: Color(0xFF64748B),
+            color: isDark ? Colors.white70 : const Color(0xFF64748B),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLoadingState(String lang) {
+  Widget _buildLoadingState(String lang, bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        color: isDark ? const Color(0xFF1E3528) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
       ),
       child: const Center(
-        child: CircularProgressIndicator(color: Color(0xFF3B82F6)),
+        child: CircularProgressIndicator(color: Color(0xFF22C55E)),
       ),
     );
   }
 
-  Widget _buildErrorState(BuildContext context, WidgetRef ref, String lang, String error) {
+  Widget _buildErrorState(BuildContext context, WidgetRef ref, String lang, String error, bool isDark) {
     bool isLocationError = error.contains('WEATHER_LOCATION_UNAVAILABLE');
     String msg = isLocationError ? 'location_unavailable'.tr(lang) : 'temporarily_unavailable'.tr(lang);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        color: isDark ? const Color(0xFF1E3528) : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFFECACA)),
       ),
       child: Column(
         children: [
@@ -327,19 +331,19 @@ class WeatherWidget extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             'weather_unavailable'.tr(lang),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF991B1B),
+              color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             msg,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF991B1B),
+              color: isDark ? const Color(0xFFF87171) : const Color(0xFF991B1B),
             ),
           ),
           const SizedBox(height: 16),
@@ -348,8 +352,8 @@ class WeatherWidget extends ConsumerWidget {
               ref.read(weatherProvider(farmId).notifier).fetchWeather();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFEE2E2),
-              foregroundColor: const Color(0xFF991B1B),
+              backgroundColor: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
+              foregroundColor: isDark ? Colors.white : const Color(0xFF991B1B),
               elevation: 0,
             ),
             child: Text('try_again'.tr(lang), style: const TextStyle(fontWeight: FontWeight.w700)),

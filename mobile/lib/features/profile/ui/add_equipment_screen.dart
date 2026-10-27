@@ -6,8 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/localization/app_localizations.dart';
+import '../../../core/constants/agricultural_catalog.dart';
 import '../../../shared/theme/app_theme.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/owner_provider.dart';
+import 'owner_bank_details_dialog.dart';
 
 class AddEquipmentScreen extends ConsumerStatefulWidget {
   const AddEquipmentScreen({super.key});
@@ -22,19 +25,13 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
   final _locationController = TextEditingController();
-  String _selectedCategory = 'TRACTOR';
+  String _selectedCategory = 'TRACTORS_AND_POWER_UNITS';
+  EquipmentCatalogItem? _selectedCatalogItem;
+  String? _catalogImageUrl;
   File? _selectedImageFile;
   bool _isSubmitting = false;
 
-  final List<String> _categories = [
-    'TRACTOR',
-    'HARVESTER',
-    'SEEDER',
-    'PLOUGH',
-    'CULTIVATOR',
-    'SPRAYER',
-    'OTHER'
-  ];
+  final List<EquipmentCategoryDefinition> _categories = AgriculturalCatalog.categories;
 
   @override
   void dispose() {
@@ -55,8 +52,23 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
         imageQuality: 85,
       );
       if (pickedFile != null) {
+        final file = File(pickedFile.path);
+        final fileBytes = await file.length();
+        if (fileBytes > 5 * 1024 * 1024) {
+          if (mounted) {
+            final lang = ref.read(languageProvider);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('image_size_exceeded'.tr(lang)),
+                backgroundColor: const Color(0xFFC62828),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
         setState(() {
-          _selectedImageFile = File(pickedFile.path);
+          _selectedImageFile = file;
         });
       }
     } catch (e) {
@@ -137,16 +149,92 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     final lang = ref.read(languageProvider);
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
+    // Enforce Owner Phone Number Requirement
+    final authUser = ref.read(authProvider).user;
+    final ownerPhone = authUser?.phone?.trim() ?? '';
+    final cleanedOwnerPhone = ownerPhone.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+    final isValidOwnerPhone = RegExp(r'^[6-9]\d{9}$').hasMatch(cleanedOwnerPhone) || RegExp(r'^91[6-9]\d{9}$').hasMatch(cleanedOwnerPhone);
+
+    if (!isValidOwnerPhone) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('phone_required_for_listing'.tr(lang)),
+          backgroundColor: const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'update_phone'.tr(lang),
+            textColor: Colors.white,
+            onPressed: () => context.push('/edit-profile'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Enforce Owner Bank Details Requirement before listing equipment for rent
+    try {
+      final bankRes = await ApiClient().dio.get('owner/bank-details');
+      final bankData = bankRes.data?['data'];
+      final hasBankDetails = bankRes.statusCode == 200 &&
+          bankData != null &&
+          (bankData['maskedAccountNumber'] != null && bankData['maskedAccountNumber'].toString().isNotEmpty);
+
+      if (!hasBankDetails) {
+        if (!mounted) return;
+        final shouldAdd = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.account_balance_wallet_rounded, color: AppTheme.primaryGreen),
+                SizedBox(width: 10),
+                Expanded(child: Text('Bank Details Required', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold))),
+              ],
+            ),
+            content: const Text(
+              'To list equipment and receive rental earnings securely, you must provide and save your bank payout details first.\n\nWould you like to set up your bank details now?',
+              style: TextStyle(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Add Bank Details', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldAdd == true && mounted) {
+          final result = await OwnerBankDetailsDialog.show(context);
+          if (result == null) {
+            return;
+          }
+        } else {
+          return;
+        }
+      }
+    } catch (_) {
+      // Backend will enforce if network check failed
+    }
+
+    if (!mounted) return;
+
     final price = double.tryParse(_priceController.text.trim());
     if (price == null || price <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('fill_required_fields'.tr(lang)),
+          content: Text('enter_valid_price'.tr(lang)),
           backgroundColor: const Color(0xFFC62828),
           behavior: SnackBarBehavior.floating,
         ),
@@ -198,20 +286,27 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
     }
 
     // 2. Create Equipment in DB
+    final resolvedImageUrl = uploadedImageUrl ??
+        _catalogImageUrl ??
+        AgriculturalCatalog.resolveImageUrl(
+          category: _selectedCategory,
+          title: _titleController.text.trim(),
+        );
+
     final data = <String, dynamic>{
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
       'pricePerDay': price,
       'category': _selectedCategory.toUpperCase(),
       'location': _locationController.text.trim(),
-      if (uploadedImageUrl != null && uploadedImageUrl.isNotEmpty)
-        'imageUrl': uploadedImageUrl,
+      'imageUrl': resolvedImageUrl,
     };
 
     final success = await ref.read(ownerProvider.notifier).createEquipment(data);
+    if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    if (success && mounted) {
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -224,12 +319,12 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
         ),
       );
       context.pop();
-    } else if (!success && mounted) {
+    } else {
       final err = ref.read(ownerProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            err ?? 'unable_to_load_messages'.tr(lang),
+            err ?? 'failed_to_create_equipment'.tr(lang),
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           backgroundColor: const Color(0xFFC62828),
@@ -243,6 +338,10 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
   Widget build(BuildContext context) {
     final lang = ref.watch(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authUser = ref.watch(authProvider).user;
+    final ownerPhone = authUser?.phone?.trim() ?? '';
+    final cleanedOwnerPhone = ownerPhone.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+    final isValidOwnerPhone = RegExp(r'^[6-9]\d{9}$').hasMatch(cleanedOwnerPhone) || RegExp(r'^91[6-9]\d{9}$').hasMatch(cleanedOwnerPhone);
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
@@ -275,6 +374,58 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!isValidOwnerPhone)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'phone_required_for_owners'.tr(lang),
+                              style: const TextStyle(
+                                color: Color(0xFF991B1B),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'phone_required_for_listing'.tr(lang),
+                        style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 36,
+                        child: ElevatedButton.icon(
+                          onPressed: () => context.push('/edit-profile'),
+                          icon: const Icon(Icons.edit, size: 16),
+                          label: Text('update_phone'.tr(lang), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -304,15 +455,24 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
                     ),
                     const SizedBox(height: 18),
 
-                    // Machine Title Field
+                    // Machine Title Field (min 3 chars required)
                     _buildTextField(
                       controller: _titleController,
                       label: '${'title'.tr(lang)} *',
-                      hint: 'e.g. John Deere 5050D 4WD',
+                      hint: 'e.g. Mahindra 575 DI 45HP Tractor',
                       isDark: isDark,
-                      validator: (val) => (val == null || val.trim().isEmpty)
-                          ? 'fill_required_fields'.tr(lang)
-                          : null,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'fill_required_fields'.tr(lang);
+                        }
+                        if (val.trim().length < 3) {
+                          return 'enter_valid_title'.tr(lang);
+                        }
+                        if (val.trim().length > 100) {
+                          return 'Maximum 100 characters allowed';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -325,15 +485,13 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
                         color: isDark ? Colors.white : AppTheme.textDarkNavy,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'category'.tr(lang),
+                        labelText: '${'category'.tr(lang)} *',
                         labelStyle: TextStyle(
                           color: isDark ? Colors.white60 : AppTheme.textMutedGray,
                           fontSize: 13,
                         ),
                         filled: true,
-                        fillColor: isDark
-                            ? AppTheme.darkBackground
-                            : const Color(0xFFF7F9F8),
+                        fillColor: isDark ? AppTheme.darkBackground : const Color(0xFFF7F9F8),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide(
@@ -353,42 +511,98 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
                             width: 1.8,
                           ),
                         ),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       ),
-                      items: _categories
-                          .map((c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(c),
-                              ))
-                          .toList(),
+                      items: _categories.map((cat) {
+                        return DropdownMenuItem<String>(
+                          value: cat.id,
+                          child: Row(
+                            children: [
+                              Icon(cat.icon, size: 18, color: AppTheme.primaryGreen),
+                              const SizedBox(width: 10),
+                              Text(
+                                cat.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                       onChanged: (val) {
-                        if (val != null) setState(() => _selectedCategory = val);
+                        if (val != null) {
+                          setState(() {
+                            _selectedCategory = val;
+                            _selectedCatalogItem = null;
+                            _catalogImageUrl = null;
+                          });
+                        }
                       },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Standard Catalog Quick-Fill Section
+                    Text(
+                      'Agricultural Catalog (Tap to Auto-fill)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white70 : AppTheme.textMutedGray,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: AgriculturalCatalog.getItemsForCategory(_selectedCategory).map((item) {
+                          final isSelected = _selectedCatalogItem?.id == item.id;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ActionChip(
+                              avatar: Icon(item.icon, size: 16, color: isSelected ? Colors.white : AppTheme.primaryGreen),
+                              label: Text(item.name),
+                              labelStyle: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? Colors.white : (isDark ? Colors.white : AppTheme.textDarkNavy),
+                              ),
+                              backgroundColor: isSelected ? AppTheme.primaryGreen : (isDark ? Colors.white10 : const Color(0xFFF1F5F2)),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedCatalogItem = item;
+                                  _titleController.text = item.name;
+                                  _priceController.text = item.defaultPricePerDay.toStringAsFixed(0);
+                                  _descriptionController.text = item.description;
+                                  _catalogImageUrl = item.defaultImageUrl;
+                                });
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                     const SizedBox(height: 16),
 
                     // Daily Rental Rate
                     _buildTextField(
                       controller: _priceController,
-                      label: '${'rental_rate'.tr(lang)} (Ã¢â€šÂ¹ / ${'day'.tr(lang)}) *',
-                      hint: 'e.g. 2500',
+                      label: '${'rental_rate'.tr(lang)} (₹/${'day'.tr(lang)}) *',
+                      hint: 'e.g. 1500',
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       isDark: isDark,
-                      keyboardType: TextInputType.number,
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) {
                           return 'fill_required_fields'.tr(lang);
                         }
                         final num = double.tryParse(val.trim());
                         if (num == null || num <= 0) {
-                          return 'fill_required_fields'.tr(lang);
+                          return 'enter_valid_price'.tr(lang);
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
 
-                    // Location
+                    // Farm Location
                     _buildTextField(
                       controller: _locationController,
                       label: 'location'.tr(lang),
@@ -397,54 +611,96 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Real Device Image / Photo Picker UI
-                    _buildPhotoPickerSection(lang, isDark),
-                    const SizedBox(height: 16),
-
-                    // Description
+                    // Description Field (max 1000 chars)
                     _buildTextField(
                       controller: _descriptionController,
                       label: 'description'.tr(lang),
-                      hint: 'Provide details about power, attachments, condition...',
-                      isDark: isDark,
+                      hint: 'Provide details about implements, horse power, condition...',
                       maxLines: 3,
+                      isDark: isDark,
+                      validator: (val) {
+                        if (val != null && val.trim().length > 1000) {
+                          return 'Maximum 1000 characters allowed';
+                        }
+                        return null;
+                      },
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Image Upload Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'equipment_photo'.tr(lang),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildImagePicker(isDark, lang),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
 
               // Submit Button
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryGreen,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.6),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isSubmitting ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.6),
+                    elevation: 2,
+                    shadowColor: AppTheme.primaryGreen.withValues(alpha: 0.4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                  elevation: 0,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'submit_equipment'.tr(lang),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                 ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.2,
-                        ),
-                      )
-                    : Text(
-                        'save_equipment'.tr(lang),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -452,67 +708,94 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
     );
   }
 
-  Widget _buildPhotoPickerSection(String lang, bool isDark) {
+  Widget _buildImagePicker(bool isDark, String lang) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'add_equipment_photo'.tr(lang),
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white70 : AppTheme.textDarkNavy,
-          ),
-        ),
-        const SizedBox(height: 8),
         if (_selectedImageFile != null)
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? Colors.white24 : AppTheme.primaryGreen.withValues(alpha: 0.3),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.file(
+                  _selectedImageFile!,
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                ),
               ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(15),
-              child: Stack(
-                alignment: Alignment.topRight,
-                children: [
-                  Image.file(
-                    _selectedImageFile!,
-                    height: 180,
+              Positioned(
+                top: 8,
+                right: 8,
+                child: InkWell(
+                  onTap: () => setState(() => _selectedImageFile = null),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, size: 16, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          )
+        else if (_catalogImageUrl != null && _catalogImageUrl!.isNotEmpty)
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  _catalogImageUrl!,
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, stack) => Container(
                     width: double.infinity,
-                    fit: BoxFit.cover,
+                    height: 140,
+                    color: isDark ? AppTheme.darkBackground : const Color(0xFFF1F5F2),
+                    child: const Icon(Icons.agriculture_rounded, size: 48, color: AppTheme.primaryGreen),
                   ),
-                  Container(
-                    margin: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
-                          onPressed: () => _showImageSourceDialog(lang, isDark),
-                          tooltip: 'change_photo'.tr(lang),
-                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                          padding: EdgeInsets.zero,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                          onPressed: () => setState(() => _selectedImageFile = null),
-                          tooltip: 'remove_photo'.tr(lang),
-                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              Positioned(
+                bottom: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.verified_rounded, size: 14, color: AppTheme.accentLime),
+                      const SizedBox(width: 4),
+                      Text(
+                        'catalog_image'.tr(lang),
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: InkWell(
+                  onTap: () => _showImageSourceDialog(lang, isDark),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
           )
         else
           InkWell(
@@ -520,12 +803,12 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
             borderRadius: BorderRadius.circular(16),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              height: 140,
               decoration: BoxDecoration(
                 color: isDark ? AppTheme.darkBackground : const Color(0xFFF7F9F8),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? Colors.white12 : Colors.grey.shade300,
+                  color: isDark ? Colors.white12 : const Color(0xFFE0E0E0),
                   style: BorderStyle.solid,
                 ),
               ),
@@ -535,13 +818,13 @@ class _AddEquipmentScreenState extends ConsumerState<AddEquipmentScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.add_a_photo_outlined,
                       color: AppTheme.primaryGreen,
-                      size: 26,
+                      size: 28,
                     ),
                   ),
                   const SizedBox(height: 10),

@@ -7,10 +7,10 @@ import { useStore } from '@/store/useStore';
 
 const languages = [
   { code: 'en', name: 'English' },
-  { code: 'te', name: 'Ã Â°Â¤Ã Â±â€ Ã Â°Â²Ã Â±ÂÃ Â°â€”Ã Â±Â' },
-  { code: 'hi', name: 'Ã Â¤Â¹Ã Â¤Â¿Ã Â¤Â¨Ã Â¥ÂÃ Â¤Â¦Ã Â¥â‚¬' },
-  { code: 'ta', name: 'Ã Â®Â¤Ã Â®Â®Ã Â®Â¿Ã Â®Â´Ã Â¯Â' },
-  { code: 'kn', name: 'Ã Â²â€¢Ã Â²Â¨Ã Â³ÂÃ Â²Â¨Ã Â²Â¡' }
+  { code: 'te', name: 'తెలుగు' },
+  { code: 'hi', name: 'हिन्दी' },
+  { code: 'ta', name: 'தமிழ்' },
+  { code: 'kn', name: 'ಕನ್ನಡ' }
 ];
 
 export default function LanguageSwitcher() {

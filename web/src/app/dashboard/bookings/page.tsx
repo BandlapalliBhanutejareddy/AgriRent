@@ -187,7 +187,7 @@ export default function OwnerBookingsPage() {
                         {formatCurrency(booking.totalPrice)}
                       </div>
                       <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                        Deposit: Ã¢â€šÂ¹{booking.securityDeposit || 0}
+                        Deposit: ₹{booking.securityDeposit || 0}
                       </div>
                     </td>
 
@@ -285,7 +285,7 @@ export default function OwnerBookingsPage() {
                               })}
                               className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
                             >
-                              Ã¢Ëœâ€¦ Rate Farmer
+                              ★ Rate Farmer
                             </button>
                           </div>
                         )}
@@ -311,7 +311,7 @@ export default function OwnerBookingsPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-slate-900 dark:text-white">Equipment Inspection</h3>
-                  <p className="text-xs text-slate-500 font-semibold">{inspectionModal.equipmentTitle} Ã¢â‚¬Â¢ Rented by {inspectionModal.farmerName}</p>
+                  <p className="text-xs text-slate-500 font-semibold">{inspectionModal.equipmentTitle} • Rented by {inspectionModal.farmerName}</p>
                 </div>
               </div>
               <button onClick={() => setInspectionModal(prev => ({ ...prev, isOpen: false }))} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl">
@@ -327,14 +327,14 @@ export default function OwnerBookingsPage() {
                   onChange={(e) => setInspectionData(prev => ({ ...prev, condition: e.target.value }))}
                   className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
-                  <option value="GOOD">GOOD Ã¢â‚¬â€ Clean, fully functional, no damage</option>
-                  <option value="MINOR_DAMAGE">MINOR_DAMAGE Ã¢â‚¬â€ Minor wear/cleaning required (small deduction)</option>
-                  <option value="MAJOR_DAMAGE">MAJOR_DAMAGE Ã¢â‚¬â€ Severe breakdown/damage (security deposit withheld)</option>
+                  <option value="GOOD">GOOD — Clean, fully functional, no damage</option>
+                  <option value="MINOR_DAMAGE">MINOR_DAMAGE — Minor wear/cleaning required (small deduction)</option>
+                  <option value="MAJOR_DAMAGE">MAJOR_DAMAGE — Severe breakdown/damage (security deposit withheld)</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Security Deposit Deduction (Ã¢â€šÂ¹)</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Security Deposit Deduction (₹)</label>
                 <input
                   type="number"
                   min={0}

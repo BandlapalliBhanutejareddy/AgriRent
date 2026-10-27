@@ -1,0 +1,11 @@
+const token = "eyJhbGciOiJFUzI1NiIsImtpZCI6IjUxZjBlMGI4LTczZWEtNGI1YS1hYjMzLWMzMmQ5YzNhZWVmNyIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V6eWx4eXJ0bm9keHRoZGd5bnZuLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJjZDY1ODdjMC01ODM3LTQzMGMtYjMxMC02ZTVmYmNlMjM2NzEiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzkxMTc5NTUyLCJpYXQiOjE3OTExNzU5NTIsImVtYWlsIjoiZmFybWVyLmxpdmVAYWdyb3JlbnQuYWkiLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiUmFtZXNoIEt1bWFyIChGYXJtZXIpIiwicGhvbmUiOiIrOTE5ODc2NTQzMjEwIiwicm9sZSI6IkZBUk1FUiJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzkxMTc1OTUyfV0sInNlc3Npb25faWQiOiI5ZjcyMGY5Ni01YWRiLTQzNzUtYWU3Ny00YjdiNWQzYjdjNDciLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.UDguY-XA1xebOAM16oyWhLZLXXvYxtCNq38_lXA8kuqJWL8MQPpCu5s3ERa6WJp-HkmFFYWG1zf6com_LoDUfA";
+
+fetch('https://agrirent-5qpx.onrender.com/api/payments/history', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+}).then(r => {
+  console.log('Status:', r.status);
+  return r.text();
+}).then(t => console.log('Body:', t))
+.catch(e => console.error(e));

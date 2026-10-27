@@ -34,22 +34,52 @@ router.get('/', async (req: Request, res: Response, next: any): Promise<void> =>
     }
 
     if (category && category !== 'ALL' && category !== 'All Categories') {
-      where.category = String(category).toUpperCase();
+      const catUpper = String(category).trim().toUpperCase();
+      const categoryMap: Record<string, string[]> = {
+        'TRACTOR': ['TRACTOR', 'TRACTORS'],
+        'TRACTORS': ['TRACTOR', 'TRACTORS'],
+        'HARVESTER': ['HARVESTER', 'HARVESTERS'],
+        'HARVESTERS': ['HARVESTER', 'HARVESTERS'],
+        'POWER_TILLERS': ['POWER_TILLERS', 'POWER_TILLER', 'TILLER', 'POWER TILLER'],
+        'POWER TILLERS': ['POWER_TILLERS', 'POWER_TILLER', 'TILLER', 'POWER TILLER'],
+        'POWER_TILLER': ['POWER_TILLERS', 'POWER_TILLER', 'TILLER', 'POWER TILLER'],
+        'POWER TILLER': ['POWER_TILLERS', 'POWER_TILLER', 'TILLER', 'POWER TILLER'],
+        'TILLER': ['POWER_TILLERS', 'POWER_TILLER', 'TILLER', 'POWER TILLER'],
+        'IMPLEMENTS': ['IMPLEMENTS', 'ROTAVATOR', 'THRESHER', 'SEED DRILL'],
+        'SPRAYER': ['SPRAYER', 'SPRAYERS'],
+        'SPRAYERS': ['SPRAYER', 'SPRAYERS'],
+        'PUMP': ['IRRIGATION', 'PUMP', 'PUMPS', 'WATER PUMP'],
+        'PUMPS': ['IRRIGATION', 'PUMP', 'PUMPS', 'WATER PUMP'],
+        'IRRIGATION': ['IRRIGATION', 'PUMP', 'PUMPS', 'WATER PUMP'],
+        'CULTIVATOR': ['CULTIVATOR', 'CULTIVATORS'],
+      };
+
+      if (categoryMap[catUpper]) {
+        where.category = { in: categoryMap[catUpper] };
+      } else {
+        where.category = { equals: catUpper, mode: 'insensitive' };
+      }
     }
 
     if (search) {
       const searchStr = String(search).toLowerCase();
       // Hybrid search: local mapped keyword first
       const dictionary: Record<string, string> = {
-        'Ã Â°Å¸Ã Â±ÂÃ Â°Â°Ã Â°Â¾Ã Â°â€¢Ã Â±ÂÃ Â°Å¸Ã Â°Â°Ã Â±Â': 'tractor', 'tractor': 'tractor', 'Ã Â¤Å¸Ã Â¥ÂÃ Â¤Â°Ã Â¥Ë†Ã Â¤â€¢Ã Â¥ÂÃ Â¤Å¸Ã Â¤Â°': 'tractor', 'Ã Â®Å¸Ã Â®Â¿Ã Â®Â°Ã Â®Â¾Ã Â®â€¢Ã Â¯ÂÃ Â®Å¸Ã Â®Â°Ã Â¯Â': 'tractor', 'Ã Â²Å¸Ã Â³ÂÃ Â²Â°Ã Â²Â¾Ã Â²â€¢Ã Â³ÂÃ Â²Å¸Ã Â²Â°Ã Â³Â': 'tractor',
-        'harvester': 'harvester', 'Ã Â°Â¹Ã Â°Â¾Ã Â°Â°Ã Â±ÂÃ Â°ÂµÃ Â±â€ Ã Â°Â¸Ã Â±ÂÃ Â°Å¸Ã Â°Â°Ã Â±Â': 'harvester', 'Ã Â¤Â¹Ã Â¤Â¾Ã Â¤Â°Ã Â¥ÂÃ Â¤ÂµÃ Â¥â€¡Ã Â¤Â¸Ã Â¥ÂÃ Â¤Å¸Ã Â¤Â°': 'harvester', 'Ã Â®â€¦Ã Â®Â±Ã Â¯ÂÃ Â®ÂµÃ Â®Å¸Ã Â¯Ë† Ã Â®â€¡Ã Â®Â¯Ã Â®Â¨Ã Â¯ÂÃ Â®Â¤Ã Â®Â¿Ã Â®Â°Ã Â®Â®Ã Â¯Â': 'harvester', 'Ã Â²Â¹Ã Â²Â¾Ã Â²Â°Ã Â³ÂÃ Â²ÂµÃ Â³â€ Ã Â²Â¸Ã Â³ÂÃ Â²Å¸Ã Â²Â°Ã Â³Â': 'harvester',
-        'cultivator': 'cultivator', 'Ã Â°â€¢Ã Â°Â²Ã Â±ÂÃ Â°Å¸Ã Â°Â¿Ã Â°ÂµÃ Â±â€¡Ã Â°Å¸Ã Â°Â°Ã Â±Â': 'cultivator', 'Ã Â¤â€¢Ã Â¤Â²Ã Â¥ÂÃ Â¤Å¸Ã Â¥â‚¬Ã Â¤ÂµÃ Â¥â€¡Ã Â¤Å¸Ã Â¤Â°': 'cultivator', 'Ã Â®Å¡Ã Â®Â¾Ã Â®â€¢Ã Â¯ÂÃ Â®ÂªÃ Â®Å¸Ã Â®Â¿Ã Â®Â¯Ã Â®Â¾Ã Â®Â³Ã Â®Â°Ã Â¯Â': 'cultivator', 'Ã Â²â€¢Ã Â²Â²Ã Â³ÂÃ Â²Å¸Ã Â²Â¿Ã Â²ÂµÃ Â³â€¡Ã Â²Å¸Ã Â²Â°Ã Â³Â': 'cultivator',
-        'rotavator': 'rotavator', 'Ã Â°Â°Ã Â±â€¹Ã Â°Å¸Ã Â°ÂµÃ Â±â€¡Ã Â°Å¸Ã Â°Â°Ã Â±Â': 'rotavator', 'Ã Â¤Â°Ã Â¥â€¹Ã Â¤Å¸Ã Â¤Â¾Ã Â¤ÂµÃ Â¥â€¡Ã Â¤Å¸Ã Â¤Â°': 'rotavator', 'Ã Â®Â°Ã Â¯â€¹Ã Â®Å¸Ã Â¯ÂÃ Â®Å¸Ã Â®Â¾Ã Â®ÂµÃ Â¯â€¡Ã Â®Å¸Ã Â¯ÂÃ Â®Å¸Ã Â®Â°Ã Â¯Â': 'rotavator', 'Ã Â²Â°Ã Â³Å Ã Â²Å¸Ã Â²Â¾Ã Â²ÂµÃ Â³â€¡Ã Â²Å¸Ã Â²Â°Ã Â³Â': 'rotavator',
-        'sprayer': 'sprayer', 'Ã Â°Â¸Ã Â±ÂÃ Â°ÂªÃ Â±ÂÃ Â°Â°Ã Â±â€¡Ã Â°Â¯Ã Â°Â°Ã Â±Â': 'sprayer', 'Ã Â¤Â¸Ã Â¥ÂÃ Â¤ÂªÃ Â¥ÂÃ Â¤Â°Ã Â¥â€¡Ã Â¤Â¯Ã Â¤Â°': 'sprayer', 'Ã Â®Â¤Ã Â¯â€ Ã Â®Â³Ã Â®Â¿Ã Â®ÂªÃ Â¯ÂÃ Â®ÂªÃ Â®Â¾Ã Â®Â©Ã Â¯Â': 'sprayer', 'Ã Â²Â¸Ã Â²Â¿Ã Â²â€šÃ Â²ÂªÃ Â²Â¡Ã Â²Â¿Ã Â²Â¸Ã Â³ÂÃ Â²ÂµÃ Â²ÂµÃ Â²Â¨Ã Â³Â': 'sprayer',
-        'thresher': 'thresher', 'Ã Â°Â¥Ã Â±ÂÃ Â°Â°Ã Â±â€ Ã Â°Â·Ã Â°Â°Ã Â±Â': 'thresher', 'Ã Â¤Â¥Ã Â¥ÂÃ Â¤Â°Ã Â¥â€¡Ã Â¤Â¶Ã Â¤Â°': 'thresher', 'Ã Â®â€¢Ã Â®Â¤Ã Â®Â¿Ã Â®Â°Ã Â¯Â Ã Â®â€¦Ã Â®Å¸Ã Â®Â¿Ã Â®ÂªÃ Â¯ÂÃ Â®ÂªÃ Â®Â¾Ã Â®Â©Ã Â¯Â': 'thresher', 'Ã Â²Â¥Ã Â³ÂÃ Â²Â°Ã Â³â€ Ã Â²Â·Ã Â²Â°Ã Â³Â': 'thresher',
-        'seed drill': 'seed drill', 'Ã Â°Â¸Ã Â±â‚¬Ã Â°Â¡Ã Â±Â Ã Â°Â¡Ã Â±ÂÃ Â°Â°Ã Â°Â¿Ã Â°Â²Ã Â±Â': 'seed drill', 'Ã Â¤Â¸Ã Â¥â‚¬Ã Â¤Â¡ Ã Â¤Â¡Ã Â¥ÂÃ Â¤Â°Ã Â¤Â¿Ã Â¤Â²': 'seed drill', 'Ã Â®ÂµÃ Â®Â¿Ã Â®Â¤Ã Â¯Ë† Ã Â®Â¤Ã Â¯ÂÃ Â®Â°Ã Â®ÂªÃ Â¯ÂÃ Â®ÂªÃ Â®Â£Ã Â®Â®Ã Â¯Â': 'seed drill', 'Ã Â²Â¬Ã Â³â‚¬Ã Â²Å“ Ã Â²Â¡Ã Â³ÂÃ Â²Â°Ã Â²Â¿Ã Â²Â²Ã Â³Â': 'seed drill',
-        'power tiller': 'power tiller', 'Ã Â°ÂªÃ Â°ÂµÃ Â°Â°Ã Â±Â Ã Â°Å¸Ã Â°Â¿Ã Â°Â²Ã Â±ÂÃ Â°Â²Ã Â°Â°Ã Â±Â': 'power tiller', 'Ã Â¤ÂªÃ Â¤Â¾Ã Â¤ÂµÃ Â¤Â° Ã Â¤Å¸Ã Â¤Â¿Ã Â¤Â²Ã Â¤Â°': 'power tiller', 'Ã Â®ÂªÃ Â®ÂµÃ Â®Â°Ã Â¯Â Ã Â®Å¸Ã Â®Â¿Ã Â®Â²Ã Â¯ÂÃ Â®Â²Ã Â®Â°Ã Â¯Â': 'power tiller', 'Ã Â²ÂªÃ Â²ÂµÃ Â²Â°Ã Â³Â Ã Â²Å¸Ã Â²Â¿Ã Â²Â²Ã Â³ÂÃ Â²Â²Ã Â²Â°Ã Â³Â': 'power tiller',
-        'rice transplanter': 'rice transplanter', 'Ã Â°Â°Ã Â±Ë†Ã Â°Â¸Ã Â±Â Ã Â°Å¸Ã Â±ÂÃ Â°Â°Ã Â°Â¾Ã Â°Â¨Ã Â±ÂÃ Â°Â¸Ã Â±ÂÃ¢â‚¬Å’Ã Â°ÂªÃ Â±ÂÃ Â°Â²Ã Â°Â¾Ã Â°â€šÃ Â°Å¸Ã Â°Â°Ã Â±Â': 'rice transplanter', 'Ã Â¤Â°Ã Â¤Â¾Ã Â¤â€¡Ã Â¤Â¸ Ã Â¤Å¸Ã Â¥ÂÃ Â¤Â°Ã Â¤Â¾Ã Â¤â€šÃ Â¤Â¸Ã Â¤ÂªÃ Â¥ÂÃ Â¤Â²Ã Â¤Â¾Ã Â¤â€šÃ Â¤Å¸Ã Â¤Â°': 'rice transplanter', 'Ã Â®Â¨Ã Â¯â€ Ã Â®Â²Ã Â¯Â Ã Â®Â¨Ã Â®Â¾Ã Â®Â±Ã Â¯ÂÃ Â®Â±Ã Â¯Â Ã Â®Â¨Ã Â®Å¸Ã Â¯ÂÃ Â®Â®Ã Â¯Â Ã Â®â€¡Ã Â®Â¯Ã Â®Â¨Ã Â¯ÂÃ Â®Â¤Ã Â®Â¿Ã Â®Â°Ã Â®Â®Ã Â¯Â': 'rice transplanter', 'Ã Â²Â­Ã Â²Â¤Ã Â³ÂÃ Â²Â¤Ã Â²Â¦ Ã Â²Â¨Ã Â²Â¾Ã Â²Å¸Ã Â²Â¿ Ã Â²Â¯Ã Â²â€šÃ Â²Â¤Ã Â³ÂÃ Â²Â°': 'rice transplanter'
+        // Telugu
+        'ట్రాక్టర్': 'tractor', 'హార్వెస్టర్': 'harvester', 'కల్టివేటర్': 'cultivator', 'రోటవేటర్': 'rotavator',
+        'స్ప్రేయర్': 'sprayer', 'థ్రెషర్': 'thresher', 'సీడ్ డ్రిల్': 'seed drill', 'పవర్ టిల్లర్': 'power tiller', 'రైస్ ట్రాన్స్‌ప్లాంటర్': 'rice transplanter',
+        // Hindi
+        'ट्रैक्टर': 'tractor', 'हार्वेस्टर': 'harvester', 'कल्तीवेटर': 'cultivator', 'रोटावेटर': 'rotavator',
+        'स्प्रेयर': 'sprayer', 'थ्रेशर': 'thresher', 'सीड ड्रिल': 'seed drill', 'पावर टिलर': 'power tiller', 'राइस ट्रांसप्लांटर': 'rice transplanter',
+        // Tamil
+        'டிராக்டர்': 'tractor', 'அறுவடை இயந்திரம்': 'harvester', 'சாகுபடியாளர்': 'cultivator', 'ரோட்டாவேட்டர்': 'rotavator',
+        'தெளிப்பான்': 'sprayer', 'கதிர் அடிப்பான்': 'thresher', 'விதை துரப்பணம்': 'seed drill', 'பவர் டில்லர்': 'power tiller', 'நெல் நாற்று நடும் இயந்திரம்': 'rice transplanter',
+        // Kannada
+        'ಟ್ರಾಕ್ಟರ್': 'tractor', 'ಹಾರ್ವೆಸ್ಟರ್': 'harvester', 'ಕಲ್ಟಿವೇಟರ್': 'cultivator', 'ರೊಟಾವೇಟರ್': 'rotavator',
+        'ಸಿಂಪಡಿಸುವವನು': 'sprayer', 'ಥ್ರೆಷರ್': 'thresher', 'ಬೀಜ ಡ್ರಿಲ್': 'seed drill', 'ಪವರ್ ಟಿಲ್ಲರ್': 'power tiller', 'ಭತ್ತದ ನಾಟಿ ಯಂತ್ರ': 'rice transplanter',
+        // English canonical
+        'tractor': 'tractor', 'harvester': 'harvester', 'cultivator': 'cultivator', 'rotavator': 'rotavator',
+        'sprayer': 'sprayer', 'thresher': 'thresher', 'seed drill': 'seed drill', 'power tiller': 'power tiller', 'rice transplanter': 'rice transplanter'
       };
 
       let keyword = dictionary[searchStr];
@@ -193,8 +223,8 @@ router.get('/nearby', async (req: Request, res: Response, next: any): Promise<vo
   }
 });
 
-// Get My Equipment (Owner Only)
-router.get('/my', requireAuth, requireRole('OWNER'), async (req: AuthRequest, res: Response): Promise<void> => {
+// Get My Equipment (Owner Only) - supports both /my and /owner
+router.get(['/my', '/owner'], requireAuth, requireRole('OWNER'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const equipment = await prisma.equipment.findMany({
       where: { ownerId: String(req.prismaUser.id) },
@@ -214,7 +244,7 @@ router.get('/:id', async (req: Request, res: Response, next: any): Promise<void>
       where: { id: String(req.params.id) },
       include: {
         owner: {
-          select: { id: true, name: true, phone: true }
+          select: { id: true, name: true }
         }
       }
     });
@@ -260,6 +290,42 @@ router.get('/:id', async (req: Request, res: Response, next: any): Promise<void>
 router.post('/', requireAuth, requireRole('OWNER'), validate(createEquipmentSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   console.log("CREATE PAYLOAD", req.body);
   try {
+    // Validate Owner Phone Number requirement (Indian mobile format: 10 digits or +91)
+    const ownerUser = await prisma.user.findUnique({
+      where: { id: req.prismaUser.id },
+      select: { phone: true },
+    });
+
+    const phoneStr = ownerUser?.phone ? String(ownerUser.phone).replace(/[\s\-\(\)\+]/g, '') : '';
+    const isValidPhone = (/^[6-9]\d{9}$/.test(phoneStr) || /^91[6-9]\d{9}$/.test(phoneStr));
+
+    if (!isValidPhone) {
+      res.status(400).json({
+        status: 'error',
+        code: 'PHONE_NUMBER_REQUIRED',
+        message: 'Please add a valid phone number to your profile before listing equipment.',
+      });
+      return;
+    }
+
+    // Validate Owner Bank Details requirement before listing equipment for rent
+    const bankEntry = await prisma.auditLog.findFirst({
+      where: {
+        actorId: req.prismaUser.id,
+        resource: 'OWNER_BANK_DETAILS'
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!bankEntry || !bankEntry.metadata) {
+      res.status(400).json({
+        status: 'error',
+        code: 'BANK_DETAILS_REQUIRED',
+        message: 'Please provide and save your bank account payout details before listing equipment for rent.',
+      });
+      return;
+    }
+
     const { title, category, pricePerDay, description, imageUrl, location } = req.body;
 
     let finalImageUrl = imageUrl ? String(imageUrl) : '';
@@ -336,7 +402,29 @@ router.put('/:id', requireAuth, requireRole('OWNER'), validate(updateEquipmentSc
     if (updates.location !== undefined) data.location = updates.location ? String(updates.location) : null;
     if (updates.latitude !== undefined) data.latitude = updates.latitude ? parseFloat(String(updates.latitude)) : null;
     if (updates.longitude !== undefined) data.longitude = updates.longitude ? parseFloat(String(updates.longitude)) : null;
-    if (updates.available !== undefined) data.available = Boolean(updates.available);
+    if (updates.available !== undefined) {
+      data.available = Boolean(updates.available);
+
+      // If owner is activating a listing, enforce bank details requirement
+      if (data.available === true && existingEquipment.available !== true) {
+        const bankEntry = await prisma.auditLog.findFirst({
+          where: {
+            actorId: req.prismaUser.id,
+            resource: 'OWNER_BANK_DETAILS'
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        if (!bankEntry || !bankEntry.metadata) {
+          res.status(400).json({
+            status: 'error',
+            code: 'BANK_DETAILS_REQUIRED',
+            message: 'Please provide and save your bank account payout details before publishing an active listing.',
+          });
+          return;
+        }
+      }
+    }
 
     const equipment = await prisma.equipment.update({
       where: { id: equipmentId },
@@ -419,6 +507,161 @@ router.delete('/:id', requireAuth, requireRole('OWNER'), async (req: AuthRequest
   } catch (error) {
     console.error('Delete Equipment Error:', error);
     res.status(500).json({ error: 'Failed to delete equipment' });
+  }
+});
+
+/**
+ * GET /api/equipment/:id/maintenance
+ * Retrieve maintenance and service history for an equipment item
+ */
+router.get('/:id/maintenance', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const equipmentId = String(req.params.id);
+    const userId = (req as any).prismaUser.id;
+    const isAdmin = (req as any).prismaUser.role === 'ADMIN';
+
+    const equip = await prisma.equipment.findUnique({
+      where: { id: equipmentId },
+      select: { id: true, title: true, ownerId: true }
+    });
+
+    if (!equip) {
+      res.status(404).json({ success: false, error: 'Equipment not found' });
+      return;
+    }
+
+    if (!isAdmin && equip.ownerId !== userId) {
+      res.status(403).json({ success: false, error: 'Forbidden: You do not own this equipment.' });
+      return;
+    }
+
+    const records = await prisma.auditLog.findMany({
+      where: {
+        resource: 'EQUIPMENT_MAINTENANCE',
+        resourceId: equipmentId
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const maintenanceList = records.map((r) => {
+      let meta: any = {};
+      try {
+        if (r.metadata) meta = JSON.parse(r.metadata);
+      } catch (_) {}
+
+      return {
+        id: r.id,
+        equipmentId,
+        equipmentTitle: equip.title,
+        serviceType: meta.serviceType || 'Routine Service',
+        serviceDate: meta.serviceDate || r.createdAt.toISOString(),
+        cost: meta.cost != null ? Number(meta.cost) : 0,
+        providerName: meta.providerName || '',
+        notes: meta.notes || '',
+        nextServiceDue: meta.nextServiceDue || '',
+        createdAt: r.createdAt
+      };
+    });
+
+    res.json({
+      success: true,
+      data: maintenanceList
+    });
+  } catch (error: any) {
+    console.error('Fetch maintenance records error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch maintenance records' });
+  }
+});
+
+/**
+ * POST /api/equipment/:id/maintenance
+ * Record service or maintenance for an equipment item
+ */
+router.post('/:id/maintenance', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const equipmentId = String(req.params.id);
+    const userId = (req as any).prismaUser.id;
+    const userRole = (req as any).prismaUser.role;
+    const isAdmin = userRole === 'ADMIN';
+
+    const equip = await prisma.equipment.findUnique({
+      where: { id: equipmentId }
+    });
+
+    if (!equip) {
+      res.status(404).json({ success: false, error: 'Equipment not found' });
+      return;
+    }
+
+    if (!isAdmin && equip.ownerId !== userId) {
+      res.status(403).json({ success: false, error: 'Forbidden: You can only log maintenance for your own equipment.' });
+      return;
+    }
+
+    const { serviceType, serviceDate, cost, providerName, notes, nextServiceDue } = req.body;
+
+    const validTypes = [
+      'Routine Service',
+      'Oil Change',
+      'Tyre Replacement',
+      'Engine Repair',
+      'Blade/Attachment Sharpening',
+      'Electrical',
+      'General Inspection',
+      'Other'
+    ];
+
+    const type = String(serviceType || '').trim();
+    if (!type) {
+      res.status(400).json({ success: false, error: 'Service Type is required' });
+      return;
+    }
+
+    const parsedCost = cost != null ? Number(cost) : 0;
+    if (isNaN(parsedCost) || parsedCost < 0) {
+      res.status(400).json({ success: false, error: 'Cost must be a valid non-negative number' });
+      return;
+    }
+
+    const parsedDate = serviceDate ? new Date(serviceDate).toISOString() : new Date().toISOString();
+
+    const record = await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorRole: userRole,
+        action: 'LOG_MAINTENANCE',
+        resource: 'EQUIPMENT_MAINTENANCE',
+        resourceId: equipmentId,
+        metadata: JSON.stringify({
+          serviceType: type,
+          serviceDate: parsedDate,
+          cost: parsedCost,
+          providerName: String(providerName || '').trim(),
+          notes: String(notes || '').trim(),
+          nextServiceDue: String(nextServiceDue || '').trim(),
+          equipmentTitle: equip.title
+        })
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Maintenance record saved successfully',
+      data: {
+        id: record.id,
+        equipmentId,
+        serviceType: type,
+        serviceDate: parsedDate,
+        cost: parsedCost,
+        providerName: String(providerName || '').trim(),
+        notes: String(notes || '').trim(),
+        nextServiceDue: String(nextServiceDue || '').trim(),
+        createdAt: record.createdAt
+      }
+    });
+  } catch (error: any) {
+    console.error('Log maintenance record error:', error);
+    res.status(500).json({ success: false, error: 'Failed to record maintenance' });
   }
 });
 

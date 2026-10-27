@@ -1,32 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/api/api_client.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/app_localizations.dart';
+import '../../../shared/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
-
-class CopilotMessage {
-  final String role; // 'farmer' or 'ai'
-  final String text;
-  final Map<String, dynamic>? rawResponse;
-  final bool isError;
-  final String? lastQuery;
-  
-  CopilotMessage({
-    required this.role,
-    required this.text,
-    this.rawResponse,
-    this.isError = false,
-    this.lastQuery,
-  });
-}
+import '../../weather/providers/weather_provider.dart';
+import '../models/farm_model.dart';
+import '../providers/farm_provider.dart';
+import '../providers/copilot_provider.dart';
 
 class FarmCopilotScreen extends ConsumerStatefulWidget {
   final String farmId;
   final String cropId;
 
-  const FarmCopilotScreen({super.key, required this.farmId, required this.cropId});
+  const FarmCopilotScreen({
+    super.key,
+    required this.farmId,
+    required this.cropId,
+  });
 
   @override
   ConsumerState<FarmCopilotScreen> createState() => _FarmCopilotScreenState();
@@ -35,170 +26,112 @@ class FarmCopilotScreen extends ConsumerStatefulWidget {
 class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<CopilotMessage> _messages = [];
-  bool _isLoading = false;
   String _activeFarmId = '';
   String _activeCropId = '';
   String _activeCropName = '';
+  String _activeCropStage = '';
 
   @override
   void initState() {
     super.initState();
     _activeFarmId = widget.farmId;
     _activeCropId = widget.cropId;
-    _resolveFarmAndInitialize();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resolveFarmAndInitialize();
+    });
   }
 
   Future<void> _resolveFarmAndInitialize() async {
-    if (_activeFarmId.isNotEmpty && _activeCropId.isNotEmpty) {
-      _addWelcomeMessage();
-      return;
+    final farmState = ref.read(farmProvider);
+    if (farmState.farms.isEmpty) {
+      await ref.read(farmProvider.notifier).fetchFarms();
     }
 
-    try {
-      final res = await ApiClient().dio.get('farms');
-      final data = res.data;
-      final List<dynamic> farmsList = data is List ? data : (data['data'] is List ? data['data'] : []);
-      if (farmsList.isNotEmpty) {
-        final farm = farmsList[0];
-        _activeFarmId = farm['id'] ?? '';
-        final crops = farm['crops'] as List? ?? [];
-        if (crops.isNotEmpty) {
-          _activeCropId = crops[0]['id'] ?? '';
-          _activeCropName = crops[0]['cropName'] ?? '';
+    final selectedFarm = ref.read(farmProvider).selectedFarm;
+    if (selectedFarm != null) {
+      if (_activeFarmId.isEmpty) {
+        _activeFarmId = selectedFarm.id;
+      }
+      if (_activeCropId.isEmpty && selectedFarm.crops.isNotEmpty) {
+        final crop = selectedFarm.crops.first;
+        _activeCropId = crop.id;
+        _activeCropName = crop.cropName;
+        _activeCropStage = crop.stage;
+      } else if (_activeCropId.isNotEmpty) {
+        for (final c in selectedFarm.crops) {
+          if (c.id == _activeCropId) {
+            _activeCropName = c.cropName;
+            _activeCropStage = c.stage;
+            break;
+          }
         }
       }
-    } catch (_) {
-      // Fallback
     }
 
-    if (mounted) {
-      _addWelcomeMessage();
-    }
-  }
-
-  void _addWelcomeMessage() {
     final user = ref.read(authProvider).user;
     final userName = user?.name.split(' ').first ?? 'Farmer';
-    final cropInfo = _activeCropName.isNotEmpty ? ' for $_activeCropName' : '';
 
-    _messages.add(CopilotMessage(
-      role: 'ai',
-      text: 'Hello $userName! 🌾 I am your AI Farm Copilot$cropInfo. Ask me anything about crop care, field operations, soil health, or equipment recommendations.',
-    ));
+    ref.read(copilotProvider.notifier).initForFarm(
+      farmId: _activeFarmId,
+      cropId: _activeCropId,
+      cropName: _activeCropName,
+      userName: userName,
+    );
   }
 
   Future<void> _sendMessage(String text, String lang) async {
     final query = text.trim();
-    if (query.isEmpty || _isLoading) return;
+    if (query.isEmpty) return;
 
-    setState(() {
-      _messages.add(CopilotMessage(role: 'farmer', text: query));
-      _isLoading = true;
-    });
+    final copilotState = ref.read(copilotProvider);
+    if (copilotState.isLoading) return;
 
-    _controller.clear();
-    _scrollToBottom();
+    final notifier = ref.read(copilotProvider.notifier);
 
-    try {
-      if (_activeFarmId.isNotEmpty && _activeCropId.isNotEmpty) {
-        final res = await ApiClient().dio.post('ai/farm-copilot', data: {
-          'farmId': _activeFarmId,
-          'cropId': _activeCropId,
-          'question': query,
-          'language': lang,
-        });
+    // Keep query in controller in case of failure; clear on success
+    final success = await notifier.askQuestion(
+      query: query,
+      farmId: _activeFarmId,
+      cropId: _activeCropId,
+      language: lang,
+    );
 
-        final dynamic raw = res.data;
-        final Map<String, dynamic> data = (raw is Map && raw['data'] is Map)
-            ? Map<String, dynamic>.from(raw['data'])
-            : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
-        final explanation = (data['explanation'] ?? data['reply'] ?? data['summary'] ?? 'Here is what I recommend for your field.').toString();
-
-        if (mounted) {
-          setState(() {
-            _messages.add(CopilotMessage(
-              role: 'ai',
-              text: explanation,
-              rawResponse: data,
-            ));
-            _isLoading = false;
-          });
-          _scrollToBottom();
-        }
-      } else {
-        // Fallback to general AI Advisor if no farm context is configured yet
-        final res = await ApiClient().dio.post('ai/advisor', data: {
-          'question': query,
-          'language': lang,
-        });
-
-        final dynamic raw = res.data;
-        final Map<String, dynamic> data = (raw is Map && raw['data'] is Map)
-            ? Map<String, dynamic>.from(raw['data'])
-            : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
-        final reply = (data['reply'] ?? data['explanation'] ?? 'Here is agronomic advice for your request.').toString();
-
-        if (mounted) {
-          setState(() {
-            _messages.add(CopilotMessage(
-              role: 'ai',
-              text: reply,
-            ));
-            _isLoading = false;
-          });
-          _scrollToBottom();
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        String errorMsg = 'Unable to connect to AI engine. Please check network connection and try again.';
-        if (e.toString().contains('403') || e.toString().contains('Forbidden')) {
-          errorMsg = 'Farm context authorization expired. Please re-open your Farm screen.';
-        }
-        setState(() {
-          _messages.add(CopilotMessage(
-            role: 'ai',
-            text: errorMsg,
-            isError: true,
-            lastQuery: query,
-          ));
-          _isLoading = false;
-        });
-        _scrollToBottom();
-      }
+    if (success) {
+      _controller.clear();
+      _scrollToBottom();
+    } else {
+      _scrollToBottom();
     }
   }
 
-  Future<void> _addStepsToPlan(List<dynamic> steps, String lang) async {
+  Future<void> _addStepsToPlan(List<String> steps, String lang) async {
     if (_activeFarmId.isEmpty || _activeCropId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please configure a farm first.')),
+        SnackBar(content: Text('missing_farm_context'.tr(lang))),
       );
       return;
     }
 
-    try {
-      final res = await ApiClient().dio.post('ai/farm-copilot/add-to-plan', data: {
-        'farmId': _activeFarmId,
-        'cropId': _activeCropId,
-        'actionableSteps': steps.map((s) => s.toString()).toList(),
-      });
+    final success = await ref.read(copilotProvider.notifier).addToPlan(
+      farmId: _activeFarmId,
+      cropId: _activeCropId,
+      steps: steps,
+      stage: _activeCropStage.isNotEmpty ? _activeCropStage : null,
+    );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res.data?['message'] ?? 'Steps added to Farm Operations successfully!'),
-            backgroundColor: AppTheme.primaryGreen,
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'plan_added_success'.tr(lang) : 'plan_added_failed'.tr(lang),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to add steps to Farm Operations.'), backgroundColor: Colors.red),
-        );
-      }
+          backgroundColor: success ? AppTheme.primaryGreen : const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
     }
   }
 
@@ -208,7 +141,7 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+          curve: Curves.easeOutCubic,
         );
       }
     });
@@ -225,12 +158,19 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
   Widget build(BuildContext context) {
     final lang = ref.watch(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final copilotState = ref.watch(copilotProvider);
+    final farmState = ref.watch(farmProvider);
+    final currentFarm = farmState.selectedFarm;
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: isDark ? Colors.white : AppTheme.textDarkNavy,
+          ),
           onPressed: () {
             if (Navigator.of(context).canPop()) {
               Navigator.of(context).pop();
@@ -244,12 +184,64 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Farm Copilot', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-            Text('AI Agronomic Intelligence', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+            Text(
+              'farmer_assistant'.tr(lang),
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                color: isDark ? Colors.white : AppTheme.textDarkNavy,
+              ),
+            ),
+            Text(
+              'ai_agronomic_intelligence'.tr(lang),
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.grey.shade400 : AppTheme.textMutedGray,
+              ),
+            ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Select Language',
+            initialValue: lang,
+            icon: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.language, size: 16, color: AppTheme.primaryGreen),
+                  const SizedBox(width: 4),
+                  Text(
+                    lang.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            onSelected: (newLang) {
+              ref.read(languageProvider.notifier).setLanguage(newLang);
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'en', child: Text('English (EN)')),
+              PopupMenuItem(value: 'te', child: Text('తెలుగు (TE)')),
+              PopupMenuItem(value: 'hi', child: Text('हिन्दी (HI)')),
+              PopupMenuItem(value: 'ta', child: Text('தமிழ் (TA)')),
+              PopupMenuItem(value: 'kn', child: Text('ಕನ್ನಡ (KN)')),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        foregroundColor: isDark ? Colors.white : AppTheme.textDarkNavy,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
@@ -257,91 +249,193 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
           child: Container(color: isDark ? Colors.white10 : Colors.grey.shade200, height: 1),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final isFarmer = msg.role == 'farmer';
-                return _buildMessageBubble(msg, isFarmer, lang, isDark);
-              },
-            ),
-          ),
-          if (_messages.length == 1 && !_isLoading) _buildQuickPrompts(lang, isDark),
-          if (_isLoading) _buildThinkingIndicator(isDark),
-          _buildInputArea(lang, isDark),
-        ],
-      ),
-    );
-  }
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. Authoritative Farm Facts Header
+            if (currentFarm != null)
+              _buildAuthoritativeFarmFactsBar(currentFarm, lang, isDark)
+            else
+              _buildMissingFarmContextWarning(lang, isDark),
 
-  Widget _buildQuickPrompts(String lang, bool isDark) {
-    final prompts = [
-      '🌾 Best practices for current crop stage',
-      '🚜 Recommended machinery for my farm',
-      '💧 Ideal irrigation and fertilizer schedule',
-      '🐛 How to identify and control pests',
-    ];
+            // 2. Agronomic Safety Disclaimer
+            _buildSafetyDisclaimer(lang, isDark),
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Suggested questions:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: prompts.map((p) => InkWell(
-              onTap: () => _sendMessage(p.replaceFirst(RegExp(r'^[^\w]+'), '').trim(), lang),
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkCard : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade300),
-                ),
-                child: Text(p, style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : AppTheme.textDarkNavy)),
+            // 3. Conversation Message Stream
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                itemCount: copilotState.messages.length,
+                itemBuilder: (context, index) {
+                  final msg = copilotState.messages[index];
+                  return _buildMessageBubble(msg, lang, isDark);
+                },
               ),
-            )).toList(),
-          ),
-        ],
-      ),
-    );
-  }
+            ),
 
-  Widget _buildThinkingIndicator(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkCard : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen)),
-              SizedBox(width: 10),
-              Text('Analyzing farm conditions...', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w500)),
-            ],
-          ),
+            // 4. Quick Suggested Questions
+            if (copilotState.messages.length <= 1 && !copilotState.isLoading)
+              _buildQuickPrompts(lang, isDark),
+
+            // 5. Thinking Indicator
+            if (copilotState.isLoading)
+              _buildThinkingIndicator(lang, isDark),
+
+            // 6. Composer Input Area
+            _buildInputArea(copilotState, lang, isDark),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildMessageBubble(CopilotMessage msg, bool isFarmer, String lang, bool isDark) {
+  Widget _buildAuthoritativeFarmFactsBar(FarmModel farm, String lang, bool isDark) {
+    final weatherState = _activeFarmId.isNotEmpty ? ref.watch(weatherProvider(_activeFarmId)) : null;
+    final currentTemp = weatherState?.weatherData?.current.temperature;
+    final weatherText = currentTemp != null ? '${currentTemp.round()}°C' : null;
+
+    final cropInfo = _activeCropName.isNotEmpty
+        ? '$_activeCropName${_activeCropStage.isNotEmpty ? ' • $_activeCropStage' : ''}'
+        : 'No Crop Registered';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard.withValues(alpha: 0.7) : const Color(0xFFF1F8E9),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? Colors.white10 : const Color(0xFFDCEDC8),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.verified_outlined, color: AppTheme.primaryGreen, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'authoritative_farm_facts'.tr(lang).toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                    if (weatherText != null) ...[
+                      const Spacer(),
+                      const Icon(Icons.cloud_outlined, size: 12, color: AppTheme.primaryGreen),
+                      const SizedBox(width: 4),
+                      Text(
+                        weatherText,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${farm.name} • $cropInfo • ${farm.area} ${farm.areaUnit}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white70 : AppTheme.textDarkNavy,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMissingFarmContextWarning(String lang, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.amber.shade900.withValues(alpha: 0.2) : const Color(0xFFFFF8E1),
+        border: Border(
+          bottom: BorderSide(color: Colors.amber.shade300, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'select_farm_prompt'.tr(lang),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push('/farm-setup'),
+            child: Text('add_farm'.tr(lang), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafetyDisclaimer(String lang, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      color: isDark ? Colors.black26 : const Color(0xFFF8F9FA),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1.5),
+            child: Icon(Icons.shield_outlined, size: 13, color: Colors.orange),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'agronomic_safety_disclaimer'.tr(lang),
+              style: TextStyle(
+                fontSize: 10,
+                height: 1.35,
+                color: isDark ? Colors.white60 : AppTheme.textMutedGray,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(CopilotMessage msg, String lang, bool isDark) {
+    final isFarmer = msg.isFarmer;
+
     return Align(
       alignment: isFarmer ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -352,7 +446,7 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
           color: isFarmer
               ? AppTheme.primaryGreen
               : (msg.isError
-                  ? (isDark ? Colors.red.shade900.withValues(alpha: 0.3) : Colors.red.shade50)
+                  ? (isDark ? Colors.red.shade900.withValues(alpha: 0.3) : const Color(0xFFFFEBEE))
                   : (isDark ? AppTheme.darkCard : Colors.white)),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
@@ -372,8 +466,8 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
               : [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
         ),
@@ -387,20 +481,22 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: msg.isError ? Colors.red.withValues(alpha: 0.2) : AppTheme.primaryGreen.withValues(alpha: 0.15),
+                      color: msg.isError
+                          ? Colors.red.withValues(alpha: 0.2)
+                          : AppTheme.primaryGreen.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      msg.isError ? Icons.error_outline : Icons.smart_toy_rounded,
+                      msg.isError ? Icons.cloud_off_rounded : Icons.smart_toy_rounded,
                       size: 14,
                       color: msg.isError ? Colors.red : AppTheme.primaryGreen,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Farm Copilot',
+                    'farmer_assistant'.tr(lang),
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w900,
                       color: msg.isError ? Colors.red : AppTheme.primaryGreen,
                     ),
@@ -409,6 +505,8 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
               ),
               const SizedBox(height: 10),
             ],
+
+            // Message Body Text
             Text(
               msg.text,
               style: TextStyle(
@@ -417,58 +515,69 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
                     : (msg.isError
                         ? (isDark ? Colors.red.shade200 : Colors.red.shade900)
                         : (isDark ? Colors.grey.shade100 : AppTheme.textDarkNavy)),
-                height: 1.5,
-                fontSize: 14,
+                height: 1.45,
+                fontSize: 13.5,
               ),
             ),
+
+            // Retry Button on Failure
             if (msg.isError && msg.lastQuery != null) ...[
               const SizedBox(height: 12),
               ElevatedButton.icon(
-                onPressed: () => _sendMessage(msg.lastQuery!, lang),
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Retry'),
+                onPressed: () {
+                  _controller.text = msg.lastQuery!;
+                  _sendMessage(msg.lastQuery!, lang);
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: Text('retry_query'.tr(lang)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade600,
+                  backgroundColor: const Color(0xFFC62828),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
-            if (!isFarmer && msg.rawResponse != null) _buildRichContent(msg.rawResponse!, lang, isDark),
+
+            // Rich Content (Actionable steps, warnings, recommended equipment)
+            if (!isFarmer && !msg.isError) _buildRichContent(msg, lang, isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRichContent(Map<String, dynamic> data, String lang, bool isDark) {
-    final steps = data['actionableSteps'] as List?;
-    final warnings = data['warnings'] as List?;
-    final eq = data['translatedEquipment'] as List?;
+  Widget _buildRichContent(CopilotMessage msg, String lang, bool isDark) {
+    final steps = msg.actionableSteps;
+    final warnings = msg.warnings;
+    final equipment = msg.recommendedEquipment;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (steps != null && steps.isNotEmpty) ...[
-          const SizedBox(height: 16),
+        // Actionable Steps
+        if (steps.isNotEmpty) ...[
+          const SizedBox(height: 14),
           Divider(color: isDark ? Colors.white10 : Colors.grey.shade200),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Actionable Steps',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.lightGreenAccent : AppTheme.primaryGreen,
+              Expanded(
+                child: Text(
+                  'suggested_planned_tasks'.tr(lang),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.lightGreenAccent : AppTheme.primaryGreen,
+                  ),
                 ),
               ),
               TextButton.icon(
                 onPressed: () => _addStepsToPlan(steps, lang),
-                icon: const Icon(Icons.playlist_add_check, size: 16),
-                label: const Text('Add to Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.playlist_add_check_rounded, size: 16),
+                label: Text('add_all_to_plan'.tr(lang), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                 style: TextButton.styleFrom(
                   foregroundColor: AppTheme.primaryGreen,
                   padding: EdgeInsets.zero,
@@ -477,7 +586,7 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           ...steps.map((s) => Padding(
             padding: const EdgeInsets.only(bottom: 6.0),
             child: Row(
@@ -485,14 +594,14 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
               children: [
                 const Padding(
                   padding: EdgeInsets.only(top: 2),
-                  child: Icon(Icons.check_circle_outline, size: 16, color: AppTheme.primaryGreen),
+                  child: Icon(Icons.check_circle_outline_rounded, size: 15, color: AppTheme.primaryGreen),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    s.toString(),
+                    s,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       height: 1.4,
                       color: isDark ? Colors.grey.shade200 : Colors.grey.shade800,
                     ),
@@ -502,21 +611,23 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
             ),
           )),
         ],
-        if (warnings != null && warnings.isNotEmpty) ...[
-          const SizedBox(height: 16),
+
+        // Warnings / Alerts
+        if (warnings.isNotEmpty) ...[
+          const SizedBox(height: 14),
           Divider(color: isDark ? Colors.white10 : Colors.grey.shade200),
-          const SizedBox(height: 8),
-          const Row(
+          const SizedBox(height: 6),
+          Row(
             children: [
-              Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
-              SizedBox(width: 6),
+              const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
+              const SizedBox(width: 6),
               Text(
-                'Agronomic Alerts',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.orange),
+                'agronomic_alerts'.tr(lang),
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Colors.orange),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           ...warnings.map((w) => Container(
             margin: const EdgeInsets.only(bottom: 6),
             padding: const EdgeInsets.all(10),
@@ -526,30 +637,27 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
               border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
             child: Text(
-              w.toString(),
+              w,
               style: const TextStyle(fontSize: 12, color: Colors.orange, height: 1.4),
             ),
           )),
         ],
-        if (eq != null && eq.isNotEmpty) ...[
-          const SizedBox(height: 16),
+
+        // Recommended Machinery from Real Marketplace Records
+        if (equipment.isNotEmpty) ...[
+          const SizedBox(height: 14),
           Divider(color: isDark ? Colors.white10 : Colors.grey.shade200),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            'Recommended Machinery',
+            'recommended_machinery'.tr(lang),
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: FontWeight.w900,
               color: isDark ? Colors.white : AppTheme.textDarkNavy,
             ),
           ),
-          const SizedBox(height: 10),
-          ...eq.map((e) {
-            final name = e['equipmentName'] ?? 'Farming Tool';
-            final why = e['whyNeeded'] ?? e['whatItDoes'] ?? '';
-            final price = e['pricePerDay'];
-            final eqId = e['equipmentId'];
-
+          const SizedBox(height: 8),
+          ...equipment.map((eq) {
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
@@ -561,97 +669,273 @@ class _FarmCopilotScreenState extends ConsumerState<FarmCopilotScreen> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.agriculture_rounded, color: AppTheme.primaryGreen, size: 24),
+                    child: const Icon(Icons.agriculture_rounded, color: AppTheme.primaryGreen, size: 22),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        if (why.isNotEmpty) ...[
+                        Text(
+                          eq.equipmentName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        if (eq.whyNeeded.isNotEmpty) ...[
                           const SizedBox(height: 2),
-                          Text(why, style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+                          Text(
+                            eq.whyNeeded,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.grey.shade400 : AppTheme.textMutedGray,
+                            ),
+                          ),
                         ],
-                        if (price != null) ...[
+                        if (eq.pricePerDay > 0) ...[
                           const SizedBox(height: 4),
-                          Text('₹$price / day', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
+                          Text(
+                            '₹ ${eq.pricePerDay.toStringAsFixed(0)} / day',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.primaryGreen,
+                            ),
+                          ),
                         ],
                       ],
                     ),
                   ),
-                  if (eqId != null && eqId.toString().isNotEmpty)
+                  if (eq.equipmentId.isNotEmpty)
                     IconButton(
-                      icon: const Icon(Icons.arrow_forward_ios, size: 14),
+                      icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                       color: AppTheme.primaryGreen,
-                      onPressed: () => context.push('/equipment/$eqId'),
+                      onPressed: () => context.push('/equipment/${eq.equipmentId}'),
                     ),
                 ],
               ),
             );
           }),
-        ]
+        ],
+
+        // Farming Guides Link
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => context.push('/knowledge-base'),
+            icon: const Icon(Icons.menu_book_rounded, size: 16),
+            label: Text('view_farming_guides'.tr(lang), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primaryGreen,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildInputArea(String lang, bool isDark) {
+  Widget _buildThinkingIndicator(String lang, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkCard : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'analyzing_farm_conditions'.tr(lang),
+                  style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : AppTheme.textMutedGray,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () {
+                  ref.read(copilotProvider.notifier).cancel();
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.close_rounded, size: 14, color: isDark ? Colors.red.shade300 : Colors.red),
+                      const SizedBox(width: 2),
+                      Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: isDark ? Colors.red.shade300 : Colors.red,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickPrompts(String lang, bool isDark) {
+    final prompts = [
+      '🌾 Best practices for current crop stage',
+      '🚜 Recommended machinery for my farm',
+      '💧 Ideal irrigation and fertilizer schedule',
+      '🐛 How to identify and control pests',
+    ];
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'suggested_questions'.tr(lang),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: prompts.map((p) => InkWell(
+              onTap: () => _sendMessage(p.replaceFirst(RegExp(r'^[^\w]+'), '').trim(), lang),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade300),
+                ),
+                child: Text(
+                  p,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white70 : AppTheme.textDarkNavy,
+                  ),
+                ),
+              ),
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputArea(CopilotState state, String lang, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : Colors.white,
         border: Border(
           top: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade200),
         ),
       ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 120),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkBackground : const Color(0xFFF4F6F5),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: isDark ? Colors.white12 : const Color(0xFFE0E0E0),
+                  width: 1,
+                ),
+              ),
               child: TextField(
                 controller: _controller,
-                enabled: !_isLoading,
-                style: TextStyle(fontSize: 14, color: isDark ? Colors.white : AppTheme.textDarkNavy),
+                enabled: !state.isLoading,
+                minLines: 1,
+                maxLines: 4,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                ),
                 decoration: InputDecoration(
-                  hintText: 'Ask about crop care, tools, or schedule...',
-                  hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, fontSize: 13),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade300),
+                  hintText: 'ask_copilot_hint'.tr(lang),
+                  hintStyle: TextStyle(
+                    color: isDark ? Colors.white38 : AppTheme.textMutedGray,
+                    fontSize: 13,
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  filled: true,
-                  fillColor: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  border: InputBorder.none,
+                  isDense: true,
                 ),
                 onSubmitted: (val) => _sendMessage(val, lang),
               ),
             ),
-            const SizedBox(width: 10),
-            Container(
-              decoration: const BoxDecoration(
-                color: AppTheme.primaryGreen,
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                onPressed: _isLoading ? null : () => _sendMessage(_controller.text, lang),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: state.isLoading ? null : () => _sendMessage(_controller.text, lang),
+              borderRadius: BorderRadius.circular(24),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: state.isLoading
+                      ? (isDark ? Colors.white10 : Colors.grey.shade300)
+                      : AppTheme.primaryGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: state.isLoading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

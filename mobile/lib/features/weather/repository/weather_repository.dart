@@ -5,7 +5,10 @@ import '../../../core/api/api_client.dart';
 class WeatherRepository {
   Future<WeatherData> getFarmWeather(String farmId) async {
     try {
-      final response = await ApiClient().dio.get('/farms/$farmId/weather');
+      final path = (farmId.isEmpty || farmId == 'default' || farmId == 'current-lookup')
+          ? '/farms/weather/lookup'
+          : '/farms/$farmId/weather';
+      final response = await ApiClient().dio.get(path);
       final dynamic raw = response.data;
       if (raw is Map<String, dynamic>) {
         if (raw['success'] == true && raw['data'] != null && raw['data'] is Map<String, dynamic>) {

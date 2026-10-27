@@ -164,7 +164,7 @@ export default function OwnerDashboard() {
             <Tractor size={12} /> {t('owner_fleet_console', { defaultValue: 'Owner Fleet Console' })}
           </span>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-2">
-            {t('welcome', { defaultValue: 'Welcome' })}, {user?.name || 'Equipment Owner'} Ã°Å¸Å¡Å“
+            {t('welcome', { defaultValue: 'Welcome' })}, {user?.name || 'Equipment Owner'} 🚜
           </h1>
           <p className="text-blue-100 max-w-xl text-sm font-medium leading-relaxed opacity-90">
             {t('dashboard_subtitle', { defaultValue: 'Monitor real-time rental yield, approve pending farmer requests, manage listed fleet inventory, and review monthly payouts.' })}

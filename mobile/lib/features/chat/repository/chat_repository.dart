@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/errors/api_error_handler.dart';
 import '../models/chat_message.dart';
@@ -7,7 +8,10 @@ class ChatRepository {
 
   Future<List<ChatMessage>> fetchMessages(String bookingId) async {
     try {
-      final response = await _apiClient.dio.get('chat/booking/$bookingId');
+      final response = await _apiClient.dio.get(
+        'chat/booking/$bookingId',
+        options: Options(receiveTimeout: const Duration(seconds: 12)),
+      );
       final data = response.data;
       final List<dynamic> list = data is List ? data : (data?['data'] ?? []);
       return list.map((json) => ChatMessage.fromJson(json as Map<String, dynamic>)).toList();
@@ -21,6 +25,10 @@ class ChatRepository {
       final response = await _apiClient.dio.post(
         'chat/booking/$bookingId',
         data: {'text': text.trim()},
+        options: Options(
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
+        ),
       );
       final data = response.data?['data'] ?? response.data;
       return ChatMessage.fromJson(data as Map<String, dynamic>);

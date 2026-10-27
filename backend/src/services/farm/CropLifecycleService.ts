@@ -21,6 +21,8 @@ export interface CropLifecycleEvaluation {
   sowingDate: Date;
   expectedHarvestDate: Date;
   status: string;
+  supportedStages: string[];
+  stageOrder: Record<string, number>;
 }
 
 const LOCALIZED_EXPLANATIONS: Record<string, Record<string, (crop: string, stage: string, days: number, status: string) => string>> = {
@@ -146,7 +148,9 @@ export class CropLifecycleService {
       recommendedEquipmentCategory,
       sowingDate,
       expectedHarvestDate,
-      status: crop.status
+      status: crop.status,
+      supportedStages: rules.supportedStages,
+      stageOrder: rules.stageOrder
     };
   }
 

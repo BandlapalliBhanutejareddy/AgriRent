@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../core/api/api_client.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../providers/notification_provider.dart';
+import '../repository/notification_repository.dart';
 
 class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
@@ -14,96 +15,41 @@ class NotificationScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationScreenState extends ConsumerState<NotificationScreen> {
-  List<dynamic> _notifications = [];
-  bool _isLoading = true;
-  String? _error;
-
   @override
   void initState() {
     super.initState();
-    _fetchNotifications();
-  }
-
-  Future<void> _fetchNotifications() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationsProvider.notifier).fetchNotifications(forceRefresh: true);
     });
-    try {
-      final res = await ApiClient().dio.get('/notifications');
-      final dynamic raw = res.data;
-      final List<dynamic> list = raw is List
-          ? raw
-          : (raw is Map && raw['data'] is List
-              ? raw['data']
-              : (raw is Map && raw['notifications'] is List
-                  ? raw['notifications']
-                  : []));
+  }
 
-      if (mounted) {
-        setState(() {
-          _notifications = list;
-          _isLoading = false;
-        });
-        ref.read(unreadNotificationsCountProvider.notifier).refresh();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+  void _handleNotificationTap(Notification n, String lang) {
+    if (!n.read) {
+      ref.read(notificationsProvider.notifier).markAsRead(n.id);
     }
-  }
 
-  Future<void> _markAsRead(String id) async {
-    try {
-      await ApiClient().dio.put('/notifications/$id/read');
-      if (mounted) {
-        setState(() {
-          final idx = _notifications.indexWhere((n) => n['id'] == id);
-          if (idx != -1 && _notifications[idx] is Map) {
-            _notifications[idx]['read'] = true;
-          }
-        });
-        ref.read(unreadNotificationsCountProvider.notifier).decrement();
-      }
-    } catch (_) {}
-  }
+    final relId = n.relatedId?.trim();
+    if (relId == null || relId.isEmpty) return;
 
-  Future<void> _markAllAsRead() async {
-    try {
-      await ApiClient().dio.put('/notifications/read-all');
-      if (mounted) {
-        setState(() {
-          for (var n in _notifications) {
-            if (n is Map) {
-              n['read'] = true;
-            }
-          }
-        });
-        ref.read(unreadNotificationsCountProvider.notifier).reset();
-      }
-    } catch (_) {}
-  }
+    final type = (n.type ?? '').toUpperCase();
 
-  Future<void> _deleteNotification(String id) async {
-    try {
-      await ApiClient().dio.delete('/notifications/$id');
-      if (mounted) {
-        setState(() {
-          _notifications.removeWhere((n) => n['id'] == id);
-        });
-        ref.read(unreadNotificationsCountProvider.notifier).refresh();
-      }
-    } catch (_) {}
+    if (type == 'CHAT_MESSAGE') {
+      context.push('/chat?bookingId=$relId');
+    } else if (type.contains('BOOKING')) {
+      // Booking related: navigate to chat or booking details
+      context.push('/chat?bookingId=$relId');
+    } else if (type.contains('WEATHER') || type.contains('AGRONOMIC') || type.contains('ALERT')) {
+      context.push('/crop-advisor');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(languageProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final notifState = ref.watch(notificationsProvider);
+    final notifications = notifState.notifications;
+    final hasUnread = notifications.any((n) => !n.read);
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
@@ -129,20 +75,32 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          if (_notifications.any((n) => n is Map && n['read'] == false))
+          if (hasUnread)
             IconButton(
               icon: const Icon(Icons.done_all_rounded, color: AppTheme.primaryGreen),
-              onPressed: _markAllAsRead,
+              onPressed: notifState.isActionLoading
+                  ? null
+                  : () async {
+                      await ref.read(notificationsProvider.notifier).markAllAsRead();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('all_notifications_read'.tr(lang)),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
               tooltip: 'mark_all_read'.tr(lang),
             ),
           const SizedBox(width: 4),
         ],
       ),
-      body: _isLoading
+      body: notifState.isLoading && notifications.isEmpty
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.primaryGreen),
             )
-          : _error != null && _notifications.isEmpty
+          : notifState.error != null && notifications.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24.0),
@@ -162,7 +120,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: _fetchNotifications,
+                          onPressed: () {
+                            ref.read(notificationsProvider.notifier).fetchNotifications(forceRefresh: true);
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryGreen,
                             foregroundColor: Colors.white,
@@ -174,7 +134,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     ),
                   ),
                 )
-              : _notifications.isEmpty
+              : notifications.isEmpty
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -184,7 +144,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: isDark ? AppTheme.darkCard : AppTheme.primaryGreen.withValues(alpha: 0.08),
+                                color: isDark
+                                    ? AppTheme.darkCard
+                                    : AppTheme.primaryGreen.withValues(alpha: 0.08),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -208,26 +170,20 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     )
                   : RefreshIndicator(
                       color: AppTheme.primaryGreen,
-                      onRefresh: _fetchNotifications,
+                      onRefresh: () async {
+                        await ref
+                            .read(notificationsProvider.notifier)
+                            .fetchNotifications(forceRefresh: true);
+                      },
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        itemCount: _notifications.length,
+                        itemCount: notifications.length,
                         itemBuilder: (context, index) {
-                          final n = _notifications[index];
-                          if (n is! Map) return const SizedBox.shrink();
-                          final isRead = n['read'] == true;
-                          final id = n['id']?.toString() ?? '$index';
-                          final title = n['title']?.toString() ?? '';
-                          final message = n['message']?.toString() ?? '';
-                          final type = n['type']?.toString();
-                          final createdAtStr = n['createdAt']?.toString();
-                          String timeFormatted = '';
-                          if (createdAtStr != null) {
-                            try {
-                              final dt = DateTime.parse(createdAtStr);
-                              timeFormatted = DateFormat('MMM d, h:mm a').format(dt.toLocal());
-                            } catch (_) {}
-                          }
+                          final n = notifications[index];
+                          final isRead = n.read;
+                          final id = n.id;
+                          final timeFormatted =
+                              DateFormat('MMM d, h:mm a').format(n.createdAt.toLocal());
 
                           return Dismissible(
                             key: Key(id),
@@ -240,20 +196,37 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                 color: const Color(0xFFD32F2F),
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 24),
+                              child: const Icon(Icons.delete_outline_rounded,
+                                  color: Colors.white, size: 24),
                             ),
-                            onDismissed: (_) => _deleteNotification(id),
+                            onDismissed: (_) {
+                              ref.read(notificationsProvider.notifier).deleteNotification(id);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('notification_deleted'.tr(lang)),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            },
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? (isRead ? AppTheme.darkCard : AppTheme.primaryGreen.withValues(alpha: 0.12))
+                                    ? (isRead
+                                        ? AppTheme.darkCard
+                                        : AppTheme.primaryGreen.withValues(alpha: 0.12))
                                     : (isRead ? Colors.white : const Color(0xFFE8F5E9)),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: isDark
-                                      ? (isRead ? Colors.white10 : AppTheme.primaryGreen.withValues(alpha: 0.3))
-                                      : (isRead ? Colors.black.withValues(alpha: 0.06) : AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                                      ? (isRead
+                                          ? Colors.white10
+                                          : AppTheme.primaryGreen.withValues(alpha: 0.3))
+                                      : (isRead
+                                          ? Colors.black.withValues(alpha: 0.06)
+                                          : AppTheme.primaryGreen.withValues(alpha: 0.3)),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -264,13 +237,14 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                 ],
                               ),
                               child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 leading: CircleAvatar(
                                   radius: 20,
-                                  backgroundColor: _getIconColor(type).withValues(alpha: 0.14),
+                                  backgroundColor: _getIconColor(n.type).withValues(alpha: 0.14),
                                   child: Icon(
-                                    _getIconForType(type),
-                                    color: _getIconColor(type),
+                                    _getIconForType(n.type),
+                                    color: _getIconColor(n.type),
                                     size: 20,
                                   ),
                                 ),
@@ -278,7 +252,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        title,
+                                        n.title,
                                         style: TextStyle(
                                           fontWeight: isRead ? FontWeight.w600 : FontWeight.w800,
                                           fontSize: 14,
@@ -302,7 +276,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                   children: [
                                     const SizedBox(height: 4),
                                     Text(
-                                      message,
+                                      n.message,
                                       style: TextStyle(
                                         fontSize: 12.5,
                                         color: isDark ? Colors.white70 : AppTheme.textMutedGray,
@@ -318,11 +292,37 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                         ),
                                       ),
                                     ],
+                                    if (n.relatedId != null && n.relatedId!.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          ElevatedButton.icon(
+                                            onPressed: () => _handleNotificationTap(n, lang),
+                                            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                            label: Text(
+                                              (n.type ?? '').toUpperCase() == 'CHAT_MESSAGE'
+                                                  ? 'reply'.tr(lang)
+                                                  : 'open_chat'.tr(lang),
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppTheme.primaryGreen,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 12, vertical: 6),
+                                              minimumSize: const Size(0, 32),
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(8)),
+                                              elevation: 0,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ),
-                                onTap: () {
-                                  if (!isRead) _markAsRead(id);
-                                },
+                                onTap: () => _handleNotificationTap(n, lang),
                               ),
                             ),
                           );
@@ -346,6 +346,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         return Icons.chat_rounded;
       case 'AI':
         return Icons.smart_toy_rounded;
+      case 'WEATHER_ALERT':
+        return Icons.cloud_outlined;
+      case 'AGRONOMIC_ALERT':
+        return Icons.eco_rounded;
       default:
         return Icons.notifications_rounded;
     }
@@ -365,6 +369,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         return AppTheme.primaryGreen;
       case 'AI':
         return const Color(0xFF7B1FA2);
+      case 'WEATHER_ALERT':
+        return Colors.blue;
+      case 'AGRONOMIC_ALERT':
+        return Colors.green;
       default:
         return AppTheme.primaryGreen;
     }

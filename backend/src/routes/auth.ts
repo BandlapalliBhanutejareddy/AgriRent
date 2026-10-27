@@ -14,6 +14,11 @@ function validatePasswordStrength(password: string): boolean {
   return hasUppercase && hasLowercase && hasNumber;
 }
 
+function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 // 1. Register User via Supabase Auth & Link Application User
 router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -27,6 +32,19 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     if (role !== 'FARMER' && role !== 'OWNER') {
       res.status(400).json({ success: false, error: 'Invalid role. Must be FARMER or OWNER' });
       return;
+    }
+
+    if (!validateEmail(String(email).trim())) {
+      res.status(400).json({ success: false, error: 'Please enter a valid email address.' });
+      return;
+    }
+
+    if (phone) {
+      const cleanPhone = String(phone).replace(/\D/g, '');
+      if (cleanPhone.length > 0 && cleanPhone.length < 10) {
+        res.status(400).json({ success: false, error: 'Please enter a valid 10-digit phone number.' });
+        return;
+      }
     }
 
     if (!validatePasswordStrength(String(password))) {
@@ -43,63 +61,9 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (existingUser) {
-      if (existingUser.role === role || existingUser.role === 'BOTH') {
-        res.status(400).json({
-          success: false,
-          error: `An account with this email address already exists as ${existingUser.role}. Please log in.`
-        });
-        return;
-      }
-
-      // Upgrade account role to BOTH
-      const updatedUser = await prisma.user.update({
-        where: { id: existingUser.id },
-        data: { role: 'BOTH' }
-      });
-
-      // Sign in via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: String(email).toLowerCase(),
-        password: String(password)
-      });
-
-      let token = authData?.session?.access_token;
-
-      if (authError || !token) {
-        // Create user in Supabase Auth if missing
-        const { data: newUserAuth, error: createError } = await supabase.auth.admin.createUser({
-          email: String(email).toLowerCase(),
-          password: String(password),
-          email_confirm: true,
-          user_metadata: { name: updatedUser.name, role: updatedUser.role }
-        });
-
-        if (!createError && newUserAuth.user) {
-          await prisma.user.update({
-            where: { id: updatedUser.id },
-            data: { authId: newUserAuth.user.id }
-          });
-          const { data: reloginData } = await supabase.auth.signInWithPassword({
-            email: String(email).toLowerCase(),
-            password: String(password)
-          });
-          token = reloginData?.session?.access_token;
-        }
-      }
-
-      res.json({
-        success: true,
-        message: `Role capability successfully updated to BOTH!`,
-        user: {
-          id: updatedUser.id,
-          email: updatedUser.email,
-          name: updatedUser.name,
-          role: updatedUser.role,
-          phone: updatedUser.phone,
-          preferredLanguage: updatedUser.preferredLanguage
-        },
-        token: token,
-        session: authData?.session
+      res.status(400).json({
+        success: false,
+        error: `An account with this email address already exists. Please log in.`
       });
       return;
     }
@@ -169,6 +133,147 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// 1b. Continue with Google (Secure OAuth Identity Token Verification)
+router.post('/google', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { idToken, role } = req.body;
+
+    if (!idToken) {
+      res.status(400).json({ success: false, error: 'Google ID token is required.' });
+      return;
+    }
+
+    const targetRole = role === 'OWNER' ? 'OWNER' : 'FARMER'; // Default FARMER, never allow self-registering as ADMIN
+
+    // Verify token with official Google tokeninfo endpoint
+    let googleData: any = null;
+    try {
+      const gResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+      if (!gResponse.ok) {
+        const errDetails = await gResponse.text();
+        res.status(401).json({
+          success: false,
+          error: 'Invalid or expired Google identity token.',
+          details: errDetails
+        });
+        return;
+      }
+      googleData = await gResponse.json();
+    } catch (netErr: any) {
+      res.status(502).json({
+        success: false,
+        error: 'Failed to verify token with Google auth service. Please check internet connectivity.'
+      });
+      return;
+    }
+
+    if (!googleData || !googleData.email || (googleData.email_verified !== 'true' && googleData.email_verified !== true)) {
+      res.status(401).json({
+        success: false,
+        error: 'Google account email is unverified or invalid.'
+      });
+      return;
+    }
+
+    const verifiedEmail = String(googleData.email).toLowerCase().trim();
+    const verifiedName = String(googleData.name || verifiedEmail.split('@')[0]).trim();
+    const googleSub = String(googleData.sub);
+
+    // Look up existing user by verified email or google sub identifier
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: verifiedEmail },
+          { authId: googleSub }
+        ]
+      }
+    });
+
+    let isNewUser = false;
+
+    if (user) {
+      if (user.isSuspended) {
+        res.status(403).json({ success: false, error: 'Account suspended by administrator.' });
+        return;
+      }
+
+      // Link googleSub if missing
+      if (!user.authId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { authId: googleSub }
+        });
+      }
+    } else {
+      // Create fresh user in Prisma PostgreSQL
+      isNewUser = true;
+      user = await prisma.user.create({
+        data: {
+          name: verifiedName,
+          email: verifiedEmail,
+          password: 'GOOGLE_OAUTH_MANAGED',
+          role: targetRole,
+          authId: googleSub,
+          isVerified: true,
+          profileImage: googleData.picture || null
+        }
+      });
+
+      // Synchronize into Supabase Auth admin
+      try {
+        await supabase.auth.admin.createUser({
+          email: verifiedEmail,
+          email_confirm: true,
+          user_metadata: { name: verifiedName, role: targetRole, provider: 'google', sub: googleSub }
+        });
+      } catch (sbErr: any) {
+        console.warn('Supabase auth admin registration note:', sbErr?.message);
+      }
+    }
+
+    // Generate session token
+    let sessionToken: string | null = null;
+    try {
+      const { data: linkData } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: verifiedEmail
+      });
+      sessionToken = linkData?.properties?.hashed_token || null;
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      message: isNewUser ? 'Welcome to AgroRent AI! Your Google account is now linked.' : 'Welcome back!',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        phone: user.phone,
+        preferredLanguage: user.preferredLanguage,
+        profileImage: user.profileImage,
+        authId: user.authId
+      },
+      token: sessionToken || user.id,
+      isNewUser
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        actorRole: user.role,
+        action: isNewUser ? 'REGISTER_GOOGLE_OAUTH' : 'LOGIN_GOOGLE_OAUTH',
+        resource: 'Auth',
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent']
+      }
+    });
+  } catch (error: any) {
+    console.error('Google Auth Route Error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Google authentication failed.' });
+  }
+});
+
 // 2. Login User via Supabase Auth
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -189,7 +294,20 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     // Handle legacy seed account auto-provisioning into Supabase Auth
     if (authError) {
-      const dbUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
+      let dbUser: any = null;
+      try {
+        dbUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
+      } catch (dbErr: any) {
+        console.warn('Prisma lookup failed during auth fallback:', dbErr.message);
+        if (dbErr.name === 'PrismaClientInitializationError' || dbErr.message?.includes('tenant/user') || dbErr.message?.includes("Can't reach database server")) {
+          res.status(503).json({
+            success: false,
+            error: 'Database service is temporarily unavailable. Please verify that the Supabase project is active.',
+            code: 'DATABASE_UNAVAILABLE'
+          });
+          return;
+        }
+      }
       if (dbUser) {
         // Attempt creating or updating user in Supabase Auth for smooth transition
         const { data: createdAuth, error: createError } = await supabase.auth.admin.createUser({
@@ -325,6 +443,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         authId: user.authId
       },
       token: authData.session.access_token,
+      refreshToken: authData.session.refresh_token,
       session: authData.session
     });
 
@@ -340,6 +459,14 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error: any) {
     console.error('Login Route Error:', error);
+    if (error.name === 'PrismaClientInitializationError' || error.message?.includes('tenant/user') || error.message?.includes('fetch failed') || error.message?.includes("Can't reach database server")) {
+      res.status(503).json({
+        success: false,
+        error: 'Database service is temporarily unavailable. Please verify that the Supabase project is active.',
+        code: 'DATABASE_UNAVAILABLE'
+      });
+      return;
+    }
     res.status(500).json({ success: false, error: 'Authentication failed' });
   }
 });
@@ -487,6 +614,50 @@ router.post('/change-password', requireAuth, async (req: any, res: Response): Pr
   } catch (error: any) {
     console.error('Change password error:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to update password' });
+  }
+});
+
+// 9. Refresh Session Token
+router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      res.status(400).json({ success: false, error: 'Refresh token is required' });
+      return;
+    }
+
+    const { data, error } = await supabase.auth.refreshSession({ refresh_token: String(refreshToken) });
+    if (error || !data.session) {
+      res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      token: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      session: data.session
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to refresh token' });
+  }
+});
+
+// 10. Logout & Invalidate Session
+router.post('/logout', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+    if (token) {
+      try {
+        await supabase.auth.admin.signOut(token);
+      } catch (_) {}
+    }
+
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to log out' });
   }
 });
 
