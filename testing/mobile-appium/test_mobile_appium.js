@@ -1,6 +1,15 @@
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('../../backend/node_modules/xlsx');
+let XLSX;
+try {
+  XLSX = require('xlsx');
+} catch (e1) {
+  try {
+    XLSX = require('../../backend/node_modules/xlsx');
+  } catch (e2) {
+    XLSX = null;
+  }
+}
 
 console.log('===============================================================');
 console.log('    AGRORENT AI - MOBILE APPIUM TEST REPORT GENERATOR          ');

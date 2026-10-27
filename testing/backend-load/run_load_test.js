@@ -1,7 +1,16 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('../../backend/node_modules/xlsx');
+let XLSX;
+try {
+  XLSX = require('xlsx');
+} catch (e1) {
+  try {
+    XLSX = require('../../backend/node_modules/xlsx');
+  } catch (e2) {
+    XLSX = null;
+  }
+}
 
 const TARGET_HOST = '127.0.0.1';
 const TARGET_PORT = 4000;

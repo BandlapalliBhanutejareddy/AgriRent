@@ -1,6 +1,15 @@
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('../../../backend/node_modules/xlsx');
+let XLSX;
+try {
+  XLSX = require('xlsx');
+} catch (e1) {
+  try {
+    XLSX = require('../../../backend/node_modules/xlsx');
+  } catch (e2) {
+    XLSX = null;
+  }
+}
 const { APPIUM_CAPABILITIES, MOBILE_TEST_SCENARIOS, APK_PATH } = require('../../../testing/mobile-appium/appium_suite');
 
 const OUTPUT_DIR = path.resolve(__dirname, '../../../reports/qa/mobile');
@@ -95,43 +104,49 @@ const jsonResults = {
 fs.writeFileSync(path.join(OUTPUT_DIR, 'appium_results.json'), JSON.stringify(jsonResults, null, 2));
 
 // 3. Write Excel Results
-const wb = XLSX.utils.book_new();
-const summaryData = [
-  { Parameter: 'Application', Value: 'AgroRent AI Android Flutter Mobile App' },
-  { Parameter: 'Target APK', Value: `AgroRent_OwnerPortal_Latest.apk (${apkSizeMb} MB)` },
-  { Parameter: 'Suite Status', Value: 'BLOCKED' },
-  { Parameter: 'Blocker Root Cause', Value: 'Zero configured AVD emulators found & Appium CLI not installed globally' },
-  { Parameter: 'Physical Device Policy', Value: 'Detached (Physical phone testing prohibited during local automated QA phase)' },
-  { Parameter: 'Flutter Unit/Integration Tests', Value: '30 files, 538 / 538 Passed (100% in mobile/test/)' },
-  { Parameter: 'Planned Appium Scenarios', Value: MOBILE_TEST_SCENARIOS.length },
-  { Parameter: 'Timestamp', Value: new Date().toISOString() }
-];
-const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-XLSX.utils.book_append_sheet(wb, wsSummary, 'Audit & Blocker Summary');
+if (XLSX) {
+  try {
+    const wb = XLSX.utils.book_new();
+    const summaryData = [
+      { Parameter: 'Application', Value: 'AgroRent AI Android Flutter Mobile App' },
+      { Parameter: 'Target APK', Value: `AgroRent_OwnerPortal_Latest.apk (${apkSizeMb} MB)` },
+      { Parameter: 'Suite Status', Value: 'BLOCKED' },
+      { Parameter: 'Blocker Root Cause', Value: 'Zero configured AVD emulators found & Appium CLI not installed globally' },
+      { Parameter: 'Physical Device Policy', Value: 'Detached (Physical phone testing prohibited during local automated QA phase)' },
+      { Parameter: 'Flutter Unit/Integration Tests', Value: '30 files, 538 / 538 Passed (100% in mobile/test/)' },
+      { Parameter: 'Planned Appium Scenarios', Value: MOBILE_TEST_SCENARIOS.length },
+      { Parameter: 'Timestamp', Value: new Date().toISOString() }
+    ];
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Audit & Blocker Summary');
 
-const scenarioData = MOBILE_TEST_SCENARIOS.map(s => ({
-  ID: s.id,
-  Category: s.category,
-  Name: s.name,
-  Description: s.description,
-  TargetPlatform: 'Android 14+ (UiAutomator2)',
-  Status: 'BLOCKED (MISSING_AVD)',
-  RemediationRequirement: 'Requires local emulator setup'
-}));
-const wsScenarios = XLSX.utils.json_to_sheet(scenarioData);
-XLSX.utils.book_append_sheet(wb, wsScenarios, 'Planned Test Scenarios');
+    const scenarioData = MOBILE_TEST_SCENARIOS.map(s => ({
+      ID: s.id,
+      Category: s.category,
+      Name: s.name,
+      Description: s.description,
+      TargetPlatform: 'Android 14+ (UiAutomator2)',
+      Status: 'BLOCKED (MISSING_AVD)',
+      RemediationRequirement: 'Requires local emulator setup'
+    }));
+    const wsScenarios = XLSX.utils.json_to_sheet(scenarioData);
+    XLSX.utils.book_append_sheet(wb, wsScenarios, 'Planned Test Scenarios');
 
-const auditData = [
-  { Component: 'Android SDK', Path: 'C:\\Users\\bhanu\\AppData\\Local\\Android\\Sdk', Status: 'DETECTED' },
-  { Component: 'ADB Binary', Path: 'platform-tools\\adb.exe', Status: 'OPERATIONAL' },
-  { Component: 'Connected Devices', Path: 'adb devices', Status: '0 ATTACHED' },
-  { Component: 'Android Emulator', Path: 'emulator.exe -list-avds', Status: '0 AVDs CONFIGURED (BLOCKER)' },
-  { Component: 'Appium 2.x CLI', Path: 'appium --version', Status: 'NOT INSTALLED IN PATH (BLOCKER)' },
-  { Component: 'Flutter SDK', Path: 'flutter.bat (3.47.5)', Status: 'OPERATIONAL (538 Unit Tests Passed)' }
-];
-const wsAudit = XLSX.utils.json_to_sheet(auditData);
-XLSX.utils.book_append_sheet(wb, wsAudit, 'Environment Checklist');
-XLSX.writeFile(wb, path.join(OUTPUT_DIR, 'appium_results.xlsx'));
+    const auditData = [
+      { Component: 'Android SDK', Path: 'C:\\Users\\bhanu\\AppData\\Local\\Android\\Sdk', Status: 'DETECTED' },
+      { Component: 'ADB Binary', Path: 'platform-tools\\adb.exe', Status: 'OPERATIONAL' },
+      { Component: 'Connected Devices', Path: 'adb devices', Status: '0 ATTACHED' },
+      { Component: 'Android Emulator', Path: 'emulator.exe -list-avds', Status: '0 AVDs CONFIGURED (BLOCKER)' },
+      { Component: 'Appium 2.x CLI', Path: 'appium --version', Status: 'NOT INSTALLED IN PATH (BLOCKER)' },
+      { Component: 'Flutter SDK', Path: 'flutter.bat (3.47.5)', Status: 'OPERATIONAL (538 Unit Tests Passed)' }
+    ];
+    const wsAudit = XLSX.utils.json_to_sheet(auditData);
+    XLSX.utils.book_append_sheet(wb, wsAudit, 'Environment Checklist');
+    XLSX.writeFile(wb, path.join(OUTPUT_DIR, 'appium_results.xlsx'));
+  } catch (e) {
+    console.warn('Warning: Failed to write Excel results:', e.message);
+  }
+}
 
 // 4. Write HTML Report
 const htmlContent = `<!DOCTYPE html>
