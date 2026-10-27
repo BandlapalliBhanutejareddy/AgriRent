@@ -237,6 +237,25 @@ router.get(['/my', '/owner'], requireAuth, requireRole('OWNER'), async (req: Aut
   }
 });
 
+// Get Equipment Categories Taxonomy (Public)
+router.get('/categories', async (req: Request, res: Response, next: any): Promise<void> => {
+  try {
+    const categories = [
+      { id: 'TRACTORS', name: 'Tractors', description: 'Heavy and compact agricultural tractors' },
+      { id: 'HARVESTERS', name: 'Harvesters', description: 'Combine harvesters and grain equipment' },
+      { id: 'POWER_TILLERS', name: 'Power Tillers', description: 'Rotary tillers and soil cultivation units' },
+      { id: 'IMPLEMENTS', name: 'Implements', description: 'Rotavators, plows, and seed drills' },
+      { id: 'SPRAYERS', name: 'Sprayers', description: 'Boom sprayers and pest control equipment' },
+      { id: 'IRRIGATION', name: 'Irrigation & Pumps', description: 'Water pumps, diesel engines, and sprinkler rigs' },
+      { id: 'CULTIVATORS', name: 'Cultivators', description: 'Secondary tillage and weed control cultivators' },
+      { id: 'ATTACHMENTS', name: 'Attachments & Tools', description: 'Trolleys, loaders, and specialized attachments' }
+    ];
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get Single Equipment (Public)
 router.get('/:id', async (req: Request, res: Response, next: any): Promise<void> => {
   try {

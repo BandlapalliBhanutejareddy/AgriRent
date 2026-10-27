@@ -178,6 +178,55 @@ router.get('/owner', requireAuth, requireRole('OWNER'), async (req: AuthRequest,
   }
 });
 
+// 2.4. Get User Bookings List (Supports both / and /my, must precede /:id)
+router.get(['/', '/my'], requireAuth, async (req: AuthRequest, res: Response, next: any): Promise<void> => {
+  try {
+    const role = req.prismaUser.role;
+    const userId = req.prismaUser.id;
+
+    let where: any = {};
+    const activeContext = req.query.role as string;
+
+    if (role === 'FARMER') {
+      where.farmerId = userId;
+    } else if (role === 'OWNER') {
+      where.equipment = { ownerId: userId };
+    } else if (role === 'BOTH') {
+      if (activeContext === 'FARMER') {
+        where.farmerId = userId;
+      } else if (activeContext === 'OWNER') {
+        where.equipment = { ownerId: userId };
+      } else {
+        where.OR = [{ farmerId: userId }, { equipment: { ownerId: userId } }];
+      }
+    }
+
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: {
+        equipment: {
+          include: {
+            owner: { select: { id: true, name: true } },
+            reviews: true
+          }
+        },
+        farmer: { select: { id: true, name: true } },
+        payments: true,
+        statusHistory: { orderBy: { createdAt: 'asc' } },
+        returnInspection: true,
+        equipmentReviews: true,
+        userReviews: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(bookings);
+  } catch (error) {
+    console.error('Bookings Fetch Error:', error);
+    next(error);
+  }
+});
+
 // 2.5. Get Single Booking by ID
 router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -674,55 +723,6 @@ router.post('/:id/inspection', requireAuth, requireRole('OWNER'), validate(retur
     }
     console.error('Inspection error:', error);
     res.status(500).json({ error: 'Failed to record return inspection' });
-  }
-});
-
-// 7. Get User Bookings List
-router.get('/', requireAuth, async (req: AuthRequest, res: Response, next: any): Promise<void> => {
-  try {
-    const role = req.prismaUser.role;
-    const userId = req.prismaUser.id;
-
-    let where: any = {};
-    const activeContext = req.query.role as string;
-
-    if (role === 'FARMER') {
-      where.farmerId = userId;
-    } else if (role === 'OWNER') {
-      where.equipment = { ownerId: userId };
-    } else if (role === 'BOTH') {
-      if (activeContext === 'FARMER') {
-        where.farmerId = userId;
-      } else if (activeContext === 'OWNER') {
-        where.equipment = { ownerId: userId };
-      } else {
-        where.OR = [{ farmerId: userId }, { equipment: { ownerId: userId } }];
-      }
-    }
-
-    const bookings = await prisma.booking.findMany({
-      where,
-      include: {
-        equipment: {
-          include: {
-            owner: { select: { id: true, name: true } },
-            reviews: true
-          }
-        },
-        farmer: { select: { id: true, name: true } },
-        payments: true,
-        statusHistory: { orderBy: { createdAt: 'asc' } },
-        returnInspection: true,
-        equipmentReviews: true,
-        userReviews: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    res.json(bookings);
-  } catch (error) {
-    console.error('Bookings Fetch Error:', error);
-    next(error);
   }
 });
 

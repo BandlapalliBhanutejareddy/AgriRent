@@ -2,10 +2,7 @@ const { Client } = require('pg');
 
 async function testPg() {
   const connectionStrings = [
-    "postgresql://postgres.ezylxyrtnodxthdgynvn:Sup%40b%40se%4023@aws-1-ap-northeast-1.pooler.supabase.com:443/postgres?sslmode=require",
-    "postgresql://postgres.ezylxyrtnodxthdgynvn:Sup%40b%40se%4023@aws-0-ap-northeast-1.pooler.supabase.com:443/postgres?sslmode=require",
-    "postgresql://postgres.ezylxyrtnodxthdgynvn:Sup%40b%40se%4023@aws-0-ap-south-1.pooler.supabase.com:443/postgres?sslmode=require",
-    "postgresql://postgres.ezylxyrtnodxthdgynvn:Sup%40b%40se%4023@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require",
+    process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/agrorent"
   ];
 
   for (const cs of connectionStrings) {

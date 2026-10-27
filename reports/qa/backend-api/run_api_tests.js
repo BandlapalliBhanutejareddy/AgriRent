@@ -182,14 +182,22 @@ async function main() {
 
   await runTest('Marketplace API', 'GET /api/equipment/categories catalog taxonomy', async () => {
     const res = await request('GET', '/api/equipment/categories');
-    return `Category taxonomy verified (Status ${res.status})`;
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    const categories = res.data?.data || res.data;
+    if (!Array.isArray(categories) || categories.length === 0) {
+      throw new Error('Expected non-empty array of equipment categories');
+    }
+    return `Category taxonomy verified (${categories.length} categories available)`;
   });
 
   // 4. Bookings API
   await runTest('Bookings API', 'GET /api/bookings authenticated user rentals', async () => {
     if (!farmerToken) throw new Error('Farmer token missing');
     const res = await request('GET', '/api/bookings/my', null, { Authorization: `Bearer ${farmerToken}` });
-    return 'Retrieved user rental booking list successfully';
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    const bookings = res.data?.data || res.data;
+    if (!Array.isArray(bookings)) throw new Error('Expected array of bookings');
+    return `Retrieved user rental booking list successfully (${bookings.length} bookings)`;
   });
 
   // 5. Farm Planning & Operations API

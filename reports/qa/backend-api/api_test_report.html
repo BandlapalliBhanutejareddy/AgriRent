@@ -26,14 +26,14 @@
 <body>
   <div class="container">
     <h1>AgroRent AI — Backend REST API Test Report</h1>
-    <div class="subtitle">Live HTTP Execution on http://localhost:4000 — Tue, 27 Oct 2026 05:40:43 GMT</div>
+    <div class="subtitle">Live HTTP Execution on http://localhost:4000 — Tue, 27 Oct 2026 13:55:01 GMT</div>
     
     <div class="metrics">
       <div class="card"><div class="card-label">Total Endpoints</div><div class="card-val">16</div></div>
       <div class="card"><div class="card-label">Passed</div><div class="card-val pass">16</div></div>
       <div class="card"><div class="card-label">Failed</div><div class="card-val pass">0</div></div>
       <div class="card"><div class="card-label">Pass Rate</div><div class="card-val pass">100.0%</div></div>
-      <div class="card"><div class="card-label">Duration</div><div class="card-val">44.26s</div></div>
+      <div class="card"><div class="card-label">Duration</div><div class="card-val">43.13s</div></div>
     </div>
 
     <table>
@@ -52,7 +52,7 @@
             <td><strong>Health & Readiness</strong></td>
             <td>GET /api/health liveness probe</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>47ms</td>
+            <td>78ms</td>
             <td>Liveness probe healthy (HTTP 200) </td>
           </tr>
         
@@ -60,7 +60,7 @@
             <td><strong>Health & Readiness</strong></td>
             <td>GET /api/ready database readiness check</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>953ms</td>
+            <td>812ms</td>
             <td>Database connection pool active & healthy </td>
           </tr>
         
@@ -68,7 +68,7 @@
             <td><strong>Authentication API</strong></td>
             <td>POST /api/auth/login invalid credentials rejection</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>1989ms</td>
+            <td>1965ms</td>
             <td>Correctly rejected invalid login with HTTP 401 </td>
           </tr>
         
@@ -76,7 +76,7 @@
             <td><strong>Authentication API</strong></td>
             <td>POST /api/auth/login valid farmer login</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>1190ms</td>
+            <td>1426ms</td>
             <td>Authenticated successfully as farmer.live@agrorent.ai (JWT token issued) </td>
           </tr>
         
@@ -84,15 +84,15 @@
             <td><strong>Authentication API</strong></td>
             <td>POST /api/auth/login valid owner login</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>1306ms</td>
-            <td>Authenticated successfully as owner.live@agrorent.ai (JWT token issued) </td>
+            <td>3089ms</td>
+            <td>Authenticated successfully as owner.demo@agrorent.ai (JWT token issued) </td>
           </tr>
         
           <tr>
             <td><strong>Marketplace API</strong></td>
             <td>GET /api/equipment catalog listing</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>3511ms</td>
+            <td>5139ms</td>
             <td>Returned 20 equipment machinery items </td>
           </tr>
         
@@ -100,7 +100,7 @@
             <td><strong>Marketplace API</strong></td>
             <td>GET /api/equipment/nearby geographic search</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>1299ms</td>
+            <td>2145ms</td>
             <td>Geographic proximity search active (0 items found) </td>
           </tr>
         
@@ -108,23 +108,23 @@
             <td><strong>Marketplace API</strong></td>
             <td>GET /api/equipment/categories catalog taxonomy</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>841ms</td>
-            <td>Category taxonomy verified (Status 404) </td>
+            <td>6ms</td>
+            <td>Category taxonomy verified (8 categories available) </td>
           </tr>
         
           <tr>
             <td><strong>Bookings API</strong></td>
             <td>GET /api/bookings authenticated user rentals</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>2254ms</td>
-            <td>Retrieved user rental booking list successfully </td>
+            <td>5611ms</td>
+            <td>Retrieved user rental booking list successfully (4 bookings) </td>
           </tr>
         
           <tr>
             <td><strong>Farm Management API</strong></td>
             <td>GET /api/farms farmer digital twin schedule</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>3654ms</td>
+            <td>2889ms</td>
             <td>Retrieved digital twin farm records (1 farms registered) </td>
           </tr>
         
@@ -132,7 +132,7 @@
             <td><strong>Wishlist API</strong></td>
             <td>GET /api/saved/ids quick state query</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>2732ms</td>
+            <td>2343ms</td>
             <td>Retrieved saved IDs list (0 bookmarks) </td>
           </tr>
         
@@ -140,7 +140,7 @@
             <td><strong>Owner Fleet API</strong></td>
             <td>GET /api/analytics/owner owner KPI analytics</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>8326ms</td>
+            <td>5774ms</td>
             <td>Owner dashboard KPIs, revenue metrics, and booking counts returned </td>
           </tr>
         
@@ -148,7 +148,7 @@
             <td><strong>Owner Fleet API</strong></td>
             <td>GET /api/owner/bank-details payout configuration</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>2480ms</td>
+            <td>2088ms</td>
             <td>Retrieved bank details with masked security: Configured </td>
           </tr>
         
@@ -156,7 +156,7 @@
             <td><strong>Community API</strong></td>
             <td>GET /api/community farmer community metadata</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>4085ms</td>
+            <td>2696ms</td>
             <td>Community metadata verified: AgroRent Farmer Community </td>
           </tr>
         
@@ -164,7 +164,7 @@
             <td><strong>Community API</strong></td>
             <td>GET /api/community/messages persistent discussion feed</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>2957ms</td>
+            <td>2341ms</td>
             <td>Retrieved community messages (0 messages loaded) </td>
           </tr>
         
@@ -172,7 +172,7 @@
             <td><strong>AI Advisory API</strong></td>
             <td>POST /api/ai/advisor agricultural agronomic advice</td>
             <td><span class="badge pass">PASS</span></td>
-            <td>6635ms</td>
+            <td>4730ms</td>
             <td>AI agronomic advice generated (Fallback active) </td>
           </tr>
         
