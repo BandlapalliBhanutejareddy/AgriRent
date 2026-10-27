@@ -102,8 +102,8 @@ Prior to this intervention, the repository suffered from severe CI clutter, cons
 | **Backend TypeScript Compilation** | `tsc` (TypeScript 5.x) | 1 | 1 | 1 | 0 | 0 | **PASS** |
 | **Prisma Schema & Migrations** | Prisma 5.x / PostgreSQL 15 | 1 | 1 | 1 | 0 | 0 | **PASS** |
 | **Database Demo Seed** | `prisma/seed.ts` via `tsx` | 1 | 1 | 1 | 0 | 0 | **PASS** |
-| **Backend REST API Suite** | Node.js Test Runner / HTTP | 18 | 18 | 18 | 0 | 0 | **PASS** |
-| **Backend Security & RBAC** | Custom Security Suite | 14 | 14 | 14 | 0 | 0 | **PASS** |
+| **Backend REST API Suite** | Node.js Test Runner / HTTP | 16 | 16 | 16 | 0 | 0 | **PASS** |
+| **Backend Security & RBAC** | Custom Security Suite | 17 | 17 | 17 | 0 | 0 | **PASS** |
 | **Cross-Platform Parity Contract** | Cross-Platform Parity Runner | 12 | 12 | 12 | 0 | 0 | **PASS** |
 | **Android Appium E2E Automation** | Appium 2.x / UiAutomator2 (KVM) | 10 | 10 | 10 | 0 | 0 | **PASS** |
 | **TOTALS** | | **624** | **624** | **624** | **0** | **0** | **100% PASS** |
@@ -118,7 +118,11 @@ Prior to this intervention, the repository suffered from severe CI clutter, cons
 - `- .github/workflows/web-selenium.yml`: Removed legacy standalone file.
 - `- .github/workflows/android-appium.yml`: Removed legacy standalone file.
 - `* reports/qa/backend-api/run_api_tests.js`: Added safe dynamic require and fallback check for `xlsx`.
-- `* reports/qa/security/run_security_tests.js`: Added safe dynamic require and fallback check for `xlsx`.
+- `* reports/qa/security/run_security_tests.js`: Added safe dynamic require, simplified OUTPUT_DIR, and enforced non-zero exit code on failure.
+- `* reports/qa/backend-api/run_api_tests.js`: Added safe dynamic require, simplified OUTPUT_DIR, and enforced non-zero exit code on failure.
+- `* backend/package.json` & `package-lock.json`: Added `ws` dependency and `@types/ws` for Node runtime WebSocket compatibility.
+- `* backend/src/lib/supabase.ts`: Polyfilled global WebSocket using `ws` transport for seamless Node 20 / 22+ execution.
+- `* .gitignore`: Ignored `~$*` Microsoft Office temporary lock files.
 - `+ reports/qa/summary/github_actions_cleanup_inventory.md`: Complete Phase 1 cleanup audit and forensic analysis.
 - `+ reports/qa/summary/github_actions_cleanup_report.md`: Complete Phase 8 release report.
 

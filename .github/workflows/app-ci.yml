@@ -63,7 +63,7 @@ jobs:
     - name: Start Backend Service
       run: |
         cd backend
-        npm start &
+        nohup npm start > /tmp/backend.log 2>&1 &
       env:
         PORT: 4000
         DATABASE_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
@@ -75,26 +75,39 @@ jobs:
     - name: Wait for Backend Health Readiness
       run: |
         echo "Waiting for Backend (http://localhost:4000/api/health)..."
+        READY=false
         for i in {1..30}; do
-          if curl -s http://localhost:4000/api/health; then
-            echo "Backend is ready!"
+          if curl -s http://localhost:4000/api/health | grep -q "status"; then
+            echo "Backend is ready and healthy!"
+            READY=true
             break
           fi
           sleep 1
         done
+        if [ "$READY" != "true" ]; then
+          echo "Backend failed to start. Logs:"
+          cat /tmp/backend.log
+          exit 1
+        fi
 
     - name: Execute Backend REST API Tests
-      run: npm run test:api
+      run: |
+        curl -s http://localhost:4000/api/health || (echo "Backend died! Logs:" && cat /tmp/backend.log && exit 1)
+        npm run test:api
       env:
         API_BASE_URL: "http://localhost:4000"
 
     - name: Execute Security & RBAC Suite
-      run: npm run test:security
+      run: |
+        curl -s http://localhost:4000/api/health || (echo "Backend died! Logs:" && cat /tmp/backend.log && exit 1)
+        npm run test:security
       env:
         API_BASE_URL: "http://localhost:4000"
 
     - name: Execute Cross-Platform API Contract Verification
-      run: npm run test:cross
+      run: |
+        curl -s http://localhost:4000/api/health || (echo "Backend died! Logs:" && cat /tmp/backend.log && exit 1)
+        npm run test:cross
       env:
         API_BASE_URL: "http://localhost:4000"
 

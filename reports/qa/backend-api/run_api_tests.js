@@ -14,7 +14,7 @@ try {
 }
 
 const BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
-const OUTPUT_DIR = path.resolve(__dirname, '../../../reports/qa/backend-api');
+const OUTPUT_DIR = __dirname;
 
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
@@ -368,6 +368,11 @@ async function main() {
 </html>`;
   fs.writeFileSync(path.join(OUTPUT_DIR, 'api_test_report.html'), htmlContent);
   log(`All API test reports generated in: ${OUTPUT_DIR}`);
+
+  if (failed > 0) {
+    log(`❌ Backend API Test Suite FAILED: ${failed}/${total} test(s) failed.`);
+    process.exit(1);
+  }
 }
 
 main().catch(err => {

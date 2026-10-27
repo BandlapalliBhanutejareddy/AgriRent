@@ -74,6 +74,7 @@ logcat.txt
 *.tmp
 *.bak
 *.swp
+~$*
 scratch/
 
 # IDE and OS Junk
