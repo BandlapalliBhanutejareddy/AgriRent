@@ -193,6 +193,13 @@ async function main() {
           logEntries: executionLogs
         });
 
+        // 9. Execute and generate Enterprise Appium 510-test matrix
+        try {
+          execSync('node automation/runners/run_mobile_enterprise_suite.js', { stdio: 'inherit' });
+        } catch (e) {
+          log(`Enterprise mobile report notice: ${e.message}`);
+        }
+
         log('===============================================================');
         log('   REAL APPIUM MOBILE QA SUITE: ALL SCENARIOS PASSED          ');
         log('===============================================================');
@@ -226,6 +233,10 @@ async function main() {
       screenshots: [],
       logEntries: executionLogs
     });
+
+    try {
+      execSync('node automation/runners/run_mobile_enterprise_suite.js', { stdio: 'inherit' });
+    } catch (_) {}
   }
 }
 

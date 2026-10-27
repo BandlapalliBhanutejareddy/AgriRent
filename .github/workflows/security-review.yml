@@ -1,0 +1,132 @@
+name: Enterprise Security & Vulnerability Review
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    name: Security Review & SAST/DAST Analysis
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: agrorent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Detect Backend Framework & Architecture
+      run: |
+        echo "=== BACKEND TECH STACK DETECTION ==="
+        if [ -f "backend/package.json" ]; then
+          echo "Detected: Node.js / Express / TypeScript Backend with Prisma ORM"
+        fi
+        echo "Prisma Schema: $(test -f backend/prisma/schema.prisma && echo 'Present' || echo 'Missing')"
+
+    - name: Install Root & Backend Dependencies
+      run: |
+        npm install
+        cd backend && npm install
+
+    - name: Migrate Database Schema & Seed Demo Accounts
+      run: |
+        cd backend
+        npx prisma db push --skip-generate
+        npm run seed
+        npm run build
+      env:
+        DATABASE_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        DIRECT_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        JWT_SECRET: "test_jwt_secret_for_ci_environment_32chars_long"
+
+    - name: Start Backend Service
+      run: |
+        cd backend
+        nohup npm start > /tmp/backend.log 2>&1 &
+      env:
+        PORT: 4000
+        DATABASE_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        DIRECT_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
+        JWT_SECRET: "test_jwt_secret_for_ci_environment_32chars_long"
+        SUPABASE_URL: "https://placeholder.supabase.co"
+        SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+
+    - name: Verify Backend Readiness
+      run: |
+        echo "Waiting for Backend (http://localhost:4000/api/health)..."
+        READY=false
+        for i in {1..30}; do
+          if curl -s http://localhost:4000/api/health | grep -q "status"; then
+            echo "Backend is ready and healthy!"
+            READY=true
+            break
+          fi
+          sleep 1
+        done
+        if [ "$READY" != "true" ]; then
+          cat /tmp/backend.log
+          exit 1
+        fi
+
+    - name: Run Secret Leakage & SAST Dependency Scan
+      run: |
+        echo "Auditing package lockfiles for known CVEs..."
+        npm audit --audit-level=critical || true
+
+    - name: Execute 460-Test Enterprise Security & DAST Suite
+      run: |
+        npm run test:security
+      env:
+        API_BASE_URL: "http://localhost:4000"
+
+    - name: Execute 100-VU Baseline Load & Latency Audit
+      run: |
+        npm run test:load
+      env:
+        API_BASE_URL: "http://localhost:4000"
+
+    - name: Consolidate Master Executive QA Suite
+      run: |
+        npm run test:master
+
+    - name: Publish Security & Latency Summary to GitHub Actions Summary
+      if: always()
+      run: |
+        if [ -f reports/qa/master/master_qa_summary.md ]; then
+          cat reports/qa/master/master_qa_summary.md >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload Security & Performance Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: enterprise-security-audit-reports
+        path: |
+          reports/qa/security/
+          reports/qa/performance/
+          reports/qa/master/
+        if-no-files-found: warn

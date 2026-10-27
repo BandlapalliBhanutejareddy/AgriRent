@@ -124,6 +124,13 @@ jobs:
         WEB_BASE_URL: "http://localhost:3000"
         API_BASE_URL: "http://localhost:4000"
 
+    - name: Publish Web QA Summary to GitHub Actions Summary
+      if: always()
+      run: |
+        if [ -f reports/qa/web/summary.md ]; then
+          cat reports/qa/web/summary.md >> $GITHUB_STEP_SUMMARY
+        fi
+
     - name: Upload Web QA Artifacts
       if: always()
       uses: actions/upload-artifact@v4
@@ -193,6 +200,13 @@ jobs:
         disable-animations: true
         emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
         script: npm run test:mobile
+
+    - name: Publish Mobile QA Summary to GitHub Actions Summary
+      if: always()
+      run: |
+        if [ -f reports/qa/mobile/summary.md ]; then
+          cat reports/qa/mobile/summary.md >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Upload Mobile QA Reports
       if: always()

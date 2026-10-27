@@ -104,19 +104,33 @@ jobs:
       env:
         API_BASE_URL: "http://localhost:4000"
 
-    - name: Execute Cross-Platform API Contract Verification
+    - name: Execute 100-VU Baseline Load & Latency Audit
       run: |
         curl -s http://localhost:4000/api/health || (echo "Backend died! Logs:" && cat /tmp/backend.log && exit 1)
-        npm run test:cross
+        npm run test:load
       env:
         API_BASE_URL: "http://localhost:4000"
 
-    - name: Upload Backend QA Reports
+    - name: Consolidate Master Executive QA Suite
+      run: npm run test:master
+
+    - name: Publish Executive Summary & API Response Times to GitHub Actions Summary
+      if: always()
+      run: |
+        if [ -f reports/qa/master/master_qa_summary.md ]; then
+          cat reports/qa/master/master_qa_summary.md >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload Master Executive QA Artifacts
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: backend-qa-reports
-        path: reports/qa/backend-api/
+        name: master-executive-qa-suite
+        path: |
+          reports/qa/master/
+          reports/qa/security/
+          reports/qa/performance/
+          reports/qa/backend-api/
         if-no-files-found: warn
 
   web-ci:
