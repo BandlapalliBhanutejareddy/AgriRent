@@ -65,12 +65,19 @@ jobs:
         npm install
         npm run build
       env:
-        NEXT_PUBLIC_API_URL: "http://localhost:4000"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+        NEXT_PUBLIC_API_URL: "http://localhost:4000/api"
 
     - name: Start Web Application
       run: |
         cd web
         npm start &
+      env:
+        PORT: 3000
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+        NEXT_PUBLIC_API_URL: "http://localhost:4000/api"
 
     - name: Wait for Services Readiness
       run: |

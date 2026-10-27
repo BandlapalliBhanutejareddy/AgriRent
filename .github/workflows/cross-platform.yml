@@ -76,7 +76,9 @@ jobs:
         npm install
         npm run build
       env:
-        NEXT_PUBLIC_API_URL: "http://localhost:4000"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+        NEXT_PUBLIC_API_URL: "http://localhost:4000/api"
 
     - name: Flutter Dependencies & Unit/Widget Tests
       run: |
