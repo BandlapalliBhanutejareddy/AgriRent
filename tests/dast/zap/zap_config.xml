@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- OWASP ZAP Automated CI DAST Rules Configuration -->
+    <rules>
+        <!-- Security Headers -->
+        <rule id="10020" name="Anti-clickjacking Header" threshold="Medium"/>
+        <rule id="10021" name="X-Content-Type-Options Header Missing" threshold="Medium"/>
+        <rule id="10038" name="Content Security Policy (CSP) Header Not Set" threshold="Medium"/>
+        <rule id="10035" name="Strict-Transport-Security Header Not Set" threshold="Low"/>
+        <!-- Information Disclosure -->
+        <rule id="10015" name="Re-examine Cache-control Directives" threshold="Low"/>
+        <rule id="10024" name="Information Disclosure - Sensitive Information in URL" threshold="High"/>
+        <rule id="10036" name="Server Leaks Version Information via 'Server' HTTP Header" threshold="Low"/>
+        <!-- Injection & XSS -->
+        <rule id="40012" name="Cross Site Scripting (Reflected)" threshold="High"/>
+        <rule id="40014" name="Cross Site Scripting (Persistent)" threshold="High"/>
+        <rule id="40018" name="SQL Injection" threshold="High"/>
+        <!-- Authentication & Cookies -->
+        <rule id="10010" name="Cookie No HttpOnly Flag" threshold="Medium"/>
+        <rule id="10011" name="Cookie Without Secure Flag" threshold="Medium"/>
+        <rule id="10054" name="Cookie Without SameSite Attribute" threshold="Medium"/>
+    </rules>
+</configuration>

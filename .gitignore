@@ -86,3 +86,8 @@ desktop.ini
 *.iws
 .idea/
 .refact/
+ 
+# Python
+__pycache__/
+*.pyc
+

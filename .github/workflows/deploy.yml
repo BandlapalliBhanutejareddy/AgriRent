@@ -1,0 +1,319 @@
+name: AgroRent AI Quality Pipeline & Deployment
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # =========================================================================
+  # 1. SELENIUM WEB TESTING (351+ UNIQUE CASES)
+  # =========================================================================
+  selenium-tests:
+    name: Selenium Web Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'web/package-lock.json'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: 'tests/selenium/requirements.txt'
+
+    - name: Install Python Selenium Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --prefer-binary -r tests/selenium/requirements.txt
+
+    - name: Build Web Application (Static Export)
+      run: |
+        cd web
+        npm ci
+        STATIC_EXPORT=true npm run build
+
+    - name: Execute Selenium Web Automation Suite
+      run: |
+        python tests/selenium/test_selenium.py
+
+    - name: Upload Selenium Test Reports & Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: selenium-report
+        path: |
+          reports/selenium/
+          test-cases/selenium_test_cases.xlsx
+        retention-days: 14
+
+  # =========================================================================
+  # 2. APPIUM MOBILE TESTING (351+ UNIQUE CASES)
+  # =========================================================================
+  appium-tests:
+    name: Appium Mobile Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Set up Flutter SDK
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+        cache: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: 'tests/appium/requirements.txt'
+
+    - name: Install Python Appium Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --prefer-binary -r tests/appium/requirements.txt
+
+    - name: Execute Appium Mobile & Native Flutter Suites
+      run: |
+        python tests/appium/test_appium.py
+
+    - name: Upload Appium Test Reports & Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: appium-report
+        path: |
+          reports/appium/
+          test-cases/appium_test_cases.xlsx
+        retention-days: 14
+
+  # =========================================================================
+  # 3. LOAD / PERFORMANCE TESTING (350 UNIQUE CASES - WEB ONLY)
+  # =========================================================================
+  load-tests:
+    name: Load Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'web/package-lock.json'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: 'tests/load/requirements.txt'
+
+    - name: Install Python Locust Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --prefer-binary -r tests/load/requirements.txt
+
+    - name: Build Web Application (Static Export)
+      run: |
+        cd web
+        npm ci
+        STATIC_EXPORT=true npm run build
+
+    - name: Execute Web Load Testing Suite
+      run: |
+        python tests/load/run_load_test.py
+
+    - name: Upload Load Testing Reports & Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: load-report
+        path: |
+          reports/load-testing/
+          test-cases/load_test_cases.xlsx
+        retention-days: 14
+
+  # =========================================================================
+  # 4. DAST SECURITY TESTING (350 UNIQUE CASES - WEB ONLY)
+  # =========================================================================
+  dast-security-tests:
+    name: DAST Security Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'web/package-lock.json'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: 'tests/dast/requirements.txt'
+
+    - name: Install Python DAST Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --prefer-binary -r tests/dast/requirements.txt
+
+    - name: Build Web Application (Static Export)
+      run: |
+        cd web
+        npm ci
+        STATIC_EXPORT=true npm run build
+
+    - name: Execute DAST Security Audit Suite
+      run: |
+        python tests/dast/test_dast.py
+
+    - name: Upload DAST Security Reports & Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dast-report
+        path: |
+          reports/dast-security/
+          test-cases/dast_test_cases.xlsx
+        retention-days: 14
+
+  # =========================================================================
+  # 5. BUNDLE REPORTS (NEEDS ALL 4 TEST SUITES TO PASS)
+  # =========================================================================
+  bundle-reports:
+    name: Bundle Reports
+    runs-on: ubuntu-latest
+    needs:
+      - selenium-tests
+      - appium-tests
+      - load-tests
+      - dast-security-tests
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install Report Bundling Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --prefer-binary openpyxl pandas
+
+    - name: Download Selenium Reports
+      uses: actions/download-artifact@v4
+      with:
+        name: selenium-report
+        path: reports/selenium
+
+    - name: Download Appium Reports
+      uses: actions/download-artifact@v4
+      with:
+        name: appium-report
+        path: reports/appium
+
+    - name: Download Load Testing Reports
+      uses: actions/download-artifact@v4
+      with:
+        name: load-report
+        path: reports/load-testing
+
+    - name: Download DAST Security Reports
+      uses: actions/download-artifact@v4
+      with:
+        name: dast-report
+        path: reports/dast-security
+
+    - name: Consolidate QA Reports & Generate Master Summary
+      run: |
+        python tests/bundle_reports.py
+
+    - name: Upload Master Consolidated QA Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: all-qa-reports-bundle
+        path: |
+          reports/
+          test-cases/
+        retention-days: 30
+
+  # =========================================================================
+  # 6. DEPLOY WEB ONLY TO GITHUB PAGES (NEEDS BUNDLE REPORTS TO PASS)
+  # =========================================================================
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs:
+      - bundle-reports
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: 'web/package-lock.json'
+
+    - name: Build Web Application for GitHub Pages
+      run: |
+        cd web
+        npm ci
+        STATIC_EXPORT=true npm run build
+
+    - name: Setup GitHub Pages
+      uses: actions/configure-pages@v5
+
+    - name: Upload GitHub Pages Artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: 'web/out'
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
