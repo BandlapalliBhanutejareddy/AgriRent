@@ -94,3 +94,7 @@ __pycache__/
 # Local Scratch Directory
 scratch/
 
+# Database Safety Backups & Sensitive User Dumps
+backend/reports/
+reports/*.json
+

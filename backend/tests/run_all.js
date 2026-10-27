@@ -1,5 +1,6 @@
-const { spawn } = require('child_process');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const { spawn } = require('child_process');
 const fs = require('fs');
 const http = require('http');
 

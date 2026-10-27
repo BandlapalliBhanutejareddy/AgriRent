@@ -1,3 +1,5 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const test = require('node:test');
 const assert = require('node:assert');
 const { PrismaClient } = require('@prisma/client');
@@ -76,11 +78,24 @@ test('AuditLog Verification Suite', async (t) => {
     assert.strictEqual(logs.length, 1, 'Missing LOGIN log');
   });
 
-  await t.test('Cleanup Test User', async () => {
-    await prisma.user.delete({ where: { id: testUser.id } });
+  t.after(async () => {
+    if (testUser && testUser.id) {
+      try {
+        await prisma.user.delete({ where: { id: testUser.id } });
+      } catch (e) {
+        // user might already be deleted
+      }
+    }
+    await prisma.$disconnect();
+    if (serverStarted) {
+      stopTestServer();
+    }
   });
 
-  if (serverStarted) {
-    stopTestServer();
-  }
+  await t.test('Cleanup Test User', async () => {
+    if (testUser && testUser.id) {
+      await prisma.user.delete({ where: { id: testUser.id } });
+      testUser = null;
+    }
+  });
 });

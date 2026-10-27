@@ -94,13 +94,13 @@ export default function OwnerRentalHistoryPage() {
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 rounded-[32px] text-white shadow-xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <span className="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-xl text-xs font-black uppercase tracking-wider border border-indigo-500/30 inline-flex items-center gap-1.5">
-            <History size={13} /> Fleet Rental Audit Log
+            <History size={13} /> Fleet Rental History
           </span>
           <h1 className="text-3xl font-black tracking-tight mt-2">
             Rental History & Operations Ledger
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">
-            Complete historical record of all dispatched, completed, and active equipment rentals with payment audit integrity.
+            Complete historical record of all dispatched, completed, and active equipment rentals with payment tracking integrity.
           </p>
         </div>
       </div>

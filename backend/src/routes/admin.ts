@@ -524,25 +524,458 @@ router.get('/system-health', async (req: AuthRequest, res: Response): Promise<vo
   }
 });
 
-// 13. Data Quality
+// 13. Equipment Trend Analytics (7d, 30d, 90d, all)
+router.get('/equipment-analytics', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { period = '30d' } = req.query;
+    let startDate: Date | null = null;
+    const now = new Date();
+
+    if (period === '7d') {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (period === '30d') {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (period === '90d') {
+      startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    }
+
+    const bookingWhere: any = {};
+    if (startDate) {
+      bookingWhere.createdAt = { gte: startDate };
+    }
+
+    const [allEquipments, bookings, payments] = await Promise.all([
+      prisma.equipment.findMany({
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          bookings: {
+            where: bookingWhere,
+            select: { id: true, status: true, totalPrice: true, createdAt: true, startDate: true, endDate: true }
+          }
+        }
+      }),
+      prisma.booking.findMany({
+        where: bookingWhere,
+        include: {
+          equipment: { select: { id: true, title: true, category: true } }
+        },
+        orderBy: { createdAt: 'asc' }
+      }),
+      prisma.paymentTransaction.findMany({
+        where: startDate ? { createdAt: { gte: startDate } } : {},
+        select: { amount: true, status: true, createdAt: true }
+      })
+    ]);
+
+    // 1. Most frequently rented & highest value equipment
+    const equipmentRankings = allEquipments.map(eq => {
+      const completedBookings = eq.bookings.filter(b => b.status === 'COMPLETED');
+      const grossRevenue = completedBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+      const totalRequests = eq.bookings.length;
+      const activeOrCompleted = eq.bookings.filter(b => b.status === 'ACTIVE' || b.status === 'COMPLETED').length;
+
+      // Approximate utilization: total rental days in period / period days
+      const daysInPeriod = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 365;
+      let totalDaysRented = 0;
+      for (const b of eq.bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ACTIVE')) {
+        if (b.startDate && b.endDate) {
+          const diff = Math.max(1, Math.ceil((new Date(b.endDate).getTime() - new Date(b.startDate).getTime()) / (1000 * 60 * 60 * 24)));
+          totalDaysRented += diff;
+        }
+      }
+      const utilizationRate = Math.min(100, Math.round((totalDaysRented / daysInPeriod) * 100));
+
+      return {
+        id: eq.id,
+        title: eq.title,
+        category: eq.category,
+        pricePerDay: eq.pricePerDay,
+        available: eq.available,
+        ownerName: eq.owner?.name || 'Owner',
+        ownerEmail: eq.owner?.email || '',
+        totalRequests,
+        completedRentals: completedBookings.length,
+        grossRevenue,
+        utilizationRate,
+        isZeroUtilization: totalRequests === 0
+      };
+    });
+
+    equipmentRankings.sort((a, b) => b.completedRentals - a.completedRentals || b.grossRevenue - a.grossRevenue);
+
+    // 2. Category Performance
+    const categoryMap: { [cat: string]: { count: number; bookings: number; revenue: number } } = {};
+    for (const eq of allEquipments) {
+      const cat = eq.category || 'Other';
+      if (!categoryMap[cat]) categoryMap[cat] = { count: 0, bookings: 0, revenue: 0 };
+      categoryMap[cat].count++;
+      categoryMap[cat].bookings += eq.bookings.length;
+      categoryMap[cat].revenue += eq.bookings
+        .filter(b => b.status === 'COMPLETED')
+        .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    }
+
+    const categoryPerformance = Object.entries(categoryMap).map(([category, stats]) => ({
+      category,
+      ...stats
+    }));
+
+    // 3. Booking Demand Over Time (grouped by day)
+    const demandTrendMap: { [dateStr: string]: { requests: number; completed: number; revenue: number } } = {};
+    for (const b of bookings) {
+      const dateKey = new Date(b.createdAt).toISOString().split('T')[0];
+      if (!demandTrendMap[dateKey]) demandTrendMap[dateKey] = { requests: 0, completed: 0, revenue: 0 };
+      demandTrendMap[dateKey].requests++;
+      if (b.status === 'COMPLETED') {
+        demandTrendMap[dateKey].completed++;
+        demandTrendMap[dateKey].revenue += b.totalPrice || 0;
+      }
+    }
+
+    const demandTrend = Object.entries(demandTrendMap).map(([date, data]) => ({
+      date,
+      ...data
+    })).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      period,
+      topRented: equipmentRankings.slice(0, 10),
+      highestRevenue: [...equipmentRankings].sort((a, b) => b.grossRevenue - a.grossRevenue).slice(0, 10),
+      zeroUtilization: equipmentRankings.filter(e => e.isZeroUtilization).slice(0, 10),
+      categoryPerformance,
+      demandTrend,
+      summary: {
+        totalEquipmentCount: allEquipments.length,
+        availableCount: allEquipments.filter(e => e.available).length,
+        utilizedCount: equipmentRankings.filter(e => !e.isZeroUtilization).length,
+        totalCompletedRevenue: equipmentRankings.reduce((sum, e) => sum + e.grossRevenue, 0)
+      }
+    });
+  } catch (error: any) {
+    console.error('Equipment Analytics Error:', error);
+    res.status(500).json({ error: 'Failed to fetch equipment analytics' });
+  }
+});
+
+// 14. Best Owner Earnings Ranking (Completed & Paid Transactions)
+router.get('/owner-earnings', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { period = '30d' } = req.query;
+    let startDate: Date | null = null;
+    const now = new Date();
+
+    if (period === '7d') startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    else if (period === '30d') startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    else if (period === '90d') startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    const bookingWhere: any = {};
+    if (startDate) bookingWhere.createdAt = { gte: startDate };
+
+    const owners = await prisma.user.findMany({
+      where: { role: { in: ['OWNER', 'BOTH'] } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        equipments: {
+          select: {
+            id: true,
+            title: true,
+            bookings: {
+              where: bookingWhere,
+              include: {
+                payments: { select: { amount: true, status: true } }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const rankings = owners.map(owner => {
+      let totalCompletedRentals = 0;
+      let grossCompletedRentalValue = 0;
+      let actualCollectedAmount = 0;
+
+      for (const eq of owner.equipments) {
+        for (const b of eq.bookings) {
+          if (b.status === 'COMPLETED') {
+            totalCompletedRentals++;
+            grossCompletedRentalValue += b.totalPrice || 0;
+          }
+          // Sum successfully paid transactions
+          const paidTransactions = b.payments.filter(p => p.status === 'PAID' || p.status === 'SUCCESS');
+          for (const p of paidTransactions) {
+            actualCollectedAmount += p.amount || 0;
+          }
+        }
+      }
+
+      // Business financial model: 10% platform commission, 90% owner net earnings
+      const platformFee = Math.round(actualCollectedAmount * 0.10);
+      const ownerNetEarnings = actualCollectedAmount - platformFee;
+      // Outstanding payable is difference between completed rental value and actual collected
+      const outstandingPayable = Math.max(0, grossCompletedRentalValue - actualCollectedAmount);
+
+      return {
+        ownerId: owner.id,
+        name: owner.name,
+        email: owner.email,
+        phone: owner.phone,
+        equipmentCount: owner.equipments.length,
+        completedRentals: totalCompletedRentals,
+        grossCompletedRentalValue,
+        actualCollectedAmount,
+        platformFee,
+        ownerNetEarnings,
+        outstandingPayable
+      };
+    });
+
+    // Sort by confirmed collected earnings descending
+    rankings.sort((a, b) => b.ownerNetEarnings - a.ownerNetEarnings || b.completedRentals - a.completedRentals);
+
+    res.json({
+      period,
+      rankings,
+      totals: {
+        totalGrossRentalValue: rankings.reduce((sum, r) => sum + r.grossCompletedRentalValue, 0),
+        totalCollectedAmount: rankings.reduce((sum, r) => sum + r.actualCollectedAmount, 0),
+        totalPlatformFee: rankings.reduce((sum, r) => sum + r.platformFee, 0),
+        totalOwnerNetEarnings: rankings.reduce((sum, r) => sum + r.ownerNetEarnings, 0),
+        totalOutstandingPayable: rankings.reduce((sum, r) => sum + r.outstandingPayable, 0)
+      }
+    });
+  } catch (error: any) {
+    console.error('Owner Earnings Error:', error);
+    res.status(500).json({ error: 'Failed to fetch owner earnings' });
+  }
+});
+
+// 15. Crop Performance Analytics (Data-Driven from Farming Guides & Equipment)
+router.get('/crop-analytics', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const [guides, techniques, allBookings, farmCrops] = await Promise.all([
+      prisma.farmingGuide.findMany(),
+      prisma.modernTechnique.findMany(),
+      prisma.booking.findMany({
+        include: { equipment: { select: { title: true, category: true } } }
+      }),
+      prisma.farmCrop.findMany()
+    ]);
+
+    // Aggregate crop demand from farm crop plantings, farming guides, and modern techniques
+    const cropCounts: { [crop: string]: { guideCount: number; techniqueCount: number; farmCount: number } } = {};
+    for (const g of guides) {
+      const name = g.cropName || 'General';
+      if (!cropCounts[name]) cropCounts[name] = { guideCount: 0, techniqueCount: 0, farmCount: 0 };
+      cropCounts[name].guideCount++;
+    }
+    for (const t of techniques) {
+      const name = t.relatedCrop || 'General';
+      if (!cropCounts[name]) cropCounts[name] = { guideCount: 0, techniqueCount: 0, farmCount: 0 };
+      cropCounts[name].techniqueCount++;
+    }
+    for (const fc of farmCrops) {
+      const name = fc.cropName || 'General';
+      if (!cropCounts[name]) cropCounts[name] = { guideCount: 0, techniqueCount: 0, farmCount: 0 };
+      cropCounts[name].farmCount++;
+    }
+
+    const cropList = Object.entries(cropCounts).map(([crop, counts]) => ({
+      crop,
+      totalActivity: counts.guideCount + counts.techniqueCount + counts.farmCount,
+      ...counts
+    })).sort((a, b) => b.totalActivity - a.totalActivity);
+
+    res.json({
+      crops: cropList,
+      totalTrackedCrops: cropList.length,
+      note: 'Metrics reflect actual crop guides, modern farming techniques, and active farm crop plantings.'
+    });
+  } catch (error: any) {
+    console.error('Crop Analytics Error:', error);
+    res.status(500).json({ error: 'Failed to fetch crop analytics' });
+  }
+});
+
+// 16. Enhanced Data Quality Diagnostics (Actionable & Grouped)
 router.get('/data-quality', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const issues: any[] = [];
-    
-    const [emptyUsers, pendingEquip, unconfirmedBookings] = await Promise.all([
-      prisma.user.findMany({ where: { OR: [{ name: '' }, { phone: null }] }, take: 10 }),
-      prisma.equipment.findMany({ where: { pricePerDay: { lte: 0 } }, take: 10 }),
-      prisma.booking.findMany({ where: { status: 'PENDING', createdAt: { lte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }, take: 10 })
+
+    const [incompleteUsers, invalidPriceEquip, staleBookings, ownersWithoutBank] = await Promise.all([
+      // 1. Missing required profile fields
+      prisma.user.findMany({
+        where: {
+          OR: [
+            { name: '' },
+            { phone: null },
+            { phone: '' }
+          ]
+        },
+        select: { id: true, name: true, email: true, role: true, createdAt: true }
+      }),
+      // 2. Equipment with invalid or zero price
+      prisma.equipment.findMany({
+        where: { pricePerDay: { lte: 0 } },
+        include: { owner: { select: { id: true, name: true, email: true } } }
+      }),
+      // 3. Stale pending bookings (>7 days without owner response)
+      prisma.booking.findMany({
+        where: {
+          status: 'PENDING',
+          createdAt: { lte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        },
+        include: {
+          farmer: { select: { id: true, name: true, email: true } },
+          equipment: { include: { owner: { select: { id: true, name: true, email: true } } } }
+        }
+      }),
+      // 4. Owners with equipment but missing bank/payout details
+      prisma.user.findMany({
+        where: {
+          role: { in: ['OWNER', 'BOTH'] },
+          equipments: { some: {} }
+        },
+        select: { id: true, name: true, email: true, createdAt: true }
+      })
     ]);
 
-    emptyUsers.forEach((u: any) => issues.push({ entity: 'User', id: u.id, problem: 'Incomplete Profile (Missing phone or name)', createdAt: u.createdAt, action: 'Request user profile update' }));
-    pendingEquip.forEach((e: any) => issues.push({ entity: 'Equipment', id: e.id, problem: 'Zero or Negative Daily Rate', createdAt: e.createdAt, action: 'Disable equipment listing' }));
-    unconfirmedBookings.forEach((b: any) => issues.push({ entity: 'Booking', id: b.id, problem: 'Stale Pending Booking (>7 days)', createdAt: b.createdAt, action: 'Auto-expire or cancel booking' }));
+    // Check bank audit logs for owners
+    const bankAuditLogs = await prisma.auditLog.findMany({
+      where: { action: 'UPDATE_BANK_DETAILS' },
+      select: { actorId: true },
+      distinct: ['actorId']
+    });
+    const ownersWithBankSet = new Set(bankAuditLogs.map(l => l.actorId));
+
+    // Compile actionable issues
+    incompleteUsers.forEach(u => {
+      issues.push({
+        id: `user-inc-${u.id}`,
+        entity: 'User',
+        recordId: u.id,
+        problem: `Incomplete Profile: missing ${!u.name ? 'full name' : 'phone number'}.`,
+        severity: 'MEDIUM',
+        targetUserId: u.id,
+        targetUserName: u.name || 'User',
+        targetEmail: u.email,
+        recommendedAction: 'Notify user to complete contact phone and profile details.',
+        actionable: true,
+        createdAt: u.createdAt
+      });
+    });
+
+    invalidPriceEquip.forEach(e => {
+      issues.push({
+        id: `equip-rate-${e.id}`,
+        entity: 'Equipment',
+        recordId: e.id,
+        problem: `Invalid Pricing: ${e.title} has rate ₹${e.pricePerDay}/day.`,
+        severity: 'HIGH',
+        targetUserId: e.owner?.id,
+        targetUserName: e.owner?.name || 'Owner',
+        targetEmail: e.owner?.email || '',
+        recommendedAction: 'Notify owner to set a valid daily rental rate.',
+        actionable: true,
+        createdAt: e.createdAt
+      });
+    });
+
+    staleBookings.forEach(b => {
+      issues.push({
+        id: `book-stale-${b.id}`,
+        entity: 'Booking',
+        recordId: b.id,
+        problem: `Stale Booking Request: pending for over 7 days for ${b.equipment?.title || 'Machinery'}.`,
+        severity: 'HIGH',
+        targetUserId: b.equipment?.owner?.id || b.farmer?.id,
+        targetUserName: b.equipment?.owner?.name || 'Owner',
+        targetEmail: b.equipment?.owner?.email || '',
+        recommendedAction: 'Send alert to owner to accept or reject pending booking.',
+        actionable: true,
+        createdAt: b.createdAt
+      });
+    });
+
+    ownersWithoutBank.filter(o => !ownersWithBankSet.has(o.id)).forEach(o => {
+      issues.push({
+        id: `owner-bank-${o.id}`,
+        entity: 'Owner',
+        recordId: o.id,
+        problem: `Missing Payout Details: active equipment owner has not registered bank account.`,
+        severity: 'MEDIUM',
+        targetUserId: o.id,
+        targetUserName: o.name,
+        targetEmail: o.email,
+        recommendedAction: 'Notify owner to configure bank account and IFSC code for rental payouts.',
+        actionable: true,
+        createdAt: o.createdAt
+      });
+    });
 
     res.json(issues);
   } catch (error: any) {
-    console.error('Data Quality Error:', error);
-    res.status(500).json({ error: 'Failed to fetch data quality' });
+    console.error('Data Quality Diagnostics Error:', error);
+    res.status(500).json({ error: 'Failed to fetch data quality diagnostics' });
+  }
+});
+
+// 17. Send Admin Alert / Notification to Affected User
+router.post('/alerts/send', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { userId, title, message, relatedId, type = 'ADMIN_ALERT' } = req.body;
+
+    if (!userId || !title || !message) {
+      res.status(400).json({ success: false, error: 'User ID, title, and message are required.' });
+      return;
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: String(userId) },
+      select: { id: true, name: true, email: true }
+    });
+
+    if (!targetUser) {
+      res.status(404).json({ success: false, error: 'Target user record not found.' });
+      return;
+    }
+
+    const newNotif = await prisma.notification.create({
+      data: {
+        userId: targetUser.id,
+        title: String(title).trim(),
+        message: String(message).trim(),
+        relatedId: relatedId ? String(relatedId) : null,
+        type: String(type)
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.prismaUser.id,
+        actorRole: 'ADMIN',
+        action: 'SEND_ADMIN_ALERT',
+        resource: 'Notification',
+        resourceId: newNotif.id,
+        metadata: JSON.stringify({
+          recipientId: targetUser.id,
+          recipientEmail: targetUser.email,
+          title
+        })
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Alert sent to ${targetUser.name} (${targetUser.email}) successfully.`,
+      notification: newNotif
+    });
+  } catch (error: any) {
+    console.error('Send Admin Alert Error:', error);
+    res.status(500).json({ success: false, error: 'Failed to dispatch administrative alert.' });
   }
 });
 

@@ -143,11 +143,8 @@ export default function ProfilePage() {
       }
     } catch (err: any) {
       console.error('Save Profile Error:', err);
-      if (user) {
-        setUser({ ...user, name: name.trim(), phone: phone.trim(), preferredLanguage, profileImage: avatar });
-        i18n.changeLanguage(preferredLanguage);
-      }
-      showToast(err.response?.data?.error || 'Profile saved', 'success');
+      const errorMsg = err.response?.data?.error || 'Failed to update profile. Please check your network connection.';
+      showToast(errorMsg, 'error');
     }
   };
 

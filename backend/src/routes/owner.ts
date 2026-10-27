@@ -76,9 +76,9 @@ router.post('/bank-details', requireAuth, async (req: AuthRequest, res: Response
 
     const name = String(accountHolderName || '').trim();
     const bank = String(bankName || '').trim();
-    const acc = String(accountNumber || '').trim();
-    const confirmAcc = String(confirmAccountNumber || '').trim();
-    const ifsc = String(ifscCode || '').trim().toUpperCase();
+    const acc = String(accountNumber || '').replace(/[\s-]/g, '').trim();
+    const confirmAcc = String(confirmAccountNumber || '').replace(/[\s-]/g, '').trim();
+    const ifsc = String(ifscCode || '').replace(/\s+/g, '').trim().toUpperCase();
 
     if (!name || name.length < 2) {
       res.status(400).json({ success: false, error: 'Account Holder Name is required (minimum 2 characters)' });

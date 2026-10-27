@@ -60,17 +60,20 @@ export default function OwnerBankDetailsPage() {
       return;
     }
 
-    if (!accountNumber || !/^\d{8,20}$/.test(accountNumber.trim())) {
+    const cleanAcc = accountNumber.replace(/[\s-]/g, '').trim();
+    const cleanConfirm = confirmAccountNumber.replace(/[\s-]/g, '').trim();
+
+    if (!cleanAcc || !/^\d{8,20}$/.test(cleanAcc)) {
       setError('Account Number must be between 8 and 20 digits.');
       return;
     }
 
-    if (accountNumber.trim() !== confirmAccountNumber.trim()) {
+    if (cleanAcc !== cleanConfirm) {
       setError('Account Number and Confirm Account Number must match.');
       return;
     }
 
-    const cleanedIfsc = ifscCode.trim().toUpperCase();
+    const cleanedIfsc = ifscCode.replace(/\s+/g, '').trim().toUpperCase();
     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanedIfsc)) {
       setError('Invalid IFSC Code. Must be 11 characters (e.g. SBIN0001234 or HDFC0000456).');
       return;
@@ -81,8 +84,8 @@ export default function OwnerBankDetailsPage() {
       const res = await api.post('/owner/bank-details', {
         accountHolderName: accountHolderName.trim(),
         bankName: bankName.trim(),
-        accountNumber: accountNumber.trim(),
-        confirmAccountNumber: confirmAccountNumber.trim(),
+        accountNumber: cleanAcc,
+        confirmAccountNumber: cleanConfirm,
         ifscCode: cleanedIfsc,
       });
 

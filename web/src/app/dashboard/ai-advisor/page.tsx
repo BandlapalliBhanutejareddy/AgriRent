@@ -73,7 +73,16 @@ export default function AiAdvisorPage() {
   const { user } = useStore();
 
   const [activeTab, setActiveTab] = useState<'ASSISTANT' | 'SMART_PLAN'>('ASSISTANT');
-  const [selectedLanguage, setSelectedLanguage] = useState(i18n?.language || user?.preferredLanguage || 'en');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedLang = localStorage.getItem('agrorent_assistant_lang');
+      if (savedLang) {
+        setSelectedLanguage(savedLang);
+      }
+    }
+  }, []);
 
   // Conversational Assistant State
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -221,12 +230,11 @@ export default function AiAdvisorPage() {
               onChange={(e) => {
                 const val = e.target.value;
                 setSelectedLanguage(val);
-                i18n?.changeLanguage(val);
                 if (typeof window !== 'undefined') {
-                  localStorage.setItem('i18nextLng', val);
+                  localStorage.setItem('agrorent_assistant_lang', val);
                 }
               }}
-              className="bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded-lg border border-slate-700 outline-none"
+              className="bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded-lg border border-slate-700 outline-none cursor-pointer"
             >
               <option value="en">English</option>
               <option value="te">తెలుగు (Telugu)</option>

@@ -16,7 +16,11 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  TrendingUp,
+  BarChart3,
+  Percent,
+  DollarSign
 } from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
 import { useTranslation } from "react-i18next";
@@ -26,7 +30,7 @@ export default function AdminDashboard() {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'USERS' | 'EQUIPMENT' | 'BOOKINGS' | 'COMPLAINTS' | 'AUDIT'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'USERS' | 'EQUIPMENT' | 'BOOKINGS' | 'COMPLAINTS' | 'ANALYTICS'>('OVERVIEW');
 
   // Stats
   const [stats, setStats] = useState<any>({
@@ -37,11 +41,16 @@ export default function AdminDashboard() {
     moderation: { openComplaints: 0, totalFeedback: 0 }
   });
 
+  // Analytics states
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [equipmentAnalytics, setEquipmentAnalytics] = useState<any>(null);
+  const [ownerEarnings, setOwnerEarnings] = useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
   // Table Data & Pagination State
   const [users, setUsers] = useState<any[]>([]);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
   const [bookingsList, setBookingsList] = useState<any[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [complaintsData, setComplaintsData] = useState<{ feedbacks: any[]; complaints: any[]; equipmentReviews: any[]; userReviews: any[]; }>({ feedbacks: [], complaints: [], equipmentReviews: [], userReviews: [] });
 
   const [totalItems, setTotalItems] = useState(0);
@@ -59,7 +68,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const syncHash = () => {
       const hash = window.location.hash.replace('#', '').toUpperCase();
-      if (['USERS', 'EQUIPMENT', 'BOOKINGS', 'COMPLAINTS', 'AUDIT'].includes(hash)) {
+      if (['USERS', 'EQUIPMENT', 'BOOKINGS', 'COMPLAINTS', 'ANALYTICS'].includes(hash)) {
         setActiveTab(hash as any);
       } else {
         setActiveTab('OVERVIEW');
@@ -73,7 +82,24 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [activeTab, page, limit, searchQuery, filterRole, filterStatus]);
+  }, [activeTab, page, limit, searchQuery, filterRole, filterStatus, analyticsPeriod]);
+
+  async function fetchAnalyticsData(period: string) {
+    try {
+      setAnalyticsLoading(true);
+      const [eqRes, earnRes] = await Promise.all([
+        api.get(`/admin/equipment-analytics?period=${period}`),
+        api.get(`/admin/owner-earnings?period=${period}`)
+      ]);
+      setEquipmentAnalytics(eqRes.data?.data || eqRes.data || null);
+      setOwnerEarnings(earnRes.data?.data || earnRes.data || null);
+    } catch (err: any) {
+      console.error('Analytics load error:', err);
+      showToast('Failed to load equipment and owner analytics.', 'warning');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }
 
   async function fetchData() {
     try {
@@ -97,10 +123,8 @@ export default function AdminDashboard() {
       } else if (activeTab === 'COMPLAINTS') {
         const res = await api.get('/admin/feedback-complaints');
         setComplaintsData(res.data || { feedbacks: [], complaints: [], equipmentReviews: [], userReviews: [] });
-      } else if (activeTab === 'AUDIT') {
-        const res = await api.get(`/admin/audit-logs?page=${page}&limit=${limit}`);
-        setAuditLogs(res.data.data || []);
-        setTotalItems(res.data.total || 0);
+      } else if (activeTab === 'ANALYTICS') {
+        await fetchAnalyticsData(analyticsPeriod);
       }
     } catch (error) {
       console.error('Failed to load admin data:', error);
@@ -110,7 +134,6 @@ export default function AdminDashboard() {
       setBookingsList([]);
       setUsers([]);
       setEquipmentList([]);
-      setAuditLogs([]);
     } finally {
       setLoading(false);
     }
@@ -214,7 +237,7 @@ export default function AdminDashboard() {
               { key: 'EQUIPMENT', label: 'Equipment' },
               { key: 'BOOKINGS', label: 'Bookings' },
               { key: 'COMPLAINTS', label: 'Disputes' },
-              { key: 'AUDIT', label: 'Audit Logs' }
+              { key: 'ANALYTICS', label: 'Analytics & Yield' }
             ].map(tab => (
               <button
                 key={tab.key}
@@ -570,26 +593,189 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* AUDIT LOGS */}
-      {activeTab === 'AUDIT' && (
-        <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
-          <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white">Audit Logs</h3>
+      {/* EQUIPMENT & OWNER ANALYTICS */}
+      {activeTab === 'ANALYTICS' && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          {/* Period Filter Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Operational Analytics & Earnings</h3>
+              <p className="text-xs text-slate-500">Live metrics derived directly from real booking transactions and equipment utilization.</p>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl">
+              {[
+                { key: '7d', label: 'Last 7 Days' },
+                { key: '30d', label: 'Last 30 Days' },
+                { key: '90d', label: 'Last 90 Days' },
+                { key: 'all', label: 'All Time' }
+              ].map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setAnalyticsPeriod(p.key as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    analyticsPeriod === p.key
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="space-y-3">
-            {apiError ? <p className="text-center py-12 text-red-500 font-bold text-xs">Unable to load data. <button onClick={fetchData} className="ml-2 underline">Retry</button></p> : auditLogs.length === 0 ? <p className="text-center py-12 text-slate-400 font-bold text-xs">No audit activity recorded.</p> : null}
-            {auditLogs.map((log: any) => (
-              <div key={log.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs flex justify-between items-center">
-                <div>
-                  <span className="font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider me-2">[{log.action}]</span>
-                  <span className="text-slate-700 dark:text-slate-300 font-medium">{log.resource} ({log.resourceId?.slice(0, 8)})</span>
-                  {log.metadata && <p className="text-[10px] text-slate-400 mt-1 font-mono">{log.metadata}</p>}
-                </div>
-                <span className="text-[10px] text-slate-400 shrink-0">{new Date(log.createdAt).toLocaleString()}</span>
+
+          {/* Metric Cards Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Fleet Utilization</span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white">
+                {equipmentAnalytics?.summary?.utilizedCount || 0} / {equipmentAnalytics?.summary?.totalEquipmentCount || 0}
               </div>
-            ))}
+              <p className="text-[11px] text-emerald-600 font-bold">
+                {equipmentAnalytics?.summary?.totalEquipmentCount
+                  ? Math.round(((equipmentAnalytics?.summary?.utilizedCount || 0) / equipmentAnalytics?.summary?.totalEquipmentCount) * 100)
+                  : 0}% Active Utilization
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Gross Rental Volume</span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white">
+                {formatCurrency(equipmentAnalytics?.summary?.totalCompletedRevenue || 0)}
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium">Completed Rental Value</p>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Collected Escrow</span>
+              <div className="text-2xl font-black text-emerald-600">
+                {formatCurrency(ownerEarnings?.totals?.totalCollectedAmount || 0)}
+              </div>
+              <p className="text-[11px] text-emerald-600/80 font-bold">Successfully Paid via PG</p>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-indigo-200 dark:border-indigo-900/50 shadow-sm space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-500">Platform Revenue (10%)</span>
+              <div className="text-2xl font-black text-indigo-600">
+                {formatCurrency(ownerEarnings?.totals?.totalPlatformFee || 0)}
+              </div>
+              <p className="text-[11px] text-indigo-500/80 font-bold">Net Owner Payout (90%): {formatCurrency(ownerEarnings?.totals?.totalOwnerNetEarnings || 0)}</p>
+            </div>
           </div>
-          <PaginationControls />
+
+          {/* Top Rented Equipment Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">Top Rented Equipment & Utilization</h3>
+                <p className="text-xs text-slate-400">Ranked by actual completed rentals and demand requests</p>
+              </div>
+              <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase rounded-full">
+                {equipmentAnalytics?.topRented?.length || 0} Listed Items
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <th className="py-3 px-3">Equipment Title</th>
+                    <th className="py-3 px-3">Category</th>
+                    <th className="py-3 px-3">Owner</th>
+                    <th className="py-3 px-3 text-right">Daily Rate</th>
+                    <th className="py-3 px-3 text-center">Requests</th>
+                    <th className="py-3 px-3 text-center">Completed</th>
+                    <th className="py-3 px-3 text-right">Gross Value</th>
+                    <th className="py-3 px-3 text-center">Utilization</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                  {equipmentAnalytics?.topRented?.map((eq: any) => (
+                    <tr key={eq.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3.5 px-3 font-bold text-slate-900 dark:text-white">{eq.title}</td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {eq.category}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{eq.ownerName}</div>
+                        <div className="text-[10px] text-slate-400">{eq.ownerEmail}</div>
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono font-bold">{formatCurrency(eq.pricePerDay)}</td>
+                      <td className="py-3.5 px-3 text-center font-bold text-slate-700 dark:text-slate-300">{eq.totalRequests}</td>
+                      <td className="py-3.5 px-3 text-center font-bold text-emerald-600">{eq.completedRentals}</td>
+                      <td className="py-3.5 px-3 text-right font-bold text-slate-900 dark:text-white font-mono">{formatCurrency(eq.grossRevenue)}</td>
+                      <td className="py-3.5 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                          eq.utilizationRate > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {eq.utilizationRate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Best Owner Earnings Ranking */}
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 space-y-6 shadow-sm">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">Best Owner Earnings Ranking</h3>
+                <p className="text-xs text-slate-400">Ranked by actual confirmed rental escrow collections and completed transactions</p>
+              </div>
+              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase rounded-full">
+                {ownerEarnings?.rankings?.length || 0} Registered Owners
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <th className="py-3 px-3">Rank</th>
+                    <th className="py-3 px-3">Owner Details</th>
+                    <th className="py-3 px-3 text-center">Fleet Size</th>
+                    <th className="py-3 px-3 text-center">Completed</th>
+                    <th className="py-3 px-3 text-right">Gross Rental Value</th>
+                    <th className="py-3 px-3 text-right">Collected Revenue</th>
+                    <th className="py-3 px-3 text-right">Platform Fee (10%)</th>
+                    <th className="py-3 px-3 text-right">Owner Net (90%)</th>
+                    <th className="py-3 px-3 text-right">Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                  {ownerEarnings?.rankings?.map((owner: any, idx: number) => (
+                    <tr
+                      key={owner.ownerId}
+                      onClick={() => setSelectedUser(owner)}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3.5 px-3 font-black text-slate-400">#{idx + 1}</td>
+                      <td className="py-3.5 px-3">
+                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <span>{owner.name}</span>
+                          {idx === 0 && <span className="px-1.5 py-0.2 bg-amber-100 text-amber-700 rounded text-[9px] font-black">TOP</span>}
+                        </div>
+                        <div className="text-[10px] text-slate-400">{owner.email} • {owner.phone || 'No phone'}</div>
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-bold text-slate-700 dark:text-slate-300">{owner.equipmentCount} units</td>
+                      <td className="py-3.5 px-3 text-center font-bold text-emerald-600">{owner.completedRentals}</td>
+                      <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{formatCurrency(owner.grossCompletedRentalValue)}</td>
+                      <td className="py-3.5 px-3 text-right font-mono font-bold text-emerald-600">{formatCurrency(owner.actualCollectedAmount)}</td>
+                      <td className="py-3.5 px-3 text-right font-mono text-indigo-600">{formatCurrency(owner.platformFee)}</td>
+                      <td className="py-3.5 px-3 text-right font-mono font-black text-slate-900 dark:text-white">{formatCurrency(owner.ownerNetEarnings)}</td>
+                      <td className="py-3.5 px-3 text-right font-mono text-amber-600">{formatCurrency(owner.outstandingPayable)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 

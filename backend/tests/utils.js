@@ -1,8 +1,10 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 
-const PORT = process.env.PORT || 4012; // Use a different port for testing to avoid conflicts
+const PORT = process.env.TEST_PORT || 4012; // Use a different port for testing to avoid conflicts
 const API_URL = `http://localhost:${PORT}`;
 
 let serverProcess = null;
@@ -16,7 +18,7 @@ async function startTestServer() {
     const env = { ...process.env, PORT: PORT.toString() };
     
     // We use node to run the compiled server directly
-    serverProcess = spawn('node', ['dist/index.js'], { env, cwd: process.cwd(), shell: true });
+    serverProcess = spawn('node', ['dist/index.js'], { env, cwd: path.join(__dirname, '..'), shell: false });
     
     let isReady = false;
     

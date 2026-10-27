@@ -1,3 +1,5 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const test = require('node:test');
 const assert = require('node:assert');
 const { startTestServer, stopTestServer, request } = require('./utils');
@@ -90,11 +92,24 @@ test('Auth Verification Suite', async (t) => {
     assert.strictEqual(refreshRes.status, 401, 'Should fail to refresh after logout');
   });
 
-  await t.test('Cleanup Test User', async () => {
-    await prisma.user.delete({ where: { id: testUser.id } });
+  t.after(async () => {
+    if (testUser && testUser.id) {
+      try {
+        await prisma.user.delete({ where: { id: testUser.id } });
+      } catch (e) {
+        // user might already be deleted
+      }
+    }
+    await prisma.$disconnect();
+    if (serverStarted) {
+      stopTestServer();
+    }
   });
 
-  if (serverStarted) {
-    stopTestServer();
-  }
+  await t.test('Cleanup Test User', async () => {
+    if (testUser && testUser.id) {
+      await prisma.user.delete({ where: { id: testUser.id } });
+      testUser = null;
+    }
+  });
 });
