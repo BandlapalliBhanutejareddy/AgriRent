@@ -1,6 +1,6 @@
 /**
  * AgroRent AI — Appium 2.x Mobile Automation Test Suite
- * Target: Android 14+ / UiAutomator2 / AgroRent_OwnerPortal_Latest.apk
+ * Target: Android 10+ / UiAutomator2 / AgroRent Flutter Mobile App
  * 
  * Execution Requirement:
  * Requires running Appium 2.x server on localhost:4723 and an active Android Emulator AVD.
@@ -10,8 +10,8 @@ const path = require('path');
 const fs = require('fs');
 
 const candidateApkPaths = [
-  path.resolve(__dirname, '../../AgroRent_OwnerPortal_Latest.apk'),
-  path.resolve(__dirname, '../../mobile/build/app/outputs/flutter-apk/app-debug.apk')
+  path.resolve(__dirname, '../../mobile/build/app/outputs/flutter-apk/app-debug.apk'),
+  path.resolve(__dirname, '../../AgroRent_OwnerPortal_Latest.apk')
 ];
 const APK_PATH = candidateApkPaths.find(p => fs.existsSync(p)) || candidateApkPaths[0];
 
@@ -19,11 +19,15 @@ const APPIUM_CAPABILITIES = {
   platformName: 'Android',
   'appium:automationName': 'UiAutomator2',
   'appium:app': APK_PATH,
-  'appium:appPackage': 'com.agrorent.ai',
-  'appium:appActivity': '.MainActivity',
+  'appium:appPackage': 'com.example.mobile',
+  'appium:appActivity': 'com.example.mobile.MainActivity',
+  'appium:appWaitActivity': 'com.example.mobile.*,*.MainActivity',
   'appium:noReset': false,
-  'appium:newCommandTimeout': 60,
-  'appium:autoGrantPermissions': true
+  'appium:newCommandTimeout': 120,
+  'appium:autoGrantPermissions': true,
+  'appium:uiautomator2ServerLaunchTimeout': 60000,
+  'appium:adbExecTimeout': 60000,
+  'appium:androidInstallTimeout': 90000
 };
 
 const MOBILE_TEST_SCENARIOS = [
