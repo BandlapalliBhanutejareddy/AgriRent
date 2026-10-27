@@ -9,12 +9,14 @@
     "dev:web": "cd web && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
-    "test:web": "node testing/web-selenium/run_selenium_suite.js && node automation/runners/run_web_enterprise_suite.js",
-    "test:api": "node reports/qa/backend-api/run_api_tests.js",
-    "test:security": "node reports/qa/security/run_enterprise_security_suite.js",
-    "test:load": "node testing/backend-load/run_enterprise_load_test.js",
-    "test:mobile": "node testing/mobile-appium/run_ci_appium.js",
-    "test:master": "node reports/qa/master/generate_master_executive_report.js"
+    "test:web": "python tests/selenium/test_selenium.py",
+    "test:mobile": "python tests/appium/test_appium.py",
+    "test:api": "node backend/tests/run_api_tests.js",
+    "test:backend": "cd backend && npm run verify",
+    "test:load": "python tests/load/run_load_test.py",
+    "test:security": "python tests/dast/test_dast.py",
+    "test:bundle": "python tests/bundle_reports.py",
+    "test": "npm run test:web && npm run test:mobile && npm run test:load && npm run test:security && npm run test:bundle"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
