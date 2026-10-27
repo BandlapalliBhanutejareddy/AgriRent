@@ -12,7 +12,17 @@ const router = Router();
  */
 router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { prompt, question, crop, language = 'English' } = req.body;
+    const { prompt, question, crop, language = 'English', simulateTimeout } = req.body;
+
+    if (simulateTimeout) {
+      res.status(504).json({
+        success: false,
+        error: 'AI Provider Gateway Timeout: The underlying AI model server did not respond within the allocated threshold.',
+        code: 'AI_TIMEOUT'
+      });
+      return;
+    }
+
     const promptText = prompt || question || (crop ? `Agronomic advice for ${crop}` : null);
 
     if (!promptText || typeof promptText !== 'string') {
@@ -33,7 +43,12 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
       });
       if (userFarm?.location) farmLocation = userFarm.location;
     }
-    const advisorParams = { ...req.body, location: farmLocation || req.body.location };
+    const advisorParams = {
+      ...req.body,
+      location: farmLocation || req.body.location,
+      userId: req.prismaUser?.id,
+      conversationId: req.body.conversationId || req.prismaUser?.id
+    };
     const responseText = await aiProvider.getAdvisorAdvice(advisorParams, language, equipmentList);
 
     await prisma.auditLog.create({
@@ -51,7 +66,13 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
     res.json({ reply: responseText });
   } catch (error: any) {
     console.error('AI Advisor Error:', error);
-    res.status(503).json({ error: 'AI Advisor is currently unavailable.', details: error.message || error.toString() });
+    const isTimeout = error.name === 'TimeoutError' || (error.message && error.message.toLowerCase().includes('timeout'));
+    const statusCode = isTimeout ? 504 : 503;
+    res.status(statusCode).json({
+      success: false,
+      error: isTimeout ? 'AI Provider Gateway Timeout: The model took too long to respond.' : 'AI Advisor is currently unavailable.',
+      details: error.message || error.toString()
+    });
   }
 });
 

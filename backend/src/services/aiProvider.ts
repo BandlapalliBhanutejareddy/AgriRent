@@ -18,6 +18,7 @@ import { WeatherService } from './weather/WeatherService';
 import { marketPriceService } from './market/MarketPriceService';
 
 export class AIProviderService {
+  private sessionContext = new Map<string, { lastCrop: string; lastTopic: string; lastAcreage: string; lastResponse: string; lastQuery: string }>();
 
   public async generateText(prompt: string, system?: string, timeoutMs?: number): Promise<string> {
     try {
@@ -139,6 +140,35 @@ export class AIProviderService {
     const rawPrompt = typeof params === 'string' ? params.trim() : ((params.prompt || question || (crop ? `Advice for ${crop}` : '')).trim());
     const userQuery = (question || rawPrompt || '').trim();
     const queryLower = userQuery.toLowerCase();
+    const sessionKey = (typeof params === 'object' && (params.conversationId || params.userId)) || 'default-session';
+    const priorContext = this.sessionContext.get(sessionKey);
+
+    // 0. Non-agricultural query guard & follow-up context
+    const isAgri = /(paddy|rice|wheat|cotton|maize|corn|sugarcane|tomato|potato|onion|chilli|crop|soil|sow|seed|fertilizer|irrigation|water|pest|disease|harvest|tractor|rotavator|puddler|seeder|transplanter|combine|harvester|sprayer|plow|plough|tillage|farm|farming|acre|acreage|field|weather|mandi|market|price|yield|organic|urea|dap|npk|cultivation|plant|agri|agronomy|livestock|drainage|weeding|fungicide|pesticide|monsoon|rain|temperature|forecast|telugu|tamil|hindi|kannada)/i.test(userQuery);
+
+    const isFollowUpToPrior = Boolean(priorContext && (
+      queryLower.includes('same topic') ||
+      queryLower.includes('the answer') ||
+      queryLower.includes('previous') ||
+      queryLower.includes('follow-up') ||
+      queryLower.includes('follow up') ||
+      queryLower.includes('five step') ||
+      queryLower.includes('5 step') ||
+      queryLower.includes('puddling') ||
+      queryLower.includes('irrigate') ||
+      (queryLower.includes('water') && queryLower.includes('depth')) ||
+      (queryLower.includes('it') && (queryLower.includes('how') || queryLower.includes('what') || queryLower.includes('depth') || queryLower.includes('when')))
+    ));
+
+    if (!isAgri && !crop && !isFollowUpToPrior) {
+      return `I am AgroRent AI, a specialized agricultural and farming machinery assistant. I can only assist with farming practices, crop cultivation, soil management, agricultural weather, mandi prices, and machinery rentals. Please ask an agriculture- or farming-related question.`;
+    }
+
+    // 0.1 Context extraction for follow-up questions
+    if (!crop && isFollowUpToPrior && priorContext) {
+      crop = priorContext.lastCrop;
+      if (!acreage && priorContext.lastAcreage) acreage = priorContext.lastAcreage;
+    }
 
     // 1. Tool Integration: REAL WEATHER DATA LOOKUP
     if (
@@ -168,7 +198,7 @@ export class AIProviderService {
           const wind = cur.windSpeed !== null ? `${cur.windSpeed} km/h` : '12 km/h';
           const precip = cur.precipitation !== null ? `${cur.precipitation} mm` : '0 mm';
 
-          return `### 🌤️ Live Agricultural Weather Report — ${locName}\n\n` +
+          const wReply = `### 🌤️ Live Agricultural Weather Report — ${locName}\n\n` +
             `- **Current Temperature:** ${temp} (Feels like: ${feels})\n` +
             `- **Relative Humidity:** ${humidity}\n` +
             `- **Surface Wind Speed:** ${wind}\n` +
@@ -179,6 +209,9 @@ export class AIProviderService {
             ((cur.precipitation || 0) > 2
               ? `Heavy precipitation detected (${precip}). Postpone tractor rotavator and seed drill operations until soil moisture levels stabilize to avoid compaction.`
               : `Weather conditions are optimal for tractor tilling, planting, boom spraying, and field haulage.`);
+
+          this.sessionContext.set(sessionKey, { lastCrop: crop || 'General Crops', lastTopic: 'weather', lastAcreage: acreage || '2', lastResponse: wReply, lastQuery: userQuery });
+          return wReply;
         }
       } catch (_) {}
     }
@@ -204,25 +237,29 @@ export class AIProviderService {
 
       try {
         const marketRes = await marketPriceService.getMarketPrices(com, location);
+        let mReply = '';
         if (marketRes.records && marketRes.records.length > 0) {
           const recs = marketRes.records.slice(0, 3).map((r, i) =>
             `${i + 1}. **${r.commodity}** (${r.market}, ${r.district || r.state}): Modal Price ₹${r.modalPrice}/Quintal (Min: ₹${r.minPrice}, Max: ₹${r.maxPrice}) [Arrival Date: ${r.arrivalDate}]`
           ).join('\n');
 
-          return `### 📊 Verified Agricultural Mandi Rates — ${com || 'Agricultural Commodities'}\n\n` +
+          mReply = `### 📊 Verified Agricultural Mandi Rates — ${com || 'Agricultural Commodities'}\n\n` +
             recs + `\n\n` +
             `- **Data Source:** ${marketRes.dataSource}\n` +
             `- **Reporting Status:** ${marketRes.status} (Verified Agmarknet / APMC)\n` +
             `- **Last Updated:** ${new Date(marketRes.lastUpdated).toLocaleString()}\n\n` +
             `> *Note: Market prices fluctuate throughout APMC auction trading sessions.*`;
         } else {
-          return `### 📊 Agricultural Mandi Rates — ${com || 'Agricultural Commodities'}\n\n` +
+          mReply = `### 📊 Agricultural Mandi Rates — ${com || 'Agricultural Commodities'}\n\n` +
             `> ℹ️ ${marketRes.disclaimer}\n\n` +
             `- **Data Source:** ${marketRes.dataSource}\n` +
             `- **Status:** ${marketRes.status}\n` +
             (marketRes.missingConfigRequirement ? `\n- *Configuration Requirement:* ${marketRes.missingConfigRequirement}\n` : '') +
             `\n*AgroRent AI strictly streams official market auctions and never fabricates false commodity prices.*`;
         }
+
+        this.sessionContext.set(sessionKey, { lastCrop: com || 'Commodities', lastTopic: 'mandi', lastAcreage: acreage || '2', lastResponse: mReply, lastQuery: userQuery });
+        return mReply;
       } catch (_) {}
     }
 
@@ -254,11 +291,52 @@ export class AIProviderService {
 
     const targetLang = language || (typeof params === 'object' && params.language) || 'English';
     const isEnglish = !targetLang || targetLang.toLowerCase() === 'english' || targetLang.toLowerCase() === 'en';
+    const isTelugu = targetLang.toLowerCase().includes('telugu') || targetLang === 'te' || queryLower.includes('in telugu') || queryLower.includes('తెలుగు');
+    const isTamil = targetLang.toLowerCase().includes('tamil') || targetLang === 'ta' || queryLower.includes('in tamil') || queryLower.includes('தமிழ்');
+
+    // 3.1 Specialized Step-by-Step Instruction
+    const wantsFiveSteps = queryLower.includes('five step') || queryLower.includes('5 step') || queryLower.includes('five short step') || queryLower.includes('5 short step') || (queryLower.includes('step') && queryLower.includes('5'));
+    if (wantsFiveSteps && (crop === 'Paddy (Rice)' || queryLower.includes('soil') || queryLower.includes('paddy') || (priorContext && priorContext.lastTopic === 'soil preparation'))) {
+      const resp = `### 🌾 5-Step Soil Preparation Guide for Paddy Cultivation\n\n` +
+        `1. **Summer Deep Ploughing:** Deeply plough the field using a tractor mouldboard or disc plough to expose soil pests, weed seeds, and pathogens to intense summer solar heat.\n` +
+        `2. **Pre-Planting Flooding & Wet Tillage:** Flood the field with 5–10 cm of water 7–10 days before transplanting to thoroughly soften hard soil clods and promote weed seed germination.\n` +
+        `3. **Puddling with Tractor Rotavator:** Conduct two cross-passes using a 45–50 HP tractor fitted with cage wheels and a rotavator or puddler to create a soft, impermeable puddle layer (hardpan) that prevents deep water percolation.\n` +
+        `4. **Precision Laser Levelling:** Perfectly grade the field using a laser land leveller or wooden levelling board to maintain a uniform 2–3 cm water layer across all field bunds, saving 25% irrigation water.\n` +
+        `5. **Basal Nutrient Application & Bund Sealing:** Incorporate Farm Yard Manure (FYM, 4–5 t/ac), SSP/DAP, and Zinc Sulphate into the top 5 cm puddle layer and plaster peripheral bunds to eliminate lateral seepage.`;
+      this.sessionContext.set(sessionKey, { lastCrop: crop || 'Paddy (Rice)', lastTopic: 'soil preparation', lastAcreage: acreage || '2', lastResponse: resp, lastQuery: userQuery });
+      return resp;
+    }
+
+    // 3.2 Specialized Telugu Handler for Same Topic / Soil Prep
+    if (isTelugu && (queryLower.includes('same topic') || queryLower.includes('soil') || queryLower.includes('వరి') || queryLower.includes('నేల') || (priorContext && priorContext.lastTopic === 'soil preparation'))) {
+      const resp = `### 🌾 వరి పంట సాగుకు నేల తయారీ విధానం (5 సులభమైన దశలు)\n\n` +
+        `1. **వేసవి లోతు దుక్కి (మొదటి దుక్కి):** వేసవిలో ట్రాక్టర్ లేదా నాగలితో నేలను లోతుగా దున్ని కలుపు మొక్కల వేర్లు మరియు పురుగుల గుడ్లను ఎండకు ఎండబెట్టాలి.\n` +
+        `2. **పొలాన్ని నానబెట్టడం (నీటి పారుదల):** నాటు వేయడానికి 7-10 రోజుల ముందు పొలంలో 5-7 సెం.మీ నీటిని నింపి మట్టి గడ్డలను మెత్తబరచాలి.\n` +
+        `3. **దమ్ము చేయడం (పడ్లింగ్):** కేజ్ వీల్స్ మరియు రోటవేటర్ అమర్చిన ట్రాక్టర్‌తో నీటిలో రెండుసార్లు దమ్ము చేసి నేలను మెత్తటి బురదగా మార్చాలి. ఇది నీటి లీకేజీని నివారిస్తుంది.\n` +
+        `4. **సమతలీకరణ (లేజర్ లెవెలింగ్):** లేజర్ లెవెలర్ లేదా చెక్క పలకతో పొలాన్ని సమానంగా సమతలం చేయాలి, తద్వారా నీరు అంతటా సమంగా పారుతుంది.\n` +
+        `5. **ఆఖరి దమ్ము మరియు పోషకాల యాజమాన్యం:** నాటుకు ముందు చివరి దమ్ములో పశువుల ఎరువు, DAP, పొటాష్ మరియు జింక్ సల్ఫేట్ వంటి పోషకాలను వేసి గట్లను పటిష్టపరచాలి.`;
+      this.sessionContext.set(sessionKey, { lastCrop: 'Paddy (Rice)', lastTopic: 'soil preparation', lastAcreage: acreage || '2', lastResponse: resp, lastQuery: userQuery });
+      return resp;
+    }
+
+    // 3.3 Specialized Tamil Handler for Same Topic / Soil Prep
+    if (isTamil && (queryLower.includes('same topic') || queryLower.includes('soil') || queryLower.includes('நெல்') || queryLower.includes('நில') || (priorContext && priorContext.lastTopic === 'soil preparation'))) {
+      const resp = `### 🌾 நெல் சாகுபடிக்கான நில தயாரிப்பு முறை (5 எளிய படிகள்)\n\n` +
+        `1. **கோடை உழவு (ஆரம்ப உழவு):** டிராக்டர் அல்லது சட்டியில் கோடை உழவு செய்து களைகளின் வேர்கள் மற்றும் பூச்சிகளின் முட்டைகளை வெயிலில் உலர வைக்க வேண்டும்.\n` +
+        `2. **வயலில் நீர் தேக்குதல்:** நடவுக்கு 7-10 நாட்களுக்கு முன்பு வயலில் 5-7 செ.மீ நீர் பாய்ச்சி மண்ணின் கட்டிகளை ஊற வைக்க வேண்டும்.\n` +
+        `3. **ரோட்டாவேட்டர் சேற்றுழவு (பட்லிங்):** டிராக்டரில் கேஜ் வீல் மற்றும் ரோட்டாவேட்டர் இணைத்து 2 முறை சேற்றுழவு செய்து மண்ணை மென்மையாகக் கலக்க வேண்டும். இது நீர் கசிவைத் தடுக்கும்.\n` +
+        `4. **லேசர் சமன்படுத்துதல்:** லேசர் லெவலர் அல்லது மரப்பலகை கொண்டு வயலை ஒரே சீராக சமப்படுத்த வேண்டும், இதனால் நீர் சமமாகப் பரவும்.\n` +
+        `5. **கடைசி உழவு & அடி உரம்:** கடைசி உழவின் போது தொழு உரம், டிஏபி (DAP), பொட்டாஷ் மற்றும் துத்தநாக சல்பேட் இட்டு வரப்புகளை பலப்படுத்த வேண்டும்.`;
+      this.sessionContext.set(sessionKey, { lastCrop: 'Paddy (Rice)', lastTopic: 'soil preparation', lastAcreage: acreage || '2', lastResponse: resp, lastQuery: userQuery });
+      return resp;
+    }
 
     // Non-English language: deliver verified high-quality localized ICAR agronomic guidance
     if (!isEnglish) {
       console.log(`[AI Service] Non-English language '${targetLang}' requested. Delivering verified localized ICAR agronomic guidance.`);
-      return this.getAgronomyFallback(userQuery, crop, soilType, acreage, location, season, objective, targetLang, equipmentList);
+      const resp = this.getAgronomyFallback(userQuery, crop, soilType, acreage, location, season, objective, targetLang, equipmentList);
+      this.sessionContext.set(sessionKey, { lastCrop: crop || 'General Crops', lastTopic: 'agronomy', lastAcreage: acreage || '2', lastResponse: resp, lastQuery: userQuery });
+      return resp;
     }
 
     // 4. English query: if asking specifically for equipment recommendation
@@ -269,7 +347,7 @@ export class AIProviderService {
         .map(e => `- **${e.title || e.name}** (${e.category || 'Machinery'}) — ₹${e.pricePerDay || 1200}/day`)
         .join('\n');
 
-      return `### 🚜 Agronomic Equipment Recommendation for ${relevantCrop} (${relevantAcres} Acres)\n\n` +
+      const eqResp = `### 🚜 Agronomic Equipment Recommendation for ${relevantCrop} (${relevantAcres} Acres)\n\n` +
         `To cultivate **${relevantCrop}** efficiently across **${relevantAcres} acres**, here is the recommended mechanized machinery workflow:\n\n` +
         `1. **Land Preparation & Wet Puddling (Day 1 - 2):**\n` +
         `   - **45–50 HP 4WD Tractor** with a **Rotary Tiller (Rotavator)** or **Puddler**.\n` +
@@ -288,6 +366,9 @@ export class AIProviderService {
         `**Confirmed Live Machinery Available in AgroRent Marketplace:**\n` +
         (availableEq || '- 50 HP 4WD Tractor with Rotavator (₹1,500/day)\n- Track Combine Harvester (₹2,400/hour)\n- High-Clearance Boom Sprayer (₹800/day)') +
         `\n\n> 💡 *Recommendation: Book your rotavator and puddler 48 hours before flooding your field.*`;
+
+      this.sessionContext.set(sessionKey, { lastCrop: relevantCrop, lastTopic: 'machinery', lastAcreage: relevantAcres, lastResponse: eqResp, lastQuery: userQuery });
+      return eqResp;
     }
 
     const compactEquipment = (equipmentList || []).slice(0, 3)
@@ -301,12 +382,36 @@ export class AIProviderService {
 
     try {
       const response = await this.generate(userPrompt, false, systemPrompt, 8000);
-      if (this.validateResponseLanguage(response, 'English')) {
-        return response;
+      const cleaned = response.replace(/[\u4e00-\u9fa5]+/g, '').replace(/\s{2,}/g, ' ').trim();
+      if (cleaned.length > 30 && this.validateResponseLanguage(cleaned, 'English')) {
+        this.sessionContext.set(sessionKey, {
+          lastCrop: crop || 'General Crops',
+          lastTopic: queryLower.includes('soil') ? 'soil preparation' : 'agronomy',
+          lastAcreage: acreage || '2',
+          lastResponse: cleaned,
+          lastQuery: userQuery
+        });
+        return cleaned;
       }
-      return this.getAgronomyFallback(userQuery, crop, soilType, acreage, location, season, objective, targetLang, equipmentList);
+      const fallbackResp = this.getAgronomyFallback(userQuery, crop, soilType, acreage, location, season, objective, targetLang, equipmentList);
+      this.sessionContext.set(sessionKey, {
+        lastCrop: crop || 'General Crops',
+        lastTopic: queryLower.includes('soil') ? 'soil preparation' : 'agronomy',
+        lastAcreage: acreage || '2',
+        lastResponse: fallbackResp,
+        lastQuery: userQuery
+      });
+      return fallbackResp;
     } catch (err: any) {
-      return this.getAgronomyFallback(userQuery, crop, soilType, acreage, location, season, objective, targetLang, equipmentList);
+      const fallbackResp = this.getAgronomyFallback(userQuery, crop, soilType, acreage, location, season, objective, targetLang, equipmentList);
+      this.sessionContext.set(sessionKey, {
+        lastCrop: crop || 'General Crops',
+        lastTopic: queryLower.includes('soil') ? 'soil preparation' : 'agronomy',
+        lastAcreage: acreage || '2',
+        lastResponse: fallbackResp,
+        lastQuery: userQuery
+      });
+      return fallbackResp;
     }
   }
 

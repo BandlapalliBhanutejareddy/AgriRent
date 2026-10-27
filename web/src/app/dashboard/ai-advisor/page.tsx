@@ -124,7 +124,8 @@ export default function AiAdvisorPage() {
       const res = await api.post('/ai/advisor', {
         question: textToSend,
         prompt: textToSend,
-        language: selectedLanguage === 'te' ? 'Telugu' : selectedLanguage === 'hi' ? 'Hindi' : selectedLanguage === 'ta' ? 'Tamil' : selectedLanguage === 'kn' ? 'Kannada' : 'English'
+        language: selectedLanguage === 'te' ? 'Telugu' : selectedLanguage === 'hi' ? 'Hindi' : selectedLanguage === 'ta' ? 'Tamil' : selectedLanguage === 'kn' ? 'Kannada' : 'English',
+        history: chatMessages.slice(-4).map(m => ({ role: m.sender, content: m.text }))
       });
 
       const reply = res.data?.reply || res.data?.message || 'I have analyzed your query based on current agricultural best practices.';
@@ -204,10 +205,10 @@ export default function AiAdvisorPage() {
             <div className="p-2.5 bg-emerald-500 text-slate-950 rounded-2xl shadow-lg">
               <Bot size={26} />
             </div>
-            <h1 className="text-3xl font-black tracking-tight">Farmer Assistant & Agronomic Advisory</h1>
+            <h1 className="text-3xl font-black tracking-tight">{t('ai_advisor.title', 'Farmer Assistant & Agronomic Advisory')}</h1>
           </div>
           <p className="text-emerald-100/90 text-xs sm:text-sm font-medium leading-relaxed">
-            Get instant agronomic guidance, pest remedies, and seasonal machinery matching powered by AgroRent AI.
+            {t('ai_advisor.subtitle', 'Get instant agronomic guidance, pest remedies, and seasonal machinery matching powered by AgroRent AI.')}
           </p>
         </div>
 
@@ -217,7 +218,14 @@ export default function AiAdvisorPage() {
             <span className="font-bold text-emerald-300 uppercase text-[10px]">Language:</span>
             <select
               value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedLanguage(val);
+                i18n?.changeLanguage(val);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('i18nextLng', val);
+                }
+              }}
               className="bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded-lg border border-slate-700 outline-none"
             >
               <option value="en">English</option>
@@ -240,7 +248,7 @@ export default function AiAdvisorPage() {
               }`}
             >
               <MessageSquare size={14} />
-              <span>Live Assistant Chat</span>
+              <span>{t('ai_advisor.tab_assistant', 'Live Assistant Chat')}</span>
             </button>
             <button
               type="button"
@@ -252,7 +260,7 @@ export default function AiAdvisorPage() {
               }`}
             >
               <Sparkles size={14} />
-              <span>Smart Operations Plan</span>
+              <span>{t('ai_advisor.tab_smart_plan', 'Smart Operations Plan')}</span>
             </button>
           </div>
         </div>

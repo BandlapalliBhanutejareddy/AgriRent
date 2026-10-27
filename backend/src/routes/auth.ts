@@ -4,7 +4,10 @@ import { supabase } from '../lib/supabase';
 import { requireAuth } from '../middlewares/authMiddleware';
 import { generateFallbackToken } from '../lib/jwtFallback';
 
+const bcrypt = require('bcryptjs');
+
 const router = Router();
+const revokedRefreshTokens = new Set<string>();
 
 // Utility for password validation
 function validatePasswordStrength(password: string): boolean {
@@ -317,6 +320,33 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         }
       }
       if (dbUser) {
+        let isDbPasswordValid = false;
+        if (dbUser.password && (dbUser.password.startsWith('$2a$') || dbUser.password.startsWith('$2b$') || dbUser.password.startsWith('$2y$'))) {
+          try {
+            isDbPasswordValid = bcrypt.compareSync(String(password), dbUser.password);
+          } catch (_) {
+            isDbPasswordValid = false;
+          }
+        } else if (dbUser.password && dbUser.password !== 'SUPABASE_AUTH_MANAGED' && dbUser.password !== 'GOOGLE_OAUTH_MANAGED') {
+          isDbPasswordValid = dbUser.password === String(password);
+        }
+
+        if (!isDbPasswordValid && dbUser.password !== 'SUPABASE_AUTH_MANAGED') {
+          await prisma.auditLog.create({
+            data: {
+              actorId: dbUser.id,
+              actorRole: dbUser.role,
+              action: 'FAILED_LOGIN',
+              resource: 'Auth',
+              ip: req.ip || req.connection.remoteAddress,
+              userAgent: req.headers['user-agent']
+            }
+          }).catch(() => {});
+
+          res.status(401).json({ success: false, error: 'Invalid email or password credentials' });
+          return;
+        }
+
         // Attempt creating or updating user in Supabase Auth for smooth transition
         const { data: createdAuth, error: createError } = await supabase.auth.admin.createUser({
           email: cleanEmail,
@@ -368,34 +398,46 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         }
 
         // CI & Offline Fallback: if Supabase Auth is unreachable/unconfigured, validate with database credentials
-        if ((authError || !authData?.session) && dbUser) {
-          const passValid = dbUser.password === 'SUPABASE_AUTH_MANAGED' || dbUser.password === String(password) || String(password) === 'Password123!';
-          if (passValid) {
-            const fallbackToken = generateFallbackToken(dbUser);
-            authData = {
-              session: {
-                access_token: fallbackToken,
-                refresh_token: fallbackToken,
-                token_type: 'bearer',
-                expires_in: 604800,
-                user: {
-                  id: dbUser.authId || dbUser.id,
-                  email: dbUser.email,
-                  user_metadata: { name: dbUser.name, role: dbUser.role }
-                }
-              },
+        if ((authError || !authData?.session) && dbUser && isDbPasswordValid) {
+          const fallbackToken = generateFallbackToken(dbUser);
+          authData = {
+            session: {
+              access_token: fallbackToken,
+              refresh_token: fallbackToken,
+              token_type: 'bearer',
+              expires_in: 604800,
               user: {
                 id: dbUser.authId || dbUser.id,
-                email: dbUser.email
+                email: dbUser.email,
+                user_metadata: { name: dbUser.name, role: dbUser.role }
               }
-            } as any;
-            authError = null;
-          }
+            },
+            user: {
+              id: dbUser.authId || dbUser.id,
+              email: dbUser.email
+            }
+          } as any;
+          authError = null;
         }
       }
     }
 
     if (authError || !authData?.session || !authData?.user) {
+      if (cleanEmail) {
+        const failedUser = await prisma.user.findUnique({ where: { email: cleanEmail } }).catch(() => null);
+        if (failedUser) {
+          await prisma.auditLog.create({
+            data: {
+              actorId: failedUser.id,
+              actorRole: failedUser.role,
+              action: 'FAILED_LOGIN',
+              resource: 'Auth',
+              ip: req.ip || req.connection.remoteAddress,
+              userAgent: req.headers['user-agent']
+            }
+          }).catch(() => {});
+        }
+      }
       res.status(401).json({ success: false, error: 'Invalid email or password credentials' });
       return;
     }
@@ -490,7 +532,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       data: {
         actorId: user.id,
         actorRole: user.role,
-        action: 'LOGIN_SUPABASE_AUTH',
+        action: 'LOGIN',
         resource: 'Auth',
         ip: req.ip || req.connection.remoteAddress,
         userAgent: req.headers['user-agent']
@@ -665,6 +707,11 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (revokedRefreshTokens.has(String(refreshToken))) {
+      res.status(401).json({ success: false, error: 'Session revoked or expired' });
+      return;
+    }
+
     const { data, error } = await supabase.auth.refreshSession({ refresh_token: String(refreshToken) });
     if (error || !data.session) {
       res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
@@ -687,6 +734,11 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const refreshToken = req.body?.refreshToken;
+
+    if (refreshToken) {
+      revokedRefreshTokens.add(String(refreshToken));
+    }
 
     if (token) {
       try {

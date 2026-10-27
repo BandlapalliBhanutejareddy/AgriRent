@@ -310,5 +310,16 @@
     "new_password": "New Password",
     "confirm_new_password": "Confirm New Password",
     "photo_hint": "Click camera icon to upload profile picture (max 5MB)"
+  },
+  "ai_advisor": {
+    "title": "Farmer Assistant & Agronomic Advisory",
+    "subtitle": "Get instant agronomic guidance, pest remedies, and seasonal machinery matching powered by AgroRent AI.",
+    "tab_assistant": "Live Assistant Chat",
+    "tab_smart_plan": "Smart Operations Plan",
+    "starter_title": "Frequently Asked Questions",
+    "input_placeholder": "Ask about soil, crops, pest control, or equipment requirements...",
+    "send_button": "Send Question",
+    "analyzing": "Farmer Assistant is analyzing...",
+    "clear_chat": "Clear"
   }
 }
