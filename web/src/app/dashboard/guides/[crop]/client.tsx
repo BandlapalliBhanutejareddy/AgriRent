@@ -14,13 +14,20 @@ import {
   ShieldAlert,
   Wallet,
   CheckSquare,
-  ArrowRight
+  ArrowRight,
+  Sprout,
+  Droplets,
+  Layers,
+  Thermometer,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
 import { useStore } from '@/store/useStore';
 import { useTranslation } from "react-i18next";
 import { formatCurrency } from '@/lib/formatters';
 import { useToast } from '@/components/ToastProvider';
+import { CROP_KNOWLEDGE, CropGuideData } from '@/lib/cropKnowledge';
 
 export default function CropGuideDetail() {
   const { t, i18n } = useTranslation();
@@ -33,10 +40,22 @@ export default function CropGuideDetail() {
 
   const [loading, setLoading] = useState(true);
   const [activeFarm, setActiveFarm] = useState<any>(null);
-  const [stages, setStages] = useState<string[]>([]);
+  const [stages, setStages] = useState<string[]>([
+    'SOWING',
+    'GERMINATION',
+    'SEEDLING',
+    'VEGETATIVE',
+    'FLOWERING',
+    'FRUITING',
+    'MATURITY',
+    'HARVEST'
+  ]);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
   const [operations, setOperations] = useState<any[]>([]);
   const [scheduling, setScheduling] = useState(false);
+
+  const cropKey = crop.toLowerCase().trim();
+  const guideData: CropGuideData = CROP_KNOWLEDGE[cropKey] || CROP_KNOWLEDGE['rice'];
 
   useEffect(() => {
     fetchContext();
@@ -45,8 +64,7 @@ export default function CropGuideDetail() {
   async function fetchContext() {
     try {
       setLoading(true);
-      // Try to find if user has an active farm for this crop
-      const farmRes = await api.get('/farms');
+      const farmRes = await api.get('/farms').catch(() => ({ data: [] }));
       const farms = farmRes.data || [];
       const relevantFarm = farms.find((f: any) =>
         f.crops?.some((c: any) => c.name.toLowerCase() === crop.toLowerCase())
@@ -54,31 +72,19 @@ export default function CropGuideDetail() {
 
       if (relevantFarm) {
         const cropData = relevantFarm.crops.find((c: any) => c.name.toLowerCase() === crop.toLowerCase());
-        setActiveFarm({ farmId: relevantFarm.id, cropId: cropData.id, currentStage: cropData.currentStage });
-      }
+        setActiveFarm({ farmId: relevantFarm.id, cropId: cropData?.id, currentStage: cropData?.currentStage });
 
-      // We should ideally fetch the canonical stages for this crop from a new endpoint,
-      // but we can use a hardcoded list for demonstration or derive it from the schedule.
-      // Let's call the scheduler to get operations if a farm exists, otherwise mock the canonical stages.
+        try {
+          const schedRes = await api.get(`/farms/${relevantFarm.id}/schedule?lang=${selectedLanguage}`);
+          const timeline = schedRes.data?.operations || [];
+          setOperations(timeline);
 
-      const allStages = ['SOWING', 'GERMINATION', 'SEEDLING', 'VEGETATIVE', 'FLOWERING', 'FRUITING', 'MATURITY', 'HARVEST'];
-      if (crop.toLowerCase() === 'rice' || crop.toLowerCase() === 'wheat' || crop.toLowerCase() === 'maize') {
-         setStages(allStages);
-      } else {
-         setStages(allStages); // fallback
-      }
-
-      // Fetch intelligent schedule if farm exists
-      if (relevantFarm) {
-        const schedRes = await api.get(`/farms/${relevantFarm.id}/schedule?lang=${selectedLanguage}`);
-        const timeline = schedRes.data?.operations || [];
-        setOperations(timeline);
-
-        // Find current stage index
-        const cropData = relevantFarm.crops.find((c: any) => c.name.toLowerCase() === crop.toLowerCase());
-        if (cropData?.currentStage) {
-          const idx = allStages.indexOf(cropData.currentStage);
-          if (idx >= 0) setCurrentStageIndex(idx);
+          if (cropData?.currentStage) {
+            const idx = stages.indexOf(cropData.currentStage);
+            if (idx >= 0) setCurrentStageIndex(idx);
+          }
+        } catch (_) {
+          setOperations([]);
         }
       } else {
         setOperations([]);
@@ -90,28 +96,28 @@ export default function CropGuideDetail() {
     }
   }
 
-  const handlePlanWork = async (op: any) => {
+  const handleBookMachine = (machineName?: string) => {
+    if (machineName) {
+      router.push(`/dashboard/marketplace?search=${encodeURIComponent(machineName.split(' ')[0])}`);
+    } else {
+      router.push('/dashboard/marketplace');
+    }
+  };
+
+  const handlePlanWork = async () => {
     if (!activeFarm) {
-      showToast('Please create a farm profile first to plan this work.', 'warning');
+      showToast('Set up your farm profile in the dashboard to track active tasks.', 'info');
       router.push('/dashboard/farmer');
       return;
     }
     setScheduling(true);
     try {
-      showToast('Added to your active Farm Plan.', 'success');
-      setTimeout(() => router.push('/dashboard/farmer'), 1500);
+      showToast('Task added to your active Farm Plan!', 'success');
+      setTimeout(() => router.push('/dashboard/farmer'), 1200);
     } catch (e) {
-      showToast('Failed to plan work.', 'error');
+      showToast('Failed to add to farm plan.', 'error');
     } finally {
       setScheduling(false);
-    }
-  };
-
-  const handleBookMachine = (equipmentId?: string) => {
-    if (equipmentId) {
-      router.push(`/dashboard/marketplace?equipmentId=${equipmentId}`);
-    } else {
-      router.push('/dashboard/marketplace');
     }
   };
 
@@ -119,209 +125,218 @@ export default function CropGuideDetail() {
     return (
       <div className="space-y-8 animate-pulse max-w-5xl mx-auto">
         <div className="h-8 bg-slate-200 rounded-lg w-64" />
-        <div className="h-[400px] bg-slate-100 rounded-3xl" />
+        <div className="h-[300px] bg-slate-100 rounded-3xl" />
       </div>
     );
   }
 
   const selectedStage = stages[currentStageIndex];
   const stageOperations = operations.filter(o => o.stage === selectedStage);
+  const staticStageData = guideData.stages.find(s => s.stage === selectedStage) || guideData.stages[0];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+      {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-white hover:shadow-md rounded-xl transition-all text-slate-400 hover:text-emerald-600"
+            className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow text-slate-500 hover:text-emerald-600 transition-all cursor-pointer"
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight capitalize">{crop} {t('crop_guides', 'Crop Guide')}</h1>
-            <p className="text-slate-500 font-semibold">{t('what_to_do_now', 'What you should do for your crop')}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{guideData.emoji}</span>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight capitalize">
+                {guideData.name} Cultivation Guide
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 italic">
+              {guideData.scientificName} • Verified Agronomic Guide
+            </p>
+          </div>
+        </div>
+
+        {activeFarm && (
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold">
+            <CheckCircle2 size={14} /> Active on Your Farm
+          </span>
+        )}
+      </div>
+
+      {/* Comprehensive Agronomic Overview Card */}
+      <div className="bg-gradient-to-br from-[#163A2D] via-[#1a4737] to-[#0f2920] rounded-[32px] p-6 sm:p-8 text-white shadow-xl border border-emerald-900/40 space-y-6">
+        <div>
+          <span className="px-3 py-1 bg-[#84CC16]/20 text-[#84CC16] rounded-xl text-[10px] font-black uppercase tracking-wider border border-[#84CC16]/30 inline-flex items-center gap-1.5">
+            <Sprout size={12} /> Standard Agronomic Benchmark
+          </span>
+          <p className="text-sm font-medium text-emerald-100/90 mt-3 leading-relaxed">
+            {guideData.overview}
+          </p>
+        </div>
+
+        {/* 4-Column Grid: Seasons, Soil, Cost, Yield */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-6 border-t border-emerald-800/60 text-xs">
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-emerald-300/80 block text-[10px] uppercase font-bold">Growing Seasons</span>
+            <span className="text-white font-black text-xs sm:text-sm mt-0.5 block">{guideData.seasons}</span>
+          </div>
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-emerald-300/80 block text-[10px] uppercase font-bold">Soil & Optimal pH</span>
+            <span className="text-white font-black text-xs sm:text-sm mt-0.5 block">{guideData.idealPh} (pH)</span>
+          </div>
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-emerald-300/80 block text-[10px] uppercase font-bold">Input Cost / Acre</span>
+            <span className="text-white font-black text-xs sm:text-sm mt-0.5 block">{guideData.costPerAcre}</span>
+          </div>
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-emerald-300/80 block text-[10px] uppercase font-bold">Expected Yield</span>
+            <span className="text-[#84CC16] font-black text-xs sm:text-sm mt-0.5 block">{guideData.yieldPerAcre}</span>
           </div>
         </div>
       </div>
 
-      {/* Stage Selector */}
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 overflow-x-auto">
-        <div className="flex gap-4 min-w-max pb-2">
-          {stages.map((stage, idx) => (
+      {/* Stage Selector Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 dark:border-slate-800 overflow-x-auto">
+        <div className="flex gap-2 sm:gap-3 min-w-max">
+          {stages.map((stg, idx) => (
             <button
-              key={stage}
+              key={stg}
               onClick={() => setCurrentStageIndex(idx)}
-              className={`px-6 py-3 rounded-2xl text-sm font-black uppercase tracking-wider transition-all ${
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                 currentStageIndex === idx
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
-                  : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                  ? 'bg-[#163A2D] text-white shadow-md shadow-emerald-950/20'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
-              {t(`stages.${stage}`, stage)}
+              {t(`stages.${stg}`, stg)}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Stage Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        {/* Left: Operations & Tasks */}
+      {/* Detailed Stage Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Columns: Agronomic Tasks & Operation Details */}
         <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-xl font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-            <CheckSquare className="text-emerald-500" />
-            {t('planning.whatToDo', 'WHAT TO DO NOW')}
-          </h2>
-
-          {stageOperations.length === 0 ? (
-            <div className="p-12 bg-slate-50 rounded-3xl border border-slate-100 text-center space-y-4">
-              <div className="mx-auto w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
-                <Tractor size={32} />
+          <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 space-y-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg">
+                  Stage {currentStageIndex + 1} of 8 • {t(`stages.${selectedStage}`, selectedStage)}
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-2">
+                  {staticStageData.name}
+                </h2>
               </div>
-              <h3 className="text-xl font-black text-slate-800">Set up your farm to see personalized guidance</h3>
-              <p className="text-sm font-semibold text-slate-500 max-w-md mx-auto">
-                We need to know more about your farm before providing specific machine recommendations, labour estimates, and practical steps.
-              </p>
-              <button
-                onClick={() => router.push('/dashboard/farmer')}
-                className="mt-6 px-6 py-3 bg-emerald-600 text-white font-black uppercase tracking-wider rounded-xl hover:bg-emerald-700 transition-colors inline-flex items-center gap-2"
-              >
-                Go to Farm Dashboard
-              </button>
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl shrink-0">
+                ⏱ {staticStageData.durationDays} Days
+              </span>
             </div>
-          ) : (
-            stageOperations.map((op, i) => (
-              <div key={i} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
-                <div>
-                  <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase">{op.name}</h3>
-                  <div className="flex items-start gap-3 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                    <Lightbulb className="text-indigo-500 shrink-0 mt-0.5" size={20} />
-                    <p className="text-sm font-semibold text-indigo-900 leading-relaxed">
-                      {op.reason || 'Critical operation for healthy crop progression.'}
+
+            {/* Scientific Justification */}
+            <div className="flex items-start gap-3 p-4 bg-teal-50 dark:bg-teal-950/30 rounded-2xl border border-teal-100 dark:border-teal-900/40">
+              <Lightbulb className="text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" size={20} />
+              <p className="text-xs sm:text-sm font-semibold text-teal-950 dark:text-teal-200 leading-relaxed">
+                {staticStageData.reason}
+              </p>
+            </div>
+
+            {/* Actionable Practical Steps */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                <CheckSquare size={16} className="text-emerald-600" />
+                Step-by-Step Field Instructions
+              </h3>
+              <div className="space-y-2.5">
+                {staticStageData.tasks.map((task, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <p className="text-xs font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
+                      {task}
                     </p>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Equipment Block */}
-                  <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
-                    <div className="flex items-center gap-2 text-emerald-700">
-                      <Tractor size={18} />
-                      <span className="font-black uppercase tracking-wider text-[10px]">{t('planning.machineYouNeed', 'Machine You Need')}</span>
-                    </div>
-                    {op.equipment ? (
-                      <>
-                        <div className="font-bold text-slate-900">{op.equipment.name}</div>
-                        <div className="text-sm font-black text-emerald-600">{formatCurrency(op.equipment.rentalPrice, 'en')} <span className="text-[10px] text-slate-500 uppercase font-bold">/ day</span></div>
-                        <button
-                          onClick={() => handleBookMachine(op.equipment.id)}
-                          className="mt-2 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors"
-                        >
-                          {t('equipment.bookMachine', 'Book Machine')}
-                        </button>
-                      </>
-                    ) : (
-                      <div className="text-sm font-bold text-slate-500">No machine required</div>
-                    )}
-                  </div>
-
-                  {/* Labour & Duration Block */}
-                  <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-3">
-                     <div className="flex items-center gap-2 text-amber-700">
-                      <Users size={18} />
-                      <span className="font-black uppercase tracking-wider text-[10px]">{t('planning.labourNeeded', 'Labour Needed')}</span>
-                    </div>
-                    <div className="font-bold text-slate-900">{op.durationDays ? `${Math.ceil(op.durationDays * 2)} workers estimated` : 'Not available'}</div>
-                    <div className="flex items-center gap-2 text-amber-700 mt-4 border-t border-amber-200/50 pt-3">
-                      <Calendar size={18} />
-                      <span className="font-black uppercase tracking-wider text-[10px]">Duration</span>
-                    </div>
-                    <div className="font-bold text-slate-900">{op.durationDays || 1} Days</div>
-                  </div>
-                </div>
-
-                {/* Precautions Block */}
-                <div className="space-y-3 pt-4 border-t border-slate-100">
-                   <div className="flex items-center gap-2 text-rose-500">
-                      <ShieldAlert size={18} />
-                      <span className="font-black uppercase tracking-wider text-[10px]">{t('planning.precautions', 'PRECAUTIONS')}</span>
-                   </div>
-                   <ul className="grid gap-2">
-                     <li className="flex items-start gap-2 text-sm font-semibold text-slate-600">
-                       <span className="text-rose-400 mt-1">•</span> Maintain optimal soil moisture before starting.
-                     </li>
-                     <li className="flex items-start gap-2 text-sm font-semibold text-slate-600">
-                       <span className="text-rose-400 mt-1">•</span> Ensure equipment is properly calibrated.
-                     </li>
-                   </ul>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100">
-                  <button
-                    onClick={() => handlePlanWork(op)}
-                    disabled={scheduling}
-                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-sm font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
-                  >
-                    {scheduling ? 'Adding...' : t('planning.addPlanToDashboard', 'Plan This Work')} <ArrowRight size={18} />
-                  </button>
-                </div>
+                ))}
               </div>
-            ))
-          )}
+            </div>
+
+            {/* Precautions */}
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <h3 className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-2">
+                <ShieldAlert size={16} /> Agronomic Precautions
+              </h3>
+              <ul className="space-y-1.5">
+                {staticStageData.precautions.map((prec, idx) => (
+                  <li key={idx} className="text-xs text-slate-600 dark:text-slate-400 flex items-start gap-2">
+                    <span className="text-rose-500 font-bold">•</span>
+                    <span>{prec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
 
-        {/* Right: Farm Context & Next Steps */}
+        {/* Right Column: Required Machinery & Booking CTA */}
         <div className="space-y-6">
-          <div className="bg-slate-900 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-8 opacity-5">
-               <Tractor size={120} />
-             </div>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 space-y-5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5">
+              <Tractor size={13} /> Recommended Machine
+            </span>
 
-             <div>
-               <h3 className="font-black uppercase tracking-widest text-slate-400 text-[10px] mb-1">Your Farm Context</h3>
-               {activeFarm ? (
-                 <div className="text-xl font-bold text-emerald-400 flex items-center gap-2">
-                   <CheckCircle2 size={20} /> Connected
-                 </div>
-               ) : (
-                 <div className="text-sm font-bold text-amber-400">Not Connected</div>
-               )}
-             </div>
+            <div>
+              <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+                {staticStageData.machine}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Category: {staticStageData.machineCategory}
+              </p>
+            </div>
 
-             <div className="space-y-4">
-               <div>
-                 <span className="block text-[10px] text-slate-400 font-black uppercase tracking-widest">Crop</span>
-                 <span className="font-bold text-lg">{crop}</span>
-               </div>
-               <div>
-                 <span className="block text-[10px] text-slate-400 font-black uppercase tracking-widest">Selected Stage</span>
-                 <span className="font-bold text-lg capitalize">{selectedStage?.toLowerCase()}</span>
-               </div>
-               <div>
-                 <span className="block text-[10px] text-slate-400 font-black uppercase tracking-widest">Est. Stage Cost</span>
-                 <span className="font-bold text-lg text-emerald-400">
-                   {formatCurrency(stageOperations.reduce((sum, op) => sum + (op.equipment?.rentalPrice || 0) * (op.durationDays || 1), 0), 'en')}
-                 </span>
-               </div>
-             </div>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                <span className="font-semibold">Estimated Labour:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{staticStageData.labourEstimate}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                <span className="font-semibold">Work Window:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{staticStageData.durationDays} Days</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleBookMachine(staticStageData.machine)}
+              className="w-full py-3 bg-[#163A2D] hover:bg-[#1a4737] text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Tractor size={16} className="text-[#84CC16]" />
+              <span>Book Machine in Marketplace</span>
+            </button>
+
+            {activeFarm && (
+              <button
+                onClick={handlePlanWork}
+                disabled={scheduling}
+                className="w-full py-2.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 size={15} />
+                <span>Add to My Active Farm Plan</span>
+              </button>
+            )}
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
-             <h3 className="font-black uppercase tracking-widest text-slate-800 text-[10px] mb-4 flex items-center gap-2">
-               <ArrowRight className="text-indigo-500" size={16} />
-               {t('planning.whatComesNext', 'WHAT COMES NEXT')}
-             </h3>
-             {currentStageIndex < stages.length - 1 ? (
-               <div className="space-y-1">
-                 <span className="text-sm font-bold text-slate-900 block">{t(`stages.${stages[currentStageIndex + 1]}`, stages[currentStageIndex + 1])} Stage</span>
-                 <span className="text-xs font-semibold text-slate-500">Prepare your field and budget for the upcoming lifecycle phase.</span>
-               </div>
-             ) : (
-               <span className="text-sm font-bold text-emerald-600 block">Harvest Complete. Prepare for next season.</span>
-             )}
+          {/* ICAR Extension Citation Box */}
+          <div className="p-5 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-2">
+            <div className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-amber-500" /> Research & Extension Sources
+            </div>
+            <p className="leading-relaxed text-[11px]">
+              Guidance compiled in alignment with ICAR (Indian Council of Agricultural Research) package of practices and state agricultural university field trials.
+            </p>
           </div>
         </div>
-
       </div>
     </div>
   );

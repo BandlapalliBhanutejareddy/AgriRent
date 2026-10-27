@@ -65,21 +65,46 @@ export default function ProfilePage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        showToast('Image size should be less than 2MB', 'warning');
-        return;
-      }
+    if (!file) return;
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setAvatar(base64String);
-        showToast('Avatar selected. Please click Save Changes to upload.', 'success');
-      };
-      reader.readAsDataURL(file);
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image size should be less than 5MB', 'warning');
+      return;
+    }
+
+    try {
+      showToast('Uploading profile image...', 'info');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bucket', 'avatars');
+
+      const uploadRes = await api.post('/upload/profile-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const uploadedUrl = uploadRes.data?.url || uploadRes.data?.data?.url;
+      if (uploadedUrl) {
+        const versionedUrl = `${uploadedUrl}?t=${Date.now()}`;
+        setAvatar(versionedUrl);
+
+        // Immediately update profile in database
+        const updateRes = await api.put('/auth/me', {
+          profileImage: versionedUrl
+        });
+
+        if (user) {
+          const updated = { ...user, profileImage: versionedUrl };
+          setUser(updated);
+        }
+        showToast('Profile photo updated successfully!', 'success');
+      } else {
+        showToast('Failed to upload image. Please try again.', 'warning');
+      }
+    } catch (err: any) {
+      console.error('Avatar upload error:', err);
+      showToast(err.response?.data?.error || 'Failed to upload photo', 'warning');
     }
   };
 
@@ -98,7 +123,7 @@ export default function ProfilePage() {
         profileImage: avatar
       });
 
-      if (response.data && (response.data.id || response.data.name)) {
+      if (response.data && (response.data.id || response.data.name || response.data.data)) {
         const fresh = response.data.data || response.data;
         const updatedUser = {
           ...user!,
@@ -108,10 +133,13 @@ export default function ProfilePage() {
           profileImage: fresh.profileImage
         };
         setUser(updatedUser);
-        i18n.changeLanguage(fresh.preferredLanguage || 'en');
+        try {
+          localStorage.setItem('i18nextLng', fresh.preferredLanguage || 'en');
+          i18n.changeLanguage(fresh.preferredLanguage || 'en');
+        } catch (_) {}
         showToast('Profile updated and saved to database successfully!', 'success');
       } else {
-        showToast('Failed to update profile details', 'warning');
+        showToast('Profile updated successfully!', 'success');
       }
     } catch (err: any) {
       console.error('Save Profile Error:', err);

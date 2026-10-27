@@ -116,7 +116,9 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         email: newUser.email,
         name: newUser.name,
         role: newUser.role,
-        preferredLanguage: newUser.preferredLanguage
+        phone: newUser.phone,
+        preferredLanguage: newUser.preferredLanguage,
+        profileImage: newUser.profileImage
       },
       token: sessionToken,
       session: { access_token: sessionToken }
@@ -476,6 +478,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         role: user.role,
         phone: user.phone,
         preferredLanguage: user.preferredLanguage,
+        profileImage: user.profileImage,
         authId: user.authId
       },
       token: authData.session.access_token,

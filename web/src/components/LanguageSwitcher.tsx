@@ -30,28 +30,21 @@ export default function LanguageSwitcher() {
   }, []);
 
   const changeLanguage = async (lng: string) => {
-    i18n.changeLanguage(lng);
+    try {
+      localStorage.setItem('i18nextLng', lng);
+      await i18n.changeLanguage(lng);
+    } catch (_) {}
     setIsOpen(false);
 
     if (user) {
       setUser({ ...user, preferredLanguage: lng });
     }
 
-    // Optionally sync with backend
     try {
-      const token = localStorage.getItem('agrorent_dev_session');
-      if (token) {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/auth/language`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ language: lng })
-        });
-      }
+      const { api } = await import('@/lib/api');
+      await api.put('/auth/language', { language: lng });
     } catch (error) {
-      console.error('Failed to sync language preference', error);
+      // Continue even if network error
     }
   };
 

@@ -91,3 +91,6 @@ desktop.ini
 __pycache__/
 *.pyc
 
+# Local Scratch Directory
+scratch/
+

@@ -1,0 +1,290 @@
+[
+  {
+    "viewport": "mobile_compact",
+    "dimensions": "360x800",
+    "page": "home",
+    "url": "http://localhost:3001/",
+    "screenshot": "home_360x800.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_compact",
+    "dimensions": "360x800",
+    "page": "farmer_dashboard",
+    "url": "http://localhost:3001/dashboard/farmer",
+    "screenshot": "farmer_dashboard_360x800.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_compact",
+    "dimensions": "360x800",
+    "page": "marketplace",
+    "url": "http://localhost:3001/dashboard/marketplace",
+    "screenshot": "marketplace_360x800.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_compact",
+    "dimensions": "360x800",
+    "page": "weather_mandi",
+    "url": "http://localhost:3001/dashboard/weather",
+    "screenshot": "weather_mandi_360x800.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_compact",
+    "dimensions": "360x800",
+    "page": "crop_guide_rice",
+    "url": "http://localhost:3001/dashboard/guides/rice",
+    "screenshot": "crop_guide_rice_360x800.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_compact",
+    "dimensions": "360x800",
+    "page": "profile",
+    "url": "http://localhost:3001/dashboard/profile",
+    "screenshot": "profile_360x800.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_modern",
+    "dimensions": "390x844",
+    "page": "home",
+    "url": "http://localhost:3001/",
+    "screenshot": "home_390x844.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_modern",
+    "dimensions": "390x844",
+    "page": "farmer_dashboard",
+    "url": "http://localhost:3001/dashboard/farmer",
+    "screenshot": "farmer_dashboard_390x844.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_modern",
+    "dimensions": "390x844",
+    "page": "marketplace",
+    "url": "http://localhost:3001/dashboard/marketplace",
+    "screenshot": "marketplace_390x844.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_modern",
+    "dimensions": "390x844",
+    "page": "weather_mandi",
+    "url": "http://localhost:3001/dashboard/weather",
+    "screenshot": "weather_mandi_390x844.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_modern",
+    "dimensions": "390x844",
+    "page": "crop_guide_rice",
+    "url": "http://localhost:3001/dashboard/guides/rice",
+    "screenshot": "crop_guide_rice_390x844.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "mobile_modern",
+    "dimensions": "390x844",
+    "page": "profile",
+    "url": "http://localhost:3001/dashboard/profile",
+    "screenshot": "profile_390x844.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_portrait",
+    "dimensions": "768x1024",
+    "page": "home",
+    "url": "http://localhost:3001/",
+    "screenshot": "home_768x1024.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_portrait",
+    "dimensions": "768x1024",
+    "page": "farmer_dashboard",
+    "url": "http://localhost:3001/dashboard/farmer",
+    "screenshot": "farmer_dashboard_768x1024.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_portrait",
+    "dimensions": "768x1024",
+    "page": "marketplace",
+    "url": "http://localhost:3001/dashboard/marketplace",
+    "screenshot": "marketplace_768x1024.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_portrait",
+    "dimensions": "768x1024",
+    "page": "weather_mandi",
+    "url": "http://localhost:3001/dashboard/weather",
+    "screenshot": "weather_mandi_768x1024.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_portrait",
+    "dimensions": "768x1024",
+    "page": "crop_guide_rice",
+    "url": "http://localhost:3001/dashboard/guides/rice",
+    "screenshot": "crop_guide_rice_768x1024.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_portrait",
+    "dimensions": "768x1024",
+    "page": "profile",
+    "url": "http://localhost:3001/dashboard/profile",
+    "screenshot": "profile_768x1024.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_landscape",
+    "dimensions": "1024x768",
+    "page": "home",
+    "url": "http://localhost:3001/",
+    "screenshot": "home_1024x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_landscape",
+    "dimensions": "1024x768",
+    "page": "farmer_dashboard",
+    "url": "http://localhost:3001/dashboard/farmer",
+    "screenshot": "farmer_dashboard_1024x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_landscape",
+    "dimensions": "1024x768",
+    "page": "marketplace",
+    "url": "http://localhost:3001/dashboard/marketplace",
+    "screenshot": "marketplace_1024x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_landscape",
+    "dimensions": "1024x768",
+    "page": "weather_mandi",
+    "url": "http://localhost:3001/dashboard/weather",
+    "screenshot": "weather_mandi_1024x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_landscape",
+    "dimensions": "1024x768",
+    "page": "crop_guide_rice",
+    "url": "http://localhost:3001/dashboard/guides/rice",
+    "screenshot": "crop_guide_rice_1024x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "tablet_landscape",
+    "dimensions": "1024x768",
+    "page": "profile",
+    "url": "http://localhost:3001/dashboard/profile",
+    "screenshot": "profile_1024x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "laptop_standard",
+    "dimensions": "1366x768",
+    "page": "home",
+    "url": "http://localhost:3001/",
+    "screenshot": "home_1366x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "laptop_standard",
+    "dimensions": "1366x768",
+    "page": "farmer_dashboard",
+    "url": "http://localhost:3001/dashboard/farmer",
+    "screenshot": "farmer_dashboard_1366x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "laptop_standard",
+    "dimensions": "1366x768",
+    "page": "marketplace",
+    "url": "http://localhost:3001/dashboard/marketplace",
+    "screenshot": "marketplace_1366x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "laptop_standard",
+    "dimensions": "1366x768",
+    "page": "weather_mandi",
+    "url": "http://localhost:3001/dashboard/weather",
+    "screenshot": "weather_mandi_1366x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "laptop_standard",
+    "dimensions": "1366x768",
+    "page": "crop_guide_rice",
+    "url": "http://localhost:3001/dashboard/guides/rice",
+    "screenshot": "crop_guide_rice_1366x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "laptop_standard",
+    "dimensions": "1366x768",
+    "page": "profile",
+    "url": "http://localhost:3001/dashboard/profile",
+    "screenshot": "profile_1366x768.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "desktop_widescreen",
+    "dimensions": "1440x900",
+    "page": "home",
+    "url": "http://localhost:3001/",
+    "screenshot": "home_1440x900.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "desktop_widescreen",
+    "dimensions": "1440x900",
+    "page": "farmer_dashboard",
+    "url": "http://localhost:3001/dashboard/farmer",
+    "screenshot": "farmer_dashboard_1440x900.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "desktop_widescreen",
+    "dimensions": "1440x900",
+    "page": "marketplace",
+    "url": "http://localhost:3001/dashboard/marketplace",
+    "screenshot": "marketplace_1440x900.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "desktop_widescreen",
+    "dimensions": "1440x900",
+    "page": "weather_mandi",
+    "url": "http://localhost:3001/dashboard/weather",
+    "screenshot": "weather_mandi_1440x900.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "desktop_widescreen",
+    "dimensions": "1440x900",
+    "page": "crop_guide_rice",
+    "url": "http://localhost:3001/dashboard/guides/rice",
+    "screenshot": "crop_guide_rice_1440x900.png",
+    "horizontal_overflow": false
+  },
+  {
+    "viewport": "desktop_widescreen",
+    "dimensions": "1440x900",
+    "page": "profile",
+    "url": "http://localhost:3001/dashboard/profile",
+    "screenshot": "profile_1440x900.png",
+    "horizontal_overflow": false
+  }
+]

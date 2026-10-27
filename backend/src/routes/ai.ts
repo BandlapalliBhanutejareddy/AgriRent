@@ -25,7 +25,16 @@ router.post('/advisor', requireAuth, async (req: AuthRequest, res: Response): Pr
       select: { title: true, category: true, pricePerDay: true, location: true }
     });
 
-    const responseText = await aiProvider.getAdvisorAdvice(req.body, language, equipmentList);
+    let farmLocation = req.body.location;
+    if (!farmLocation && req.prismaUser) {
+      const userFarm = await prisma.farm.findFirst({
+        where: { ownerId: req.prismaUser.id },
+        select: { location: true }
+      });
+      if (userFarm?.location) farmLocation = userFarm.location;
+    }
+    const advisorParams = { ...req.body, location: farmLocation || req.body.location };
+    const responseText = await aiProvider.getAdvisorAdvice(advisorParams, language, equipmentList);
 
     await prisma.auditLog.create({
       data: {

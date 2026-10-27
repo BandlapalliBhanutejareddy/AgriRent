@@ -55,7 +55,32 @@ export default function DashboardLayout({
     } else {
       setHeaderAvatar(null);
     }
-  }, [user]);
+
+    // Synchronize canonical profile with backend across mobile & web
+    const syncCanonicalProfile = async () => {
+      try {
+        const { api } = await import('@/lib/api');
+        const res = await api.get('/auth/me');
+        if (res.data && res.data.id) {
+          const fresh = res.data;
+          const currentStoreUser = useStore.getState().user;
+          if (currentStoreUser) {
+            useStore.getState().setUser({
+              ...currentStoreUser,
+              name: fresh.name,
+              phone: fresh.phone,
+              preferredLanguage: fresh.preferredLanguage,
+              profileImage: fresh.profileImage
+            });
+          }
+          if (fresh.profileImage) {
+            setHeaderAvatar(fresh.profileImage);
+          }
+        }
+      } catch (_) {}
+    };
+    syncCanonicalProfile();
+  }, [user?.id]);
 
   const storedActive = activeRole;
   const currentRole = storedActive || (user?.role === 'BOTH' ? 'ROLE_SELECT' : user?.role || 'OWNER');
@@ -128,20 +153,20 @@ export default function DashboardLayout({
       case 'ADMIN':
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 shadow-sm backdrop-blur-md">
-            <ShieldAlert size={14} /> {t('admin')}
+            <ShieldAlert size={14} /> {t('admin', 'Admin')}
           </span>
         );
       case 'FARMER':
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 shadow-sm backdrop-blur-md">
-            <Sparkles size={14} /> {t('farmer')}
+            <Sparkles size={14} /> {t('farmer', 'Farmer')}
           </span>
         );
       case 'OWNER':
       default:
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 shadow-sm backdrop-blur-md">
-            <Tractor size={14} /> {t('fleet_owner')}
+            <Tractor size={14} /> {t('fleet_owner', 'Fleet Owner')}
           </span>
         );
     }
@@ -169,12 +194,12 @@ export default function DashboardLayout({
     if (role === 'ADMIN') {
       return (
         <>
-          <NavLink href="/dashboard/admin" icon={LayoutDashboard} label="Dashboard" exact />
-          <NavLink href="/dashboard/admin/operations" icon={Activity} label="Operations Monitor" />
-          <NavLink href="/dashboard/admin/alerts" icon={Bell} label="Alerts & Notifications" />
-          <NavLink href="/dashboard/admin/health" icon={ShieldAlert} label="System Health" />
-          <NavLink href="/dashboard/admin/quality" icon={CheckCircle} label="Data Quality" />
-          <NavLink href="/dashboard/profile" icon={Settings} label="Profile Settings" />
+          <NavLink href="/dashboard/admin" icon={LayoutDashboard} label={t('dashboard', 'Dashboard')} exact />
+          <NavLink href="/dashboard/admin/operations" icon={Activity} label={t('nav.operations_monitor', 'Operations Monitor')} />
+          <NavLink href="/dashboard/admin/alerts" icon={Bell} label={t('nav.alerts_notifications', 'Alerts & Notifications')} />
+          <NavLink href="/dashboard/admin/health" icon={ShieldAlert} label={t('nav.system_health', 'System Health')} />
+          <NavLink href="/dashboard/admin/quality" icon={CheckCircle} label={t('nav.data_quality', 'Data Quality')} />
+          <NavLink href="/dashboard/profile" icon={Settings} label={t('profile_settings', 'Profile Settings')} />
         </>
       );
     }
@@ -182,30 +207,30 @@ export default function DashboardLayout({
     if (role === 'FARMER') {
       return (
         <>
-          <NavLink href="/dashboard/farmer" icon={LayoutDashboard} label={t('dashboard')} exact />
-          <NavLink href="/dashboard/marketplace" icon={Search} label={t('marketplace')} />
-          <NavLink href="/dashboard/rentals" icon={CalendarDays} label={t('my_rentals')} />
-          <NavLink href="/dashboard/saved" icon={Bookmark} label="Saved Machinery" />
-          <NavLink href="/dashboard/weather" icon={CloudSun} label="Weather & Mandi" />
-          <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides')} />
-          <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label="Farmer Assistant" />
-          <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
-          <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
+          <NavLink href="/dashboard/farmer" icon={LayoutDashboard} label={t('dashboard', 'Dashboard')} exact />
+          <NavLink href="/dashboard/marketplace" icon={Search} label={t('marketplace', 'Marketplace')} />
+          <NavLink href="/dashboard/rentals" icon={CalendarDays} label={t('my_rentals', 'My Rentals')} />
+          <NavLink href="/dashboard/saved" icon={Bookmark} label={t('saved_machinery', 'Saved Machinery')} />
+          <NavLink href="/dashboard/weather" icon={CloudSun} label={t('weather_mandi', 'Weather & Mandi')} />
+          <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides', 'Crop Guides')} />
+          <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label={t('farmer_assistant', 'Farmer Assistant')} />
+          <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications', 'Notifications')} />
+          <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback', 'Feedback')} />
         </>
       );
     }
 
     return (
       <>
-        <NavLink href="/dashboard" icon={LayoutDashboard} label={t('dashboard')} exact />
-        <NavLink href="/dashboard/equipment" icon={Tractor} label={t('fleet_management')} exact />
-        <NavLink href="/dashboard/equipment/new" icon={PlusCircle} label={t('add_equipment')} />
-        <NavLink href="/dashboard/bookings" icon={ClipboardList} label={t('booking_requests')} />
-        <NavLink href="/dashboard/history" icon={History} label="Rental History" />
-        <NavLink href="/dashboard/analytics" icon={BarChart3} label="Analytics & Yield" />
-        <NavLink href="/dashboard/bank-details" icon={Landmark} label="Bank & Payouts" />
-        <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications')} />
-        <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback') || 'Feedback'} />
+        <NavLink href="/dashboard" icon={LayoutDashboard} label={t('dashboard', 'Dashboard')} exact />
+        <NavLink href="/dashboard/equipment" icon={Tractor} label={t('fleet_management', 'Fleet Management')} exact />
+        <NavLink href="/dashboard/equipment/new" icon={PlusCircle} label={t('add_equipment', 'Add Equipment')} />
+        <NavLink href="/dashboard/bookings" icon={ClipboardList} label={t('booking_requests', 'Booking Requests')} />
+        <NavLink href="/dashboard/history" icon={History} label={t('rental_history', 'Rental History')} />
+        <NavLink href="/dashboard/analytics" icon={BarChart3} label={t('analytics_yield', 'Analytics & Yield')} />
+        <NavLink href="/dashboard/bank-details" icon={Landmark} label={t('bank_payouts', 'Bank & Payouts')} />
+        <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications', 'Notifications')} />
+        <NavLink href="/dashboard/feedback" icon={MessageSquare} label={t('feedback', 'Feedback')} />
       </>
     );
   };

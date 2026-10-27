@@ -49,7 +49,8 @@ const handleUpload = async (req: AuthRequest, res: Response): Promise<void> => {
     const processedBuffer = await processImage(req.file.buffer);
     
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
-    let bucketName = req.body.bucket || 'equipment-images';
+    const isProfileUpload = req.path.includes('profile') || req.originalUrl.includes('profile');
+    let bucketName = req.body.bucket || (isProfileUpload ? 'avatars' : 'equipment-images');
 
     let { data, error } = await supabaseAdmin.storage
       .from(bucketName)
@@ -59,7 +60,7 @@ const handleUpload = async (req: AuthRequest, res: Response): Promise<void> => {
         upsert: true,
       });
 
-    // If initial bucket fails, try equipment-images as fallback
+    // If initial bucket fails, try fallback bucket
     if (error && bucketName !== 'equipment-images') {
       bucketName = 'equipment-images';
       const fallback = await supabaseAdmin.storage

@@ -302,7 +302,7 @@ export default function WeatherAndMarketPage() {
           {/* Prices Table / Grid */}
           {marketLoading ? (
             <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl animate-pulse" />
-          ) : marketResult?.prices && marketResult.prices.length > 0 ? (
+          ) : (marketResult?.records?.length > 0 || marketResult?.prices?.length > 0) ? (
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
@@ -311,22 +311,27 @@ export default function WeatherAndMarketPage() {
                       <th className="py-4 px-6">Commodity</th>
                       <th className="py-4 px-6">Mandi / Market</th>
                       <th className="py-4 px-6">District & State</th>
+                      <th className="py-4 px-6">Arrival Date</th>
                       <th className="py-4 px-6 text-right">Min Price</th>
                       <th className="py-4 px-6 text-right">Max Price</th>
                       <th className="py-4 px-6 text-right">Modal Price</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {marketResult.prices.map((item: any, i: number) => (
+                    {(marketResult?.records || marketResult?.prices || []).map((item: any, i: number) => (
                       <tr key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="py-4 px-6 font-bold text-slate-900 dark:text-white">
-                          {item.commodity}
+                          <div>{item.commodity}</div>
+                          {item.variety && <span className="text-[10px] text-slate-400 font-normal">{item.variety}</span>}
                         </td>
                         <td className="py-4 px-6 font-medium text-slate-700 dark:text-slate-300">
-                          {item.market}
+                          {item.market || 'Regional Mandi'}
                         </td>
                         <td className="py-4 px-6 text-slate-500">
                           {item.district ? `${item.district}, ` : ''}{item.state}
+                        </td>
+                        <td className="py-4 px-6 text-slate-500 font-medium">
+                          {item.arrivalDate || 'Today'}
                         </td>
                         <td className="py-4 px-6 text-right font-medium text-slate-600 dark:text-slate-400">
                           {formatCurrency(item.minPrice)} / Qtl
@@ -347,11 +352,16 @@ export default function WeatherAndMarketPage() {
             <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
               <TrendingUp size={36} className="text-slate-400 mx-auto" />
               <h3 className="text-base font-black text-slate-800 dark:text-white">
-                No active market prices for this query
+                {marketResult?.status === 'UNAVAILABLE' ? 'Official Mandi Feed Service Status' : 'No active market prices for this query'}
               </h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Agmarknet auction feeds update throughout trading hours. Try querying for major commodities like Paddy, Cotton, or Maize.
+                {marketResult?.disclaimer || 'Agmarknet auction feeds update throughout trading hours. Try querying for major commodities like Paddy, Cotton, or Maize.'}
               </p>
+              {marketResult?.missingConfigRequirement && (
+                <div className="text-[11px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/50 max-w-lg mx-auto">
+                  {marketResult.missingConfigRequirement}
+                </div>
+              )}
             </div>
           )}
         </div>
