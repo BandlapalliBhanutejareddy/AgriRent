@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('Ã°Å¸Å’Â± Starting database seeding...');
+  console.log('🌱 Starting database seeding...');
 
   // Delete all existing equipment, bookings, and saved items as requested
   await prisma.paymentTransaction.deleteMany();
@@ -11,7 +11,7 @@ async function main() {
   await prisma.savedEquipment.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.equipment.deleteMany();
-  console.log('Ã°Å¸â€”â€˜Ã¯Â¸Â  Deleted all existing equipment, bookings, and saved equipment.');
+  console.log('🗑️ Deleted all existing equipment, bookings, and saved equipment.');
 
   // 1. Create Demo Users with verified status
   const users = [
@@ -29,6 +29,14 @@ async function main() {
       password: "SUPABASE_AUTH_MANAGED",
       role: "FARMER",
       phone: "+919876543002",
+      isVerified: true
+    },
+    {
+      name: "Farmer Live",
+      email: "farmer.live@agrorent.ai",
+      password: "SUPABASE_AUTH_MANAGED",
+      role: "FARMER",
+      phone: "+919876543004",
       isVerified: true
     },
     {
@@ -50,12 +58,57 @@ async function main() {
     console.log(`ACCOUNT: ${u.name} | EMAIL: ${u.email} | ROLE: ${u.role} | VERIFIED STATUS: ${u.isVerified}`);
   }
 
-  console.log('✅ Database seeded with Secure Demo Users and all old equipment removed.');
+  // 2. Create sample equipment under owner.demo@agrorent.ai
+  const ownerUser = await prisma.user.findUnique({ where: { email: "owner.demo@agrorent.ai" } });
+  if (ownerUser) {
+    const sampleEquipments = [
+      {
+        title: "Mahindra 575 DI Tractor 45HP",
+        category: "TRACTOR",
+        description: "Heavy-duty 45HP tractor suitable for plowing, haulage, and cultivation operations.",
+        pricePerDay: 1800,
+        imageUrl: "/assets/equipment/mahindra_575.jpg",
+        ownerId: ownerUser.id,
+        available: true,
+        location: "Kurnool, Andhra Pradesh",
+        latitude: 15.8281,
+        longitude: 78.0373
+      },
+      {
+        title: "John Deere W70 Combine Harvester",
+        category: "HARVESTER",
+        description: "High capacity multi-crop combine harvester with 4-straw walker and 2400L grain tank.",
+        pricePerDay: 4500,
+        imageUrl: "/assets/equipment/john_deere_w70.jpg",
+        ownerId: ownerUser.id,
+        available: true,
+        location: "Anantapur, Andhra Pradesh",
+        latitude: 14.6819,
+        longitude: 77.6006
+      }
+    ];
+
+    for (const eq of sampleEquipments) {
+      await prisma.equipment.upsert({
+        where: {
+          title_ownerId: {
+            title: eq.title,
+            ownerId: eq.ownerId
+          }
+        },
+        update: eq,
+        create: eq
+      });
+    }
+    console.log('🚜 Seeded sample machinery for marketplace catalog.');
+  }
+
+  console.log('✅ Database seeded with Secure Demo Users and sample equipment.');
 }
 
 main()
   .catch((e) => {
-    console.error('Ã¢ÂÅ’ Error during seeding:', e);
+    console.error('❌ Error during seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { supabase } from '../lib/supabase';
+import { verifyFallbackToken } from '../lib/jwtFallback';
 
 // Extend the Express Request interface to include the user
 export interface AuthRequest extends Request {
@@ -19,45 +20,68 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
 
     const token = authHeader.split(' ')[1];
 
-    // Validate Supabase Access Token
-    const { data: { user: supabaseUser }, error } = await supabase.auth.getUser(token);
-
-    if (error || !supabaseUser) {
-      res.status(401).json({ error: 'Invalid or expired authentication token' });
-      return;
+    // 1. Try Supabase Access Token
+    let supabaseUser: any = null;
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (!error && data?.user) {
+        supabaseUser = data.user;
+      }
+    } catch {
+      // Supabase is offline or placeholder in CI
     }
 
-    // Lookup application User by Supabase authId or email
-    let user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { authId: supabaseUser.id },
-          { email: supabaseUser.email }
-        ]
-      }
-    });
+    if (supabaseUser) {
+      let user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { authId: supabaseUser.id },
+            { email: supabaseUser.email }
+          ]
+        }
+      });
 
-    if (user) {
-      // Link authId if missing on legacy record
-      if (!user.authId && supabaseUser.id) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { authId: supabaseUser.id }
-        });
-      }
+      if (user) {
+        if (!user.authId && supabaseUser.id) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { authId: supabaseUser.id }
+          });
+        }
 
-      if (user.isSuspended) {
-        res.status(403).json({ error: 'Account suspended by administrator' });
+        if (user.isSuspended) {
+          res.status(403).json({ error: 'Account suspended by administrator' });
+          return;
+        }
+
+        req.user = { id: user.id, email: user.email, authId: user.authId };
+        req.prismaUser = user;
+        next();
         return;
       }
-
-      req.user = { id: user.id, email: user.email, authId: user.authId };
-      req.prismaUser = user;
-      next();
-      return;
     }
 
-    res.status(401).json({ error: 'Application user profile not found' });
+    // 2. Try Fallback Token
+    const fallback = verifyFallbackToken(token);
+    if (fallback) {
+      const user = await prisma.user.findUnique({
+        where: { id: fallback.sub }
+      });
+
+      if (user) {
+        if (user.isSuspended) {
+          res.status(403).json({ error: 'Account suspended by administrator' });
+          return;
+        }
+
+        req.user = { id: user.id, email: user.email, authId: user.authId || user.id };
+        req.prismaUser = user;
+        next();
+        return;
+      }
+    }
+
+    res.status(401).json({ error: 'Invalid or expired authentication token' });
   } catch (err) {
     console.error('Auth Middleware Error:', err);
     next(err);

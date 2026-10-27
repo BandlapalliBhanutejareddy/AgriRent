@@ -54,6 +54,7 @@ jobs:
         cd backend
         npm install
         npx prisma db push --skip-generate
+        npm run seed
         npm run build
       env:
         DATABASE_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
@@ -69,6 +70,8 @@ jobs:
         DATABASE_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
         DIRECT_URL: "postgresql://postgres:password123@localhost:5432/agrorent_test"
         JWT_SECRET: "test_jwt_secret_for_ci_environment_32chars_long"
+        SUPABASE_URL: "https://placeholder.supabase.co"
+        SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
 
     - name: Web Build & Type Check
       run: |

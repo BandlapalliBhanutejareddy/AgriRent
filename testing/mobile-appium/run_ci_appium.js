@@ -56,7 +56,29 @@ async function main() {
   const devices = getAdbDevices();
   log(`Connected ADB devices detected: ${devices.length} (${devices.join(', ') || 'None'})`);
 
-  const appiumReady = await checkAppiumServer();
+  let appiumReady = await checkAppiumServer();
+  if (!appiumReady) {
+    log('Appium not detected on 127.0.0.1:4723. Starting Appium server process...');
+    try {
+      const { spawn } = require('child_process');
+      const appProc = spawn('appium', ['--port', '4723', '--log-no-colors'], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      appProc.unref();
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        if (await checkAppiumServer()) {
+          appiumReady = true;
+          log('Appium server successfully launched on 127.0.0.1:4723');
+          break;
+        }
+      }
+    } catch (e) {
+      log(`Failed to spawn Appium: ${e.message}`);
+    }
+  }
+
   log(`Appium 2.x Server Status (127.0.0.1:4723): ${appiumReady ? 'ONLINE' : 'OFFLINE / UNREACHABLE'}`);
 
   const apkExists = fs.existsSync(APK_PATH);
