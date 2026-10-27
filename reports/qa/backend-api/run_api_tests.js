@@ -153,7 +153,7 @@ async function main() {
 
   await runTest('Authentication API', 'POST /api/auth/login valid owner login', async () => {
     const res = await request('POST', '/api/auth/login', {
-      email: 'owner.live@agrorent.ai',
+      email: 'owner.demo@agrorent.ai',
       password: 'Password123!',
       role: 'OWNER'
     });

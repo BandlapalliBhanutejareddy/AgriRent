@@ -114,7 +114,7 @@ async function main() {
 
   try {
     const fRes = await request('POST', '/api/auth/login', {
-      email: 'farmer.b.1788354195151@agrorent.ai',
+      email: 'farmer.demo@agrorent.ai',
       password: 'Password123!',
       role: 'FARMER'
     });
@@ -125,7 +125,7 @@ async function main() {
 
   try {
     const oRes = await request('POST', '/api/auth/login', {
-      email: 'web_owner_1787209581213@test.com',
+      email: 'owner.demo@agrorent.ai',
       password: 'Password123!',
       role: 'OWNER'
     });

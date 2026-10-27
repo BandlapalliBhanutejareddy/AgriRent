@@ -24,6 +24,14 @@ async function main() {
       isVerified: true
     },
     {
+      name: "Owner Live",
+      email: "owner.live@agrorent.ai",
+      password: "SUPABASE_AUTH_MANAGED",
+      role: "OWNER",
+      phone: "+919876543005",
+      isVerified: true
+    },
+    {
       name: "Farmer Demo",
       email: "farmer.demo@agrorent.ai",
       password: "SUPABASE_AUTH_MANAGED",
