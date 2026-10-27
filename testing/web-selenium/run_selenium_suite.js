@@ -448,6 +448,9 @@ async function main() {
 </html>`;
   fs.writeFileSync(path.join(OUTPUT_DIR, 'selenium_report.html'), htmlContent);
   log(`All reports generated in: ${OUTPUT_DIR}`);
+  if (failed > 0) {
+    process.exit(1);
+  }
 }
 
 main().catch(err => {

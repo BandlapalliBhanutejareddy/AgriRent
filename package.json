@@ -7,7 +7,13 @@
   "scripts": {
     "dev:web": "cd web && npm run dev",
     "dev:backend": "cd backend && npm run dev",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\""
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
+    "test:web": "node testing/web-selenium/run_selenium_suite.js",
+    "test:api": "node reports/qa/backend-api/run_api_tests.js",
+    "test:security": "node reports/qa/security/run_security_tests.js",
+    "test:load": "node testing/backend-load/run_load_test.js",
+    "test:mobile": "node testing/mobile-appium/run_ci_appium.js",
+    "test:cross": "node testing/cross-platform/run_cross_platform_tests.js"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

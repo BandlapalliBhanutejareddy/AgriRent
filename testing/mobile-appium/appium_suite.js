@@ -9,7 +9,11 @@
 const path = require('path');
 const fs = require('fs');
 
-const APK_PATH = path.resolve(__dirname, '../../AgroRent_OwnerPortal_Latest.apk');
+const candidateApkPaths = [
+  path.resolve(__dirname, '../../AgroRent_OwnerPortal_Latest.apk'),
+  path.resolve(__dirname, '../../mobile/build/app/outputs/flutter-apk/app-debug.apk')
+];
+const APK_PATH = candidateApkPaths.find(p => fs.existsSync(p)) || candidateApkPaths[0];
 
 const APPIUM_CAPABILITIES = {
   platformName: 'Android',
