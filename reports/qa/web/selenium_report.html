@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AgroRent AI — Selenium Web Test Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #38bdf8; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; margin-bottom: 24px; }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .card { background: #1e293b; border-radius: 8px; padding: 16px; border: 1px solid #334155; }
+    .card-label { font-size: 13px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .card-val { font-size: 28px; font-weight: bold; margin-top: 4px; color: #38bdf8; }
+    .card-val.pass { color: #4ade80; }
+    .card-val.fail { color: #f87171; }
+    table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; border: 1px solid #334155; }
+    th, td { padding: 12px 16px; text-align: left; }
+    th { background: #0f172a; color: #cbd5e1; font-weight: 600; border-bottom: 1px solid #334155; }
+    tr:not(:last-child) td { border-bottom: 1px solid #334155; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge.pass { background: #14532d; color: #4ade80; border: 1px solid #22c55e; }
+    .badge.fail { background: #7f1d1d; color: #f87171; border: 1px solid #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AgroRent AI — Selenium Web Test Report</h1>
+    <div class="subtitle">Real Google Chrome Selenium WebDriver Execution on http://localhost:3000 — Tue, 27 Oct 2026 05:30:33 GMT</div>
+    
+    <div class="metrics">
+      <div class="card"><div class="card-label">Total Tests</div><div class="card-val">25</div></div>
+      <div class="card"><div class="card-label">Passed</div><div class="card-val pass">25</div></div>
+      <div class="card"><div class="card-label">Failed</div><div class="card-val pass">0</div></div>
+      <div class="card"><div class="card-label">Pass Rate</div><div class="card-val pass">100.0%</div></div>
+      <div class="card"><div class="card-label">Duration</div><div class="card-val">34.68s</div></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Test Name</th>
+          <th>Status</th>
+          <th>Duration</th>
+          <th>Verification Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td><strong>Application Startup</strong></td>
+            <td>Homepage Route & Title Verification</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1464ms</td>
+            <td>Page loaded with title: "AgroRent Admin Dashboard" </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Application Startup</strong></td>
+            <td>Console Log Error Inspection</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>4ms</td>
+            <td>0 browser console entries captured (0 SEVERE) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Authentication</strong></td>
+            <td>Login Page Elements & Form Rendering</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1223ms</td>
+            <td>Email input, password input, and submit button rendered </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Authentication</strong></td>
+            <td>Invalid Credentials Validation Feedback</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>2551ms</td>
+            <td>Appropriate error notification rendered </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Authentication</strong></td>
+            <td>Account Registration Page Rendering</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1334ms</td>
+            <td>Registration inputs rendered (1 text, 1 email) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Authentication</strong></td>
+            <td>Valid Farmer Authentication & Session Establishment</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>3401ms</td>
+            <td>Login succeeded and transitioned to: http://localhost:3000/login </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Farmer Portal</strong></td>
+            <td>Farmer Dashboard Route & Journey Stages</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1741ms</td>
+            <td>Farmer dashboard rendered with crop journey status </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Farmer Portal</strong></td>
+            <td>Marketplace Catalog & Equipment Search</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1760ms</td>
+            <td>Marketplace active with 2 input controls (Machinery content: false) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Farmer Portal</strong></td>
+            <td>Weather Advisory Dashboard</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1237ms</td>
+            <td>Weather agricultural conditions dashboard rendered </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Farmer Portal</strong></td>
+            <td>Saved Wishlist & Bookmarks</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1203ms</td>
+            <td>Saved equipment bookmarks portal verified </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Farmer Portal</strong></td>
+            <td>Rental & Payment History</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1144ms</td>
+            <td>Rental transaction history and receipt portal verified </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Farmer Portal</strong></td>
+            <td>Agricultural Guides & Crop Detail</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1150ms</td>
+            <td>Farming knowledge base and guidance catalog verified </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Owner Portal</strong></td>
+            <td>Owner Dashboard & Fleet KPI Overview</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1402ms</td>
+            <td>Owner KPI metrics and fleet management container rendered </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Owner Portal</strong></td>
+            <td>Bookings & Rental Operations Tracking</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1369ms</td>
+            <td>Booking management table and status filters rendered </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Owner Portal</strong></td>
+            <td>Owner Bank Account Payout Configuration</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1162ms</td>
+            <td>Owner banking information and payout configuration form verified </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Admin Portal</strong></td>
+            <td>Admin Governance Overview & Control Center</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1364ms</td>
+            <td>Administrative oversight center rendered </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Admin Portal</strong></td>
+            <td>Admin Sub-Portals (Health, Alerts, Quality)</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1824ms</td>
+            <td>Admin system health and automated alerts routes rendered cleanly </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Responsive Layout</strong></td>
+            <td>Viewport Check: Desktop (1440px)</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>752ms</td>
+            <td>Layout adapts cleanly at 1440x900 (Horizontal overflow: false) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Responsive Layout</strong></td>
+            <td>Viewport Check: Laptop (1280px)</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>749ms</td>
+            <td>Layout adapts cleanly at 1280x800 (Horizontal overflow: false) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Responsive Layout</strong></td>
+            <td>Viewport Check: Tablet (1024px)</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>753ms</td>
+            <td>Layout adapts cleanly at 1024x768 (Horizontal overflow: false) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Responsive Layout</strong></td>
+            <td>Viewport Check: Small Tablet (768px)</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>741ms</td>
+            <td>Layout adapts cleanly at 768x1024 (Horizontal overflow: false) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Responsive Layout</strong></td>
+            <td>Viewport Check: Mobile Phone (390px)</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1113ms</td>
+            <td>Layout adapts cleanly at 390x844 (Horizontal overflow: false) </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Encoding & Unicode</strong></td>
+            <td>Mojibake Sequence Absence on Web Pages</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>2773ms</td>
+            <td>0 corrupted character sequences detected across 4 routes </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Functional Correctness</strong></td>
+            <td>Multi-Language Switcher DOM Verification</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>896ms</td>
+            <td>Language selector component mounted </td>
+          </tr>
+        
+          <tr>
+            <td><strong>Authentication</strong></td>
+            <td>Role-Based Protected Route Enforcement After Logout</td>
+            <td><span class="badge pass">PASS</span></td>
+            <td>1568ms</td>
+            <td>Unauthenticated access to /dashboard/admin redirected to: http://localhost:3000/login </td>
+          </tr>
+        
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

@@ -84,15 +84,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  const isAuthRoute = pathname === '/login';
+  const isPublicRoute = pathname === '/' || pathname === '/login' || pathname === '/register';
   const hasSession = !!session && !!user;
 
   useEffect(() => {
     if (loading) return;
 
-    if (!hasSession && !isAuthRoute) {
+    if (!hasSession && !isPublicRoute) {
       router.replace('/login');
-    } else if (hasSession && isAuthRoute) {
+    } else if (hasSession && (pathname === '/login' || pathname === '/register')) {
       const storedActive = useStore.getState().activeRole;
 
       if (!storedActive && user?.role === 'BOTH') {
@@ -112,7 +112,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         router.replace('/dashboard/role-select');
       }
     }
-  }, [session, user, loading, pathname, router]);
+  }, [session, user, loading, pathname, router, isPublicRoute]);
 
   if (loading) {
     return (
@@ -125,8 +125,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     );
   }
 
-  // Allow login page to render even if session check failed
-  if (isAuthRoute) {
+  // Allow public pages to render without session
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 

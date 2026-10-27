@@ -1,0 +1,211 @@
+{
+  "suite": "AgroRent AI Web Selenium Test Suite",
+  "timestamp": "2026-10-27T05:30:33.942Z",
+  "baseUrl": "http://localhost:3000",
+  "totalTests": 25,
+  "passed": 25,
+  "failed": 0,
+  "durationMs": 34678,
+  "results": [
+    {
+      "Category": "Application Startup",
+      "Name": "Homepage Route & Title Verification",
+      "Status": "PASS",
+      "DurationMs": 1464,
+      "Details": "Page loaded with title: \"AgroRent Admin Dashboard\"",
+      "Error": null
+    },
+    {
+      "Category": "Application Startup",
+      "Name": "Console Log Error Inspection",
+      "Status": "PASS",
+      "DurationMs": 4,
+      "Details": "0 browser console entries captured (0 SEVERE)",
+      "Error": null
+    },
+    {
+      "Category": "Authentication",
+      "Name": "Login Page Elements & Form Rendering",
+      "Status": "PASS",
+      "DurationMs": 1223,
+      "Details": "Email input, password input, and submit button rendered",
+      "Error": null
+    },
+    {
+      "Category": "Authentication",
+      "Name": "Invalid Credentials Validation Feedback",
+      "Status": "PASS",
+      "DurationMs": 2551,
+      "Details": "Appropriate error notification rendered",
+      "Error": null
+    },
+    {
+      "Category": "Authentication",
+      "Name": "Account Registration Page Rendering",
+      "Status": "PASS",
+      "DurationMs": 1334,
+      "Details": "Registration inputs rendered (1 text, 1 email)",
+      "Error": null
+    },
+    {
+      "Category": "Authentication",
+      "Name": "Valid Farmer Authentication & Session Establishment",
+      "Status": "PASS",
+      "DurationMs": 3401,
+      "Details": "Login succeeded and transitioned to: http://localhost:3000/login",
+      "Error": null
+    },
+    {
+      "Category": "Farmer Portal",
+      "Name": "Farmer Dashboard Route & Journey Stages",
+      "Status": "PASS",
+      "DurationMs": 1741,
+      "Details": "Farmer dashboard rendered with crop journey status",
+      "Error": null
+    },
+    {
+      "Category": "Farmer Portal",
+      "Name": "Marketplace Catalog & Equipment Search",
+      "Status": "PASS",
+      "DurationMs": 1760,
+      "Details": "Marketplace active with 2 input controls (Machinery content: false)",
+      "Error": null
+    },
+    {
+      "Category": "Farmer Portal",
+      "Name": "Weather Advisory Dashboard",
+      "Status": "PASS",
+      "DurationMs": 1237,
+      "Details": "Weather agricultural conditions dashboard rendered",
+      "Error": null
+    },
+    {
+      "Category": "Farmer Portal",
+      "Name": "Saved Wishlist & Bookmarks",
+      "Status": "PASS",
+      "DurationMs": 1203,
+      "Details": "Saved equipment bookmarks portal verified",
+      "Error": null
+    },
+    {
+      "Category": "Farmer Portal",
+      "Name": "Rental & Payment History",
+      "Status": "PASS",
+      "DurationMs": 1144,
+      "Details": "Rental transaction history and receipt portal verified",
+      "Error": null
+    },
+    {
+      "Category": "Farmer Portal",
+      "Name": "Agricultural Guides & Crop Detail",
+      "Status": "PASS",
+      "DurationMs": 1150,
+      "Details": "Farming knowledge base and guidance catalog verified",
+      "Error": null
+    },
+    {
+      "Category": "Owner Portal",
+      "Name": "Owner Dashboard & Fleet KPI Overview",
+      "Status": "PASS",
+      "DurationMs": 1402,
+      "Details": "Owner KPI metrics and fleet management container rendered",
+      "Error": null
+    },
+    {
+      "Category": "Owner Portal",
+      "Name": "Bookings & Rental Operations Tracking",
+      "Status": "PASS",
+      "DurationMs": 1369,
+      "Details": "Booking management table and status filters rendered",
+      "Error": null
+    },
+    {
+      "Category": "Owner Portal",
+      "Name": "Owner Bank Account Payout Configuration",
+      "Status": "PASS",
+      "DurationMs": 1162,
+      "Details": "Owner banking information and payout configuration form verified",
+      "Error": null
+    },
+    {
+      "Category": "Admin Portal",
+      "Name": "Admin Governance Overview & Control Center",
+      "Status": "PASS",
+      "DurationMs": 1364,
+      "Details": "Administrative oversight center rendered",
+      "Error": null
+    },
+    {
+      "Category": "Admin Portal",
+      "Name": "Admin Sub-Portals (Health, Alerts, Quality)",
+      "Status": "PASS",
+      "DurationMs": 1824,
+      "Details": "Admin system health and automated alerts routes rendered cleanly",
+      "Error": null
+    },
+    {
+      "Category": "Responsive Layout",
+      "Name": "Viewport Check: Desktop (1440px)",
+      "Status": "PASS",
+      "DurationMs": 752,
+      "Details": "Layout adapts cleanly at 1440x900 (Horizontal overflow: false)",
+      "Error": null
+    },
+    {
+      "Category": "Responsive Layout",
+      "Name": "Viewport Check: Laptop (1280px)",
+      "Status": "PASS",
+      "DurationMs": 749,
+      "Details": "Layout adapts cleanly at 1280x800 (Horizontal overflow: false)",
+      "Error": null
+    },
+    {
+      "Category": "Responsive Layout",
+      "Name": "Viewport Check: Tablet (1024px)",
+      "Status": "PASS",
+      "DurationMs": 753,
+      "Details": "Layout adapts cleanly at 1024x768 (Horizontal overflow: false)",
+      "Error": null
+    },
+    {
+      "Category": "Responsive Layout",
+      "Name": "Viewport Check: Small Tablet (768px)",
+      "Status": "PASS",
+      "DurationMs": 741,
+      "Details": "Layout adapts cleanly at 768x1024 (Horizontal overflow: false)",
+      "Error": null
+    },
+    {
+      "Category": "Responsive Layout",
+      "Name": "Viewport Check: Mobile Phone (390px)",
+      "Status": "PASS",
+      "DurationMs": 1113,
+      "Details": "Layout adapts cleanly at 390x844 (Horizontal overflow: false)",
+      "Error": null
+    },
+    {
+      "Category": "Encoding & Unicode",
+      "Name": "Mojibake Sequence Absence on Web Pages",
+      "Status": "PASS",
+      "DurationMs": 2773,
+      "Details": "0 corrupted character sequences detected across 4 routes",
+      "Error": null
+    },
+    {
+      "Category": "Functional Correctness",
+      "Name": "Multi-Language Switcher DOM Verification",
+      "Status": "PASS",
+      "DurationMs": 896,
+      "Details": "Language selector component mounted",
+      "Error": null
+    },
+    {
+      "Category": "Authentication",
+      "Name": "Role-Based Protected Route Enforcement After Logout",
+      "Status": "PASS",
+      "DurationMs": 1568,
+      "Details": "Unauthenticated access to /dashboard/admin redirected to: http://localhost:3000/login",
+      "Error": null
+    }
+  ]
+}

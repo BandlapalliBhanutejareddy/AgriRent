@@ -1,0 +1,147 @@
+{
+  "suite": "AgroRent AI Backend API Security & RBAC Test Suite",
+  "timestamp": "2026-10-27T05:42:41.516Z",
+  "baseUrl": "http://localhost:4000",
+  "totalTests": 17,
+  "passed": 17,
+  "failed": 0,
+  "durationMs": 33759,
+  "findings": [
+    {
+      "Category": "Authentication",
+      "TestName": "Reject unauthenticated GET /api/bookings",
+      "Status": "PASS",
+      "DurationMs": 15,
+      "Details": "Correctly returned HTTP 401 Unauthorized",
+      "Error": ""
+    },
+    {
+      "Category": "Authentication",
+      "TestName": "Reject unauthenticated GET /api/analytics/owner",
+      "Status": "PASS",
+      "DurationMs": 6,
+      "Details": "Correctly returned HTTP 401 Unauthorized",
+      "Error": ""
+    },
+    {
+      "Category": "Authentication",
+      "TestName": "Reject unauthenticated GET /api/owner/bank-details",
+      "Status": "PASS",
+      "DurationMs": 5,
+      "Details": "Correctly returned HTTP 401 Unauthorized",
+      "Error": ""
+    },
+    {
+      "Category": "Authentication",
+      "TestName": "Reject unauthenticated POST /api/equipment",
+      "Status": "PASS",
+      "DurationMs": 4,
+      "Details": "Correctly returned HTTP 401 Unauthorized",
+      "Error": ""
+    },
+    {
+      "Category": "Authentication",
+      "TestName": "Reject malformed JWT token",
+      "Status": "PASS",
+      "DurationMs": 604,
+      "Details": "Correctly rejected with status 401",
+      "Error": ""
+    },
+    {
+      "Category": "Authentication",
+      "TestName": "Reject forged unsigned JWT header",
+      "Status": "PASS",
+      "DurationMs": 504,
+      "Details": "Correctly rejected forged token with status 401",
+      "Error": ""
+    },
+    {
+      "Category": "RBAC Authorization",
+      "TestName": "Farmer role denied owner analytics (GET /api/analytics/owner)",
+      "Status": "PASS",
+      "DurationMs": 1060,
+      "Details": "Farmer role forbidden from accessing owner business analytics",
+      "Error": ""
+    },
+    {
+      "Category": "RBAC Authorization",
+      "TestName": "Farmer role denied owner bank details (GET /api/owner/bank-details)",
+      "Status": "PASS",
+      "DurationMs": 1161,
+      "Details": "Farmer role forbidden from accessing owner banking payouts",
+      "Error": ""
+    },
+    {
+      "Category": "RBAC Authorization",
+      "TestName": "Farmer role denied equipment creation (POST /api/equipment)",
+      "Status": "PASS",
+      "DurationMs": 1480,
+      "Details": "Farmer role forbidden from listing equipment",
+      "Error": ""
+    },
+    {
+      "Category": "RBAC Authorization",
+      "TestName": "Non-admin denied access to admin overview (GET /api/admin/overview)",
+      "Status": "PASS",
+      "DurationMs": 962,
+      "Details": "Access denied with status 403",
+      "Error": ""
+    },
+    {
+      "Category": "Object Access Control",
+      "TestName": "Prevent accessing non-existent / unauthorized booking details",
+      "Status": "PASS",
+      "DurationMs": 1912,
+      "Details": "IDOR prevention verified: status 404",
+      "Error": ""
+    },
+    {
+      "Category": "Data Protection",
+      "TestName": "Owner bank details account masking (no raw account exposure)",
+      "Status": "PASS",
+      "DurationMs": 2670,
+      "Details": "Bank account securely masked: Masked",
+      "Error": ""
+    },
+    {
+      "Category": "Security Headers",
+      "TestName": "Verify Helmet security headers (CSP, HSTS, X-Frame-Options, XSS)",
+      "Status": "PASS",
+      "DurationMs": 3,
+      "Details": "X-Frame-Options: DENY | HSTS enabled | X-Content-Type-Options: nosniff | CSP active | X-Powered-By hidden",
+      "Error": ""
+    },
+    {
+      "Category": "Injection Resistance",
+      "TestName": "SQL Injection payload handling in auth login",
+      "Status": "PASS",
+      "DurationMs": 2006,
+      "Details": "Injection safely rejected with HTTP 401 (no SQL/Prisma error leak)",
+      "Error": ""
+    },
+    {
+      "Category": "Injection Resistance",
+      "TestName": "Cross-Site Scripting (XSS) payload handling in search query",
+      "Status": "PASS",
+      "DurationMs": 3194,
+      "Details": "XSS payload safely sanitized/handled with status 200",
+      "Error": ""
+    },
+    {
+      "Category": "CORS Policy",
+      "TestName": "Verify unauthorized origin header handling",
+      "Status": "PASS",
+      "DurationMs": 9,
+      "Details": "CORS origin evaluation: Restricted / Not reflected",
+      "Error": ""
+    },
+    {
+      "Category": "Rate Limiting",
+      "TestName": "Authentication rate limiting behavior under burst requests",
+      "Status": "PASS",
+      "DurationMs": 18164,
+      "Details": "Rate limiting active (HTTP 429 received)",
+      "Error": ""
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "suite": "AgroRent AI Mobile Appium Automation Suite",
+  "timestamp": "2026-10-27T05:46:35.235Z",
+  "status": "BLOCKED",
+  "blockerCode": "MISSING_ANDROID_EMULATOR_AVD",
+  "environmentAudit": {
+    "androidSdk": "C:\\Users\\bhanu\\AppData\\Local\\Android\\Sdk",
+    "adbAvailable": true,
+    "connectedDevicesCount": 0,
+    "configuredAvdsCount": 0,
+    "appiumServerAvailable": false,
+    "apkFound": true,
+    "apkSizeMb": 69.1,
+    "flutterSdk": "Flutter 3.47.5 • Dart 3.13.4",
+    "flutterUnitTests": {
+      "testFilesCount": 30,
+      "assertionsCount": 538,
+      "status": "ALL_PASSED"
+    }
+  },
+  "capabilities": {
+    "platformName": "Android",
+    "appium:automationName": "UiAutomator2",
+    "appium:app": "D:\\AgriRent_AI\\AgroRent_OwnerPortal_Latest.apk",
+    "appium:appPackage": "com.agrorent.ai",
+    "appium:appActivity": ".MainActivity",
+    "appium:noReset": false,
+    "appium:newCommandTimeout": 60,
+    "appium:autoGrantPermissions": true
+  },
+  "plannedScenarios": [
+    {
+      "id": "TC-MOB-01",
+      "category": "Startup & Navigation",
+      "name": "Application Startup & Splash Transition",
+      "description": "Verify APK cold launch, splash rendering, Riverpod initialization, and route redirection to /login",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-02",
+      "category": "Authentication",
+      "name": "Farmer & Owner Login Verification",
+      "description": "Submit credentials for Farmer and Owner, verify JWT session storage, and check role-based dashboard landing",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-03",
+      "category": "Farmer Workflows",
+      "name": "Equipment Catalog & Filter Exploration",
+      "description": "Browse equipment listings, test category filters (TRACTOR, HARVESTER), apply search queries, and view equipment details",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-04",
+      "category": "Farmer Workflows",
+      "name": "Booking Creation & Date Selection",
+      "description": "Select rental duration, confirm pricing calculation, submit booking request, and verify state transition to PENDING",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-05",
+      "category": "Owner Workflows",
+      "name": "Owner Fleet Management & Availability",
+      "description": "Verify owner equipment listings, toggle equipment availability, and inspect maintenance schedules",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-06",
+      "category": "Owner Workflows",
+      "name": "Booking Request Approval & Dispatch",
+      "description": "Review incoming booking requests, trigger Accept workflow, and verify booking status update to CONFIRMED",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-07",
+      "category": "Shared Features",
+      "name": "Multi-Language Switching (5 Languages)",
+      "description": "Change language among English, Telugu, Hindi, Tamil, and Kannada; verify localized UI text across screens",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-08",
+      "category": "Shared Features",
+      "name": "In-App Direct Chat & Call Privacy",
+      "description": "Test booking chat modal, verify sender/recipient display names, and check number masking privacy on calls",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-09",
+      "category": "AI Agronomic Advisor",
+      "name": "AI Advisory Query & Offline Fallback",
+      "description": "Submit crop disease query to AI advisor, verify response parsing, and test graceful fallback when offline",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    },
+    {
+      "id": "TC-MOB-10",
+      "category": "Stability & Resilience",
+      "name": "Network Disconnection & Error Handling",
+      "description": "Simulate network interruption, verify non-blocking snackbar alerts, and confirm no fatal app crashes occur",
+      "status": "BLOCKED (MISSING_AVD)",
+      "reason": "Requires running emulator and Appium server"
+    }
+  ],
+  "remediation": [
+    "npm install -g appium && appium driver install uiautomator2",
+    "avdmanager create avd -n AgroRent_Pixel_API34 -k \"system-images;android-34;google_apis;x86_64\"",
+    "emulator -avd AgroRent_Pixel_API34",
+    "appium",
+    "node testing/mobile-appium/appium_suite.js"
+  ]
+}

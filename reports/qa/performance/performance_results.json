@@ -1,0 +1,65 @@
+{
+  "suite": "AgroRent AI Backend 100-VU Load & Concurrency Test",
+  "timestamp": "2026-10-27T05:44:03.487Z",
+  "target": "http://127.0.0.1:4000",
+  "concurrency": 100,
+  "durationSeconds": 36.296,
+  "totalRequests": 867,
+  "successRequests": 867,
+  "errorRequests": 0,
+  "throughputRps": 23.89,
+  "errorRatePct": 0,
+  "overallPercentiles": {
+    "min": "0.80",
+    "max": "8717.25",
+    "avg": "3781.63",
+    "p50": "5454.54",
+    "p90": "7598.55",
+    "p95": "7986.60",
+    "p99": "8412.77"
+  },
+  "endpointBreakdown": [
+    {
+      "endpoint": "/api/health",
+      "requests": 342,
+      "successes": 342,
+      "errors": 0,
+      "errorRatePct": 0,
+      "min": "0.80",
+      "max": "201.86",
+      "avg": "27.56",
+      "p50": "4.29",
+      "p90": "120.26",
+      "p95": "147.91",
+      "p99": "184.93"
+    },
+    {
+      "endpoint": "/api/ready",
+      "requests": 255,
+      "successes": 255,
+      "errors": 0,
+      "errorRatePct": 0,
+      "min": "1148.91",
+      "max": "8118.61",
+      "avg": "5844.11",
+      "p50": "6054.76",
+      "p90": "7531.49",
+      "p95": "7960.56",
+      "p99": "8010.71"
+    },
+    {
+      "endpoint": "/api/equipment/nearby?lat=13.0827&lng=80.2707",
+      "requests": 270,
+      "successes": 270,
+      "errors": 0,
+      "errorRatePct": 0,
+      "min": "2405.03",
+      "max": "8717.25",
+      "avg": "6588.88",
+      "p50": "6623.53",
+      "p90": "8151.23",
+      "p95": "8351.00",
+      "p99": "8594.36"
+    }
+  ]
+}
