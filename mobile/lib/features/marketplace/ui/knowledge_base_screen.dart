@@ -260,9 +260,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 }).toList();
 
                 final filteredTechniques = techniques.where((t) {
+                  if (t is! Map) return false;
                   final title = (t['title'] ?? '').toString().toLowerCase();
                   final crop = (t['relatedCrop'] ?? '').toString().toLowerCase();
-                  return _searchQuery.isEmpty || title.contains(_searchQuery) || crop.contains(_searchQuery);
+                  final desc = (t['description'] ?? '').toString().toLowerCase();
+                  return _searchQuery.isEmpty || title.contains(_searchQuery) || crop.contains(_searchQuery) || desc.contains(_searchQuery);
                 }).toList();
 
                 return TabBarView(
@@ -307,8 +309,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             itemCount: filteredTechniques.length,
                             itemBuilder: (ctx, idx) {
-                              final tech = filteredTechniques[idx] as Map<String, dynamic>;
-                              return _buildTechniqueCard(ctx, tech, lang, isDark);
+                              return _buildTechniqueCard(ctx, filteredTechniques[idx], lang, isDark);
                             },
                           ),
                   ],
@@ -361,21 +362,41 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
 
   Widget _buildEmptyState(String lang, bool isDark) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off_rounded, size: 56, color: Colors.grey.shade400),
-          const SizedBox(height: 12),
-          Text(
-            'no_articles_found'.tr(lang),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white70 : AppTheme.textDark,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off_rounded, size: 56, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'no_articles_found'.tr(lang),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white70 : AppTheme.textDark,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              onPressed: () {
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = '';
+                  _selectedCropFilter = 'ALL';
+                });
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('View All Articles', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brandPrimary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -490,14 +511,16 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
 
   Widget _buildTechniqueCard(
     BuildContext context,
-    Map<String, dynamic> tech,
+    dynamic rawTech,
     String lang,
     bool isDark,
   ) {
-    final title = tech['title'] ?? 'technique'.tr(lang);
-    final description = tech['description'] ?? '';
-    final relatedCrop = tech['relatedCrop'] ?? '';
-    final equipment = tech['equipmentSuggestion'] ?? '';
+    final tech = (rawTech is Map) ? rawTech : const {};
+    final title = (tech['title'] ?? 'technique'.tr(lang)).toString();
+    final description = (tech['description'] ?? '').toString();
+    final relatedCrop = (tech['relatedCrop'] ?? '').toString();
+    final equipment = (tech['equipmentSuggestion'] ?? '').toString();
+    final imageUrl = (tech['imageUrl'] ?? '').toString();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -509,7 +532,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => _openGuideDetails(context, title, [tech], isCrop: false, lang: lang, isDark: isDark),
+        onTap: () => _openGuideDetails(
+          context,
+          title,
+          [Map<String, dynamic>.from(tech)],
+          isCrop: false,
+          lang: lang,
+          isDark: isDark,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -545,6 +575,31 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 ],
               ),
               const SizedBox(height: 10),
+
+              // Image Thumbnail (if available) with fallback icon container
+              if (imageUrl.isNotEmpty) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imageUrl,
+                    height: 130,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) => Container(
+                      height: 80,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: brandPrimary.withValues(alpha: isDark ? 0.3 : 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.biotech_rounded, size: 36, color: brandAccent),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
 
               // Title: Full horizontal width available
               Text(

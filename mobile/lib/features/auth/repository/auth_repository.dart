@@ -150,6 +150,22 @@ class AuthRepository {
       final session = _supabaseAuth.currentSession;
       if (session != null) {
         await SecureStorage.saveAccessToken(session.accessToken);
+        try {
+          final syncRes = await _apiClient.dio.post(ApiConstants.googleAuth, data: {
+            'accessToken': session.accessToken,
+            'role': role,
+          });
+          if (syncRes.data != null && syncRes.data['success'] == true) {
+            final appToken = syncRes.data['token']?.toString();
+            if (appToken != null && appToken.isNotEmpty) {
+              await SecureStorage.saveAccessToken(appToken);
+            }
+            final userData = syncRes.data['user'];
+            await SecureStorage.saveUser(jsonEncode(userData));
+            return models.User.fromJson(userData);
+          }
+        } catch (_) {}
+
         final meRes = await _apiClient.dio.get(ApiConstants.me);
         final raw = meRes.data;
         final userData = raw is Map && raw['data'] != null ? raw['data'] : raw;

@@ -42,6 +42,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _loginWithGoogle() async {
+    ref.read(authProvider.notifier).setActiveRole(_selectedRole);
+    final success = await ref.read(authProvider.notifier).continueWithGoogle(
+      role: _selectedRole,
+    );
+
+    if (success && mounted) {
+      if (_selectedRole == 'EQUIPMENT_OWNER' || _selectedRole == 'OWNER') {
+        ref.read(ownerProvider.notifier).fetchDashboardData();
+      }
+      context.go('/');
+    }
+  }
+
 
   @override
   void dispose() {
@@ -278,6 +292,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           'Login',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                         ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Social Divider
+              Row(
+                children: [
+                  Expanded(child: Divider(color: isDark ? Colors.white12 : Colors.grey.shade300)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Text(
+                      'OR',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white38 : Colors.grey.shade500,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: isDark ? Colors.white12 : Colors.grey.shade300)),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Continue with Google Button
+              SizedBox(
+                height: 50,
+                child: OutlinedButton(
+                  onPressed: authState.isLoading ? null : _loginWithGoogle,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+                    side: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(shape: BoxShape.circle),
+                        child: const Icon(Icons.g_mobiledata_rounded, size: 28, color: Color(0xFF4285F4)),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Continue with Google',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

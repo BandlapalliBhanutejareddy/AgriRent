@@ -147,41 +147,71 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 // 1b. Continue with Google (Secure OAuth Identity Token Verification)
 router.post('/google', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { idToken, role } = req.body;
+    const { idToken, accessToken, role } = req.body;
 
-    if (!idToken) {
-      res.status(400).json({ success: false, error: 'Google ID token is required.' });
+    if (!idToken && !accessToken) {
+      res.status(400).json({ success: false, error: 'Google ID token or access token is required.' });
       return;
     }
 
     const targetRole = role === 'OWNER' ? 'OWNER' : 'FARMER'; // Default FARMER, never allow self-registering as ADMIN
 
-    // Verify token with official Google tokeninfo endpoint
     let googleData: any = null;
-    try {
-      const gResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
-      if (!gResponse.ok) {
-        const errDetails = await gResponse.text();
-        res.status(401).json({
-          success: false,
-          error: 'Invalid or expired Google identity token.',
-          details: errDetails
-        });
-        return;
+
+    // 1. Try ID Token verification if provided
+    if (idToken) {
+      try {
+        const gResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+        if (gResponse.ok) {
+          googleData = await gResponse.json();
+        }
+      } catch (netErr: any) {
+        console.warn('Google idToken verify netErr:', netErr?.message);
       }
-      googleData = await gResponse.json();
-    } catch (netErr: any) {
-      res.status(502).json({
-        success: false,
-        error: 'Failed to verify token with Google auth service. Please check internet connectivity.'
-      });
-      return;
+    }
+
+    // 2. Try Access Token verification if idToken wasn't valid or provided
+    if ((!googleData || !googleData.email) && accessToken) {
+      try {
+        // First try Google userinfo endpoint
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (userInfoRes.ok) {
+          const info = await userInfoRes.json();
+          googleData = {
+            email: info.email,
+            email_verified: info.email_verified,
+            name: info.name,
+            sub: info.sub,
+            picture: info.picture
+          };
+        }
+      } catch (uiErr: any) {
+        console.warn('Google userinfo netErr:', uiErr?.message);
+      }
+
+      // If still not verified, check if accessToken is a Supabase Auth session token
+      if (!googleData || !googleData.email) {
+        try {
+          const { data: sbUser, error: sbErr } = await supabase.auth.getUser(accessToken);
+          if (!sbErr && sbUser?.user?.email) {
+            googleData = {
+              email: sbUser.user.email,
+              email_verified: true,
+              name: sbUser.user.user_metadata?.full_name || sbUser.user.user_metadata?.name || sbUser.user.email.split('@')[0],
+              sub: sbUser.user.id,
+              picture: sbUser.user.user_metadata?.avatar_url || sbUser.user.user_metadata?.picture
+            };
+          }
+        } catch (_) {}
+      }
     }
 
     if (!googleData || !googleData.email || (googleData.email_verified !== 'true' && googleData.email_verified !== true)) {
       res.status(401).json({
         success: false,
-        error: 'Google account email is unverified or invalid.'
+        error: 'Invalid, expired, or unverified Google identity token.'
       });
       return;
     }
@@ -242,7 +272,10 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    // Generate session token
+    // Generate reliable fallback token that auth middleware accepts
+    const fallbackToken = generateFallbackToken(user);
+
+    // Also attempt Supabase token generation if possible
     let sessionToken: string | null = null;
     try {
       const { data: linkData } = await supabase.auth.admin.generateLink({
@@ -251,6 +284,8 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       });
       sessionToken = linkData?.properties?.hashed_token || null;
     } catch (_) {}
+
+    const issuedToken = fallbackToken; // Always use verified cryptographic fallback token for consistency
 
     res.json({
       success: true,
@@ -265,7 +300,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
         profileImage: user.profileImage,
         authId: user.authId
       },
-      token: sessionToken || user.id,
+      token: issuedToken,
       isNewUser
     });
 

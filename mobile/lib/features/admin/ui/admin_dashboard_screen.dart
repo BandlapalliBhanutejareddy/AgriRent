@@ -144,7 +144,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchUsers();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _fetchUsers();
+      }
+    });
   }
 
   @override
@@ -154,57 +158,66 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }
 
   Future<void> _fetchUsers() async {
+    if (!mounted) return;
     setState(() {
       _isUsersLoading = true;
       _usersError = null;
     });
     try {
-      final queryParams = <String, dynamic>{
-        'page': _userPage,
-        'limit': _userLimit,
-      };
-      if (_userSearch.trim().isNotEmpty) {
-        queryParams['search'] = _userSearch.trim();
-      }
-      if (_userRole != 'All') {
-        queryParams['role'] = _userRole;
-      }
-      if (_userStatus != 'All') {
-        queryParams['status'] = _userStatus;
-      }
-
-      final res = await ApiClient().dio.get('/admin/users', queryParameters: queryParams);
-      final dynamic d = res.data;
       List<dynamic> list = [];
       int total = 0;
 
-      if (d is Map) {
-        if (d['data'] is List) {
-          list = d['data'] as List<dynamic>;
-          total = (d['total'] as num?)?.toInt() ?? list.length;
-        } else if (d['users'] is List) {
-          list = d['users'] as List<dynamic>;
-          total = (d['total'] as num?)?.toInt() ?? list.length;
-        } else if (d['data'] is Map) {
-          final inner = d['data'] as Map;
-          if (inner['data'] is List) {
-            list = inner['data'] as List<dynamic>;
-          } else if (inner['users'] is List) {
-            list = inner['users'] as List<dynamic>;
-          }
-          total = (inner['total'] as num?)?.toInt() ?? list.length;
-        }
-      } else if (d is List) {
-        list = d;
+      if (_userSearch.trim().isEmpty && _userRole == 'All' && _userStatus == 'All' && _userPage == 1) {
+        list = await ref.read(adminUsersProvider.future);
         total = list.length;
+      } else {
+        final queryParams = <String, dynamic>{
+          'page': _userPage,
+          'limit': _userLimit,
+        };
+        if (_userSearch.trim().isNotEmpty) {
+          queryParams['search'] = _userSearch.trim();
+        }
+        if (_userRole != 'All') {
+          queryParams['role'] = _userRole;
+        }
+        if (_userStatus != 'All') {
+          queryParams['status'] = _userStatus;
+        }
+
+        final res = await ApiClient().dio.get('/admin/users', queryParameters: queryParams);
+        final dynamic d = res.data;
+
+        if (d is Map) {
+          if (d['data'] is List) {
+            list = d['data'] as List<dynamic>;
+            total = (d['total'] as num?)?.toInt() ?? list.length;
+          } else if (d['users'] is List) {
+            list = d['users'] as List<dynamic>;
+            total = (d['total'] as num?)?.toInt() ?? list.length;
+          } else if (d['data'] is Map) {
+            final inner = d['data'] as Map;
+            if (inner['data'] is List) {
+              list = inner['data'] as List<dynamic>;
+            } else if (inner['users'] is List) {
+              list = inner['users'] as List<dynamic>;
+            }
+            total = (inner['total'] as num?)?.toInt() ?? list.length;
+          }
+        } else if (d is List) {
+          list = d;
+          total = list.length;
+        }
       }
 
+      if (!mounted) return;
       setState(() {
         _usersList = list;
         _userTotal = total;
         _isUsersLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _usersError = e.toString().replaceFirst('Exception: ', '');
         _isUsersLoading = false;
@@ -2009,242 +2022,256 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   // TAB 1: USERS DIRECTORY & ACCOUNT MANAGEMENT
   // ---------------------------------------------------------------------------
   Widget _buildUsersTab(bool isDark, String lang) {
-    final totalPages = (_userTotal / _userLimit).ceil();
+    final totalPages = _userTotal > 0 ? (_userTotal / _userLimit).ceil() : 1;
 
-    return RefreshIndicator(
-      color: const Color(0xFF2563EB),
-      onRefresh: () async => _fetchUsers(),
-      child: Column(
-        children: [
-          // 1. Search Bar & Filter Header
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            color: isDark ? AppTheme.darkCard : Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _userSearchCtrl,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name, email, or phone...',
-                    hintStyle: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? Colors.white38 : Colors.grey.shade500,
-                    ),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF2563EB)),
-                    suffixIcon: _userSearch.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18),
-                            onPressed: () {
-                              _userSearchCtrl.clear();
-                              setState(() {
-                                _userSearch = '';
-                                _userPage = 1;
-                              });
-                              _fetchUsers();
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onSubmitted: (val) {
-                    setState(() {
-                      _userSearch = val.trim();
-                      _userPage = 1;
-                    });
-                    _fetchUsers();
-                  },
+    return Column(
+      children: [
+        // 1. Search Bar & Filter Header
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _userSearchCtrl,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
                 ),
-                const SizedBox(height: 10),
-
-                // Role Filter Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Role: ',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.grey),
-                      ),
-                      ...['All', 'FARMER', 'OWNER', 'ADMIN'].map((role) {
-                        final isSel = _userRole == role;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            label: Text(
-                              role == 'All' ? 'All Roles' : (role == 'FARMER' ? 'Farmers' : (role == 'OWNER' ? 'Owners' : 'Admins')),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                color: isSel ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
-                              ),
-                            ),
-                            selected: isSel,
-                            selectedColor: const Color(0xFF2563EB),
-                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            side: BorderSide.none,
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                            onSelected: (_) {
-                              setState(() {
-                                _userRole = role;
-                                _userPage = 1;
-                              });
-                              _fetchUsers();
-                            },
-                          ),
-                        );
-                      }),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Status: ',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.grey),
-                      ),
-                      ...['All', 'Active', 'Suspended'].map((status) {
-                        final isSel = _userStatus == status;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            label: Text(
-                              status == 'All' ? 'All Status' : status,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                color: isSel ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
-                              ),
-                            ),
-                            selected: isSel,
-                            selectedColor: status == 'Suspended' ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
-                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            side: BorderSide.none,
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                            onSelected: (_) {
-                              setState(() {
-                                _userStatus = status;
-                                _userPage = 1;
-                              });
-                              _fetchUsers();
-                            },
-                          ),
-                        );
-                      }),
-                    ],
+                decoration: InputDecoration(
+                  hintText: 'Search by name, email, or phone...',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white38 : Colors.grey.shade500,
+                  ),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF2563EB)),
+                  suffixIcon: _userSearch.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _userSearchCtrl.clear();
+                            setState(() {
+                              _userSearch = '';
+                              _userPage = 1;
+                            });
+                            _fetchUsers();
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
                   ),
                 ),
-                const SizedBox(height: 6),
+                onSubmitted: (val) {
+                  setState(() {
+                    _userSearch = val.trim();
+                    _userPage = 1;
+                  });
+                  _fetchUsers();
+                },
+              ),
+              const SizedBox(height: 10),
 
-                // Record Counter
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Role Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    Text(
-                      'Showing ${_usersList.length} accounts${_userTotal > 0 ? ' of $_userTotal total' : ''}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white54 : Colors.grey.shade600,
-                      ),
+                    const Text(
+                      'Role: ',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.grey),
                     ),
-                    if (_isUsersLoading)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
-                      ),
+                    ...['All', 'FARMER', 'OWNER', 'ADMIN'].map((role) {
+                      final isSel = _userRole == role;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text(
+                            role == 'All' ? 'All Roles' : (role == 'FARMER' ? 'Farmers' : (role == 'OWNER' ? 'Owners' : 'Admins')),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                              color: isSel ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                            ),
+                          ),
+                          selected: isSel,
+                          selectedColor: const Color(0xFF2563EB),
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          side: BorderSide.none,
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                          onSelected: (_) {
+                            setState(() {
+                              _userRole = role;
+                              _userPage = 1;
+                            });
+                            _fetchUsers();
+                          },
+                        ),
+                      );
+                    }),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Status: ',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.grey),
+                    ),
+                    ...['All', 'Active', 'Suspended'].map((status) {
+                      final isSel = _userStatus == status;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text(
+                            status == 'All' ? 'All Status' : status,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                              color: isSel ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                            ),
+                          ),
+                          selected: isSel,
+                          selectedColor: status == 'Suspended' ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          side: BorderSide.none,
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                          onSelected: (_) {
+                            setState(() {
+                              _userStatus = status;
+                              _userPage = 1;
+                            });
+                            _fetchUsers();
+                          },
+                        ),
+                      );
+                    }),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
+              ),
+              const SizedBox(height: 6),
 
-          // 2. Main List View or States
-          Expanded(
+              // Record Counter
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Showing ${_usersList.length} accounts${_userTotal > 0 ? ' of $_userTotal total' : ''}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white54 : Colors.grey.shade600,
+                    ),
+                  ),
+                  if (_isUsersLoading)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+
+        // 2. Main List View or States with Safe RefreshIndicator
+        Expanded(
+          child: RefreshIndicator(
+            color: const Color(0xFF2563EB),
+            onRefresh: () async => _fetchUsers(),
             child: _isUsersLoading && _usersList.isEmpty
                 ? const Center(
                     child: CircularProgressIndicator(color: Color(0xFF2563EB)),
                   )
                 : _usersError != null
-                    ? _buildErrorState(_usersError!, isDark, lang, () => _fetchUsers())
+                    ? SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Container(
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 20),
+                          child: _buildErrorState(_usersError!, isDark, lang, () => _fetchUsers()),
+                        ),
+                      )
                     : _usersList.isEmpty
-                        ? _buildUsersEmptyState(isDark, lang)
+                        ? SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: Container(
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: _buildUsersEmptyState(isDark, lang),
+                            ),
+                          )
                         : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.all(14),
                             itemCount: _usersList.length,
                             itemBuilder: (context, index) {
-                              final u = _usersList[index] as Map<String, dynamic>;
-                              return _buildUserCard(u, isDark, lang);
+                              return _buildUserCard(_usersList[index], isDark, lang);
                             },
                           ),
           ),
+        ),
 
-          // 3. Pagination Controls
-          if (totalPages > 1)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkCard : Colors.white,
-                border: Border(
-                  top: BorderSide(
-                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
-                  ),
+        // 3. Pagination Controls
+        if (totalPages > 1)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              border: Border(
+                top: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _userPage > 1
-                        ? () {
-                            setState(() => _userPage--);
-                            _fetchUsers();
-                          }
-                        : null,
-                    icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                    label: const Text('Previous', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  Text(
-                    'Page $_userPage of $totalPages',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white70 : const Color(0xFF334155),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _userPage < totalPages
-                        ? () {
-                            setState(() => _userPage++);
-                            _fetchUsers();
-                          }
-                        : null,
-                    icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                    label: const Text('Next', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ],
-              ),
             ),
-        ],
-      ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _userPage > 1
+                      ? () {
+                          setState(() => _userPage--);
+                          _fetchUsers();
+                        }
+                      : null,
+                  icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                  label: const Text('Previous', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                Text(
+                  'Page $_userPage of $totalPages',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _userPage < totalPages
+                      ? () {
+                          setState(() => _userPage++);
+                          _fetchUsers();
+                        }
+                      : null,
+                  icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                  label: const Text('Next', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -2314,7 +2341,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildUserCard(Map<String, dynamic> u, bool isDark, String lang) {
+  Widget _buildUserCard(dynamic rawU, bool isDark, String lang) {
+    final u = (rawU is Map) ? rawU : const <String, dynamic>{};
     final id = u['id']?.toString() ?? '';
     final name = u['name']?.toString() ?? 'User';
     final email = u['email']?.toString() ?? '';
@@ -2322,7 +2350,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     final role = u['role']?.toString() ?? 'USER';
     final isSuspended = u['isSuspended'] == true;
     final isVerified = u['isVerified'] == true;
-    final counts = u['_count'] as Map<String, dynamic>? ?? {};
+    final counts = (u['_count'] is Map) ? (u['_count'] as Map) : const {};
     final bookingsCount = counts['bookings'] ?? 0;
     final equipmentsCount = counts['equipments'] ?? 0;
 
