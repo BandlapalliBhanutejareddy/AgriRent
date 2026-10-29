@@ -1871,7 +1871,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     final isOnline = status == 'ONLINE';
 
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
+                      margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: isDark ? AppTheme.darkCard : Colors.white,
@@ -1880,55 +1880,72 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                           color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
                         ),
                       ),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              isOnline ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                              color: isOnline ? Colors.green : Colors.red,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  serviceName,
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isOnline ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                  color: isOnline ? Colors.green : Colors.red,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      serviceName,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Latency / Status: $latency',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: isDark ? Colors.white54 : AppTheme.textMutedGray,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  status,
                                   style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: isOnline ? Colors.green : Colors.red,
                                   ),
                                 ),
-                                Text(
-                                  'Latency / Status: $latency',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: isDark ? Colors.white54 : AppTheme.textMutedGray,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              status,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: isOnline ? Colors.green : Colors.red,
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _testHealthService(serviceName),
+                              icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                              label: Text('Run Diagnostic for $serviceName', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                             ),
                           ),
@@ -2016,6 +2033,71 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _testHealthService(String serviceName) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+            const SizedBox(width: 12),
+            Text('Running diagnostic ping for $serviceName...'),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      String endpoint = '/admin/system-health/test-api';
+      if (serviceName.toLowerCase().contains('database')) {
+        endpoint = '/admin/system-health/test-db';
+      } else if (serviceName.toLowerCase().contains('ai')) {
+        endpoint = '/admin/system-health/test-ai';
+      }
+
+      final res = await ApiClient().dio.post(endpoint);
+      final dynamic d = res.data;
+      final msg = (d is Map && d['message'] != null) ? d['message'].toString() : '$serviceName responded successfully.';
+
+      if (mounted) {
+        messenger.hideCurrentSnackBar();
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.green),
+                const SizedBox(width: 8),
+                Flexible(child: Text('$serviceName Diagnostic')),
+              ],
+            ),
+            content: Text(msg),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ref.invalidate(adminHealthProvider);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFDC2626),
+            content: Text('Test failed: ${e.toString().replaceFirst('Exception: ', '')}'),
+          ),
+        );
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------

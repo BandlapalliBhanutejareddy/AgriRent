@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../../../core/api/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -139,43 +140,82 @@ class AuthRepository {
         throw Exception(res.data?['error'] ?? 'Google authentication failed');
       }
 
+      // 1. If an existing authenticated session is already valid, sync directly
+      final existingSession = _supabaseAuth.currentSession;
+      if (existingSession != null && !existingSession.isExpired) {
+        return await _syncGoogleSession(existingSession, role);
+      }
+
+      // 2. Set up listener to await OAuth deep link return without blocking or failing early
+      final completer = Completer<models.User>();
+      StreamSubscription<supabase.AuthState>? authSubscription;
+      Timer? timeoutTimer;
+
+      authSubscription = _supabaseAuth.onAuthStateChange.listen((data) async {
+        final session = data.session;
+        if (data.event == supabase.AuthChangeEvent.signedIn && session != null) {
+          try {
+            final user = await _syncGoogleSession(session, role);
+            if (!completer.isCompleted) {
+              completer.complete(user);
+            }
+          } catch (e) {
+            if (!completer.isCompleted) {
+              completer.completeError(e);
+            }
+          }
+        }
+      });
+
       final isOAuthTriggered = await _supabaseAuth.signInWithOAuth(
         supabase.OAuthProvider.google,
         redirectTo: 'io.supabase.agrorentai://login-callback',
       );
       if (!isOAuthTriggered) {
+        await authSubscription.cancel();
         throw Exception('Could not launch Google authentication window.');
       }
 
-      final session = _supabaseAuth.currentSession;
-      if (session != null) {
-        await SecureStorage.saveAccessToken(session.accessToken);
-        try {
-          final syncRes = await _apiClient.dio.post(ApiConstants.googleAuth, data: {
-            'accessToken': session.accessToken,
-            'role': role,
-          });
-          if (syncRes.data != null && syncRes.data['success'] == true) {
-            final appToken = syncRes.data['token']?.toString();
-            if (appToken != null && appToken.isNotEmpty) {
-              await SecureStorage.saveAccessToken(appToken);
-            }
-            final userData = syncRes.data['user'];
-            await SecureStorage.saveUser(jsonEncode(userData));
-            return models.User.fromJson(userData);
-          }
-        } catch (_) {}
+      timeoutTimer = Timer(const Duration(seconds: 90), () {
+        if (!completer.isCompleted) {
+          completer.completeError(Exception('Google sign-in timed out. Please try again.'));
+        }
+      });
 
-        final meRes = await _apiClient.dio.get(ApiConstants.me);
-        final raw = meRes.data;
-        final userData = raw is Map && raw['data'] != null ? raw['data'] : raw;
-        await SecureStorage.saveUser(jsonEncode(userData));
-        return models.User.fromJson(userData);
+      try {
+        return await completer.future;
+      } finally {
+        timeoutTimer.cancel();
+        await authSubscription.cancel();
       }
-      throw Exception('Google sign-in waiting for browser confirmation.');
     } catch (e) {
       throw Exception(ApiErrorHandler.getMessage(e));
     }
+  }
+
+  Future<models.User> _syncGoogleSession(supabase.Session session, String role) async {
+    await SecureStorage.saveAccessToken(session.accessToken);
+    try {
+      final syncRes = await _apiClient.dio.post(ApiConstants.googleAuth, data: {
+        'accessToken': session.accessToken,
+        'role': role,
+      });
+      if (syncRes.data != null && syncRes.data['success'] == true) {
+        final appToken = syncRes.data['token']?.toString();
+        if (appToken != null && appToken.isNotEmpty) {
+          await SecureStorage.saveAccessToken(appToken);
+        }
+        final userData = syncRes.data['user'];
+        await SecureStorage.saveUser(jsonEncode(userData));
+        return models.User.fromJson(userData);
+      }
+    } catch (_) {}
+
+    final meRes = await _apiClient.dio.get(ApiConstants.me);
+    final raw = meRes.data;
+    final userData = raw is Map && raw['data'] != null ? raw['data'] : raw;
+    await SecureStorage.saveUser(jsonEncode(userData));
+    return models.User.fromJson(userData);
   }
 
   Future<models.User> verifyOtp(String email, String otp, String purpose) async {

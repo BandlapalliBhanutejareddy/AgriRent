@@ -527,6 +527,91 @@ router.get('/system-health', async (req: AuthRequest, res: Response): Promise<vo
   }
 });
 
+// 12b. System Health Interactive Diagnostic Endpoints
+router.post('/system-health/test-db', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const start = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    const latencyMs = Date.now() - start;
+    res.json({
+      success: true,
+      service: 'Database',
+      status: 'ONLINE',
+      latencyMs,
+      timestamp: new Date().toISOString(),
+      message: `Database ping successful (${latencyMs}ms). PostgreSQL connection is healthy.`
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      service: 'Database',
+      status: 'OFFLINE',
+      error: err.message || 'Database query failed.',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+router.post('/system-health/test-ai', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const start = Date.now();
+    const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const aiRes = await fetch(`${ollamaUrl}/api/tags`, { signal: controller.signal });
+    clearTimeout(timeout);
+    const latencyMs = Date.now() - start;
+    if (aiRes.ok) {
+      const data: any = await aiRes.json();
+      const models = Array.isArray(data.models) ? data.models.map((m: any) => m.name) : [];
+      res.json({
+        success: true,
+        service: 'Ollama AI',
+        status: 'ONLINE',
+        latencyMs,
+        models,
+        message: `Ollama AI connected (${latencyMs}ms). Active models: ${models.join(', ') || 'None loaded'}.`
+      });
+    } else {
+      res.json({
+        success: false,
+        service: 'Ollama AI',
+        status: 'DEGRADED',
+        latencyMs,
+        error: `Ollama returned HTTP ${aiRes.status}`,
+        message: 'Ollama is responding but returned a non-OK status.'
+      });
+    }
+  } catch (err: any) {
+    res.json({
+      success: false,
+      service: 'Ollama AI',
+      status: 'OFFLINE',
+      error: 'Ollama host not reachable on local or remote endpoint.',
+      message: 'AI advisor service is currently offline. AgroRent falls back to agronomic knowledge base.'
+    });
+  }
+});
+
+router.post('/system-health/test-api', async (req: AuthRequest, res: Response): Promise<void> => {
+  const memory = process.memoryUsage();
+  res.json({
+    success: true,
+    service: 'Backend API',
+    status: 'ONLINE',
+    uptimeSeconds: Math.floor(process.uptime()),
+    nodeVersion: process.version,
+    memoryUsageMb: {
+      rss: (memory.rss / (1024 * 1024)).toFixed(1),
+      heapUsed: (memory.heapUsed / (1024 * 1024)).toFixed(1),
+      heapTotal: (memory.heapTotal / (1024 * 1024)).toFixed(1)
+    },
+    environment: process.env.NODE_ENV || 'production',
+    timestamp: new Date().toISOString(),
+    message: 'Backend API is fully operational and responsive.'
+  });
+});
+
 // 13. Equipment Trend Analytics (7d, 30d, 90d, all)
 router.get('/equipment-analytics', async (req: AuthRequest, res: Response): Promise<void> => {
   try {

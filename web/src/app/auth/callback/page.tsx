@@ -21,25 +21,28 @@ export default function AuthCallbackPage() {
         const roleParam = searchParams.get('role') || 'FARMER';
         const targetRole = roleParam === 'OWNER' ? 'OWNER' : 'FARMER';
 
-        // 1. Get current Supabase session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // 1. Get current Supabase session (with resilient exchange listener)
+        let currentSession = (await supabase.auth.getSession()).data.session;
 
-        if (sessionError) {
-          throw sessionError;
-        }
-
-        if (!session?.access_token) {
-          // If no session yet, wait briefly for token exchange
-          await new Promise((r) => setTimeout(r, 600));
-          const retry = await supabase.auth.getSession();
-          if (!retry.data.session?.access_token) {
-            throw new Error('No authentication session found. Please try signing in again.');
-          }
-        }
-
-        const currentSession = (await supabase.auth.getSession()).data.session;
         if (!currentSession?.access_token) {
-          throw new Error('Authentication session token is missing.');
+          // Wait for token hash exchange via onAuthStateChange or short polling
+          currentSession = await new Promise((resolve) => {
+            const { data: authListener } = supabase.auth.onAuthStateChange((_event, sess) => {
+              if (sess?.access_token) {
+                authListener.subscription.unsubscribe();
+                resolve(sess);
+              }
+            });
+            setTimeout(async () => {
+              authListener.subscription.unsubscribe();
+              const finalCheck = await supabase.auth.getSession();
+              resolve(finalCheck.data.session || null);
+            }, 3000);
+          });
+        }
+
+        if (!currentSession?.access_token) {
+          throw new Error('Authentication session was not completed. Please try signing in again.');
         }
 
         // 2. Synchronize with backend API
@@ -113,3 +116,4 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
+

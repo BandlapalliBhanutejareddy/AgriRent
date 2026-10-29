@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../repository/weather_repository.dart';
 import '../models/weather_model.dart';
+import '../../farm/providers/farm_provider.dart';
 
 class WeatherState {
   final bool isLoading;
@@ -22,8 +23,9 @@ class WeatherState {
 class WeatherNotifier extends StateNotifier<WeatherState> {
   final WeatherRepository _repository;
   final String farmId;
+  final String? location;
 
-  WeatherNotifier(this._repository, this.farmId) : super(WeatherState()) {
+  WeatherNotifier(this._repository, this.farmId, {this.location}) : super(WeatherState()) {
     fetchWeather();
   }
 
@@ -34,7 +36,7 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      final data = await _repository.getFarmWeather(farmId);
+      final data = await _repository.getFarmWeather(farmId, location: location);
       state = state.copyWith(isLoading: false, weatherData: data);
     } catch (e) {
       final errStr = e.toString().replaceFirst('Exception: ', '');
@@ -161,5 +163,7 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
 
 final weatherProvider = StateNotifierProvider.family<WeatherNotifier, WeatherState, String>((ref, farmId) {
   final repo = WeatherRepository();
-  return WeatherNotifier(repo, farmId);
+  final farms = ref.watch(farmProvider).farms;
+  final farm = farms.where((f) => f.id == farmId).firstOrNull;
+  return WeatherNotifier(repo, farmId, location: farm?.location);
 });

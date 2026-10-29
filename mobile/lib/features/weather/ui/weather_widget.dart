@@ -452,7 +452,7 @@ class WeatherWidget extends ConsumerWidget {
             const SizedBox(height: 8),
             TextButton.icon(
               onPressed: () {
-                ref.read(weatherProvider(farmId).notifier).fetchWeather(requestGpsIfUnavailable: true);
+                ref.read(weatherProvider(farmId).notifier).fetchWeatherWithGps();
               },
               icon: const Icon(Icons.refresh_rounded, size: 16),
               label: Text('try_again'.tr(lang), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),

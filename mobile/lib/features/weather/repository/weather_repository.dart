@@ -3,8 +3,25 @@ import '../models/weather_model.dart';
 import '../../../core/api/api_client.dart';
 
 class WeatherRepository {
-  Future<WeatherData> getFarmWeather(String farmId) async {
+  Future<WeatherData> getFarmWeather(String farmId, {String? location}) async {
     try {
+      // 1. If location is provided and contains coordinate patterns (e.g. "13.0266°, 80.0156°" or "13.0266, 80.0156")
+      if (location != null && location.trim().isNotEmpty) {
+        final sanitized = location
+            .replaceAll(RegExp(r'Coordinates:\s*', caseSensitive: false), '')
+            .replaceAll('°', '')
+            .replaceAll(RegExp(r'[NSEWnsew]'), '')
+            .trim();
+        final coordMatch = RegExp(r'([-+]?[0-9]+\.?[0-9]*)\s*,\s*([-+]?[0-9]+\.?[0-9]*)').firstMatch(sanitized);
+        if (coordMatch != null) {
+          final lat = double.tryParse(coordMatch.group(1) ?? '');
+          final lng = double.tryParse(coordMatch.group(2) ?? '');
+          if (lat != null && lng != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            return await getWeatherByCoordinates(lat, lng, locationName: location);
+          }
+        }
+      }
+
       final path = (farmId.isEmpty || farmId == 'default' || farmId == 'current-lookup')
           ? '/farms/weather/lookup'
           : '/farms/$farmId/weather';
