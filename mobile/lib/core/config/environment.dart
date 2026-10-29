@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
+
 class Environment {
   // Using const top-level fields ensures --dart-define evaluates correctly at compile-time globally.
-  static const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'development');
+  static const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'production');
 
   static const String _defaultDevHost = String.fromEnvironment('DEV_HOST', defaultValue: '127.0.0.1');
   static const String _defaultFallbackDevHost = String.fromEnvironment('FALLBACK_DEV_HOST', defaultValue: '10.0.2.2');
@@ -43,11 +45,10 @@ class Environment {
       url = _injectedBaseUrl;
     } else if (_injectedBaseUrlLegacy.isNotEmpty) {
       url = _injectedBaseUrlLegacy;
+    } else if (kReleaseMode || flavor == 'production') {
+      url = _prodBaseUrl;
     } else {
       switch (flavor) {
-        case 'production':
-          url = _prodBaseUrl;
-          break;
         case 'staging':
           url = _stagingBaseUrl;
           break;
@@ -65,9 +66,9 @@ class Environment {
 
   static String get socketUrl {
     if (_injectedSocketUrl.isNotEmpty) return _injectedSocketUrl;
+    if (kReleaseMode || flavor == 'production') return _prodSocketUrl;
 
     switch (flavor) {
-      case 'production': return _prodSocketUrl;
       case 'staging': return _stagingSocketUrl;
       case 'development':
       default: return _devSocketUrl;
