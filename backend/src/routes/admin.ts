@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { requireAuth, requireRole, AuthRequest } from '../middlewares/authMiddleware';
 import { prisma } from '../lib/prisma';
+import { emitToUser } from '../lib/socket';
 
 const router = Router();
 
@@ -925,13 +926,90 @@ router.get('/data-quality', async (req: AuthRequest, res: Response): Promise<voi
   }
 });
 
-// 17. Send Admin Alert / Notification to Affected User
+// 17. Send Admin Alert / Notification or Broadcast
 router.post('/alerts/send', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { userId, title, message, relatedId, type = 'ADMIN_ALERT' } = req.body;
+    const { userId, targetRole, title, message, relatedId, type = 'ADMIN_ALERT' } = req.body;
 
-    if (!userId || !title || !message) {
-      res.status(400).json({ success: false, error: 'User ID, title, and message are required.' });
+    if (!title || !String(title).trim() || !message || !String(message).trim()) {
+      res.status(400).json({ success: false, error: 'Headline title and message body are required.' });
+      return;
+    }
+
+    const cleanTitle = String(title).trim();
+    const cleanMsg = String(message).trim();
+
+    // Broadcast Mode
+    if (targetRole || userId === 'ALL' || (!userId && targetRole)) {
+      const roleFilter = (targetRole || 'ALL').toUpperCase().trim();
+      let whereClause: any = { isSuspended: false };
+
+      if (roleFilter === 'FARMER') {
+        whereClause.role = { in: ['FARMER', 'BOTH'] };
+      } else if (roleFilter === 'OWNER') {
+        whereClause.role = { in: ['OWNER', 'BOTH'] };
+      } else if (roleFilter === 'ADMIN') {
+        whereClause.role = 'ADMIN';
+      }
+
+      const matchingUsers = await prisma.user.findMany({
+        where: whereClause,
+        select: { id: true, name: true, email: true }
+      });
+
+      if (matchingUsers.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: `No active users found for audience filter "${roleFilter}".`
+        });
+        return;
+      }
+
+      await prisma.notification.createMany({
+        data: matchingUsers.map(u => ({
+          userId: u.id,
+          title: cleanTitle,
+          message: cleanMsg,
+          relatedId: relatedId ? String(relatedId) : null,
+          type: String(type)
+        }))
+      });
+
+      // Realtime in-app socket push to active connections
+      for (const u of matchingUsers) {
+        emitToUser(u.id, 'notification', {
+          title: cleanTitle,
+          message: cleanMsg,
+          type: String(type),
+          createdAt: new Date()
+        });
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: req.prismaUser.id,
+          actorRole: 'ADMIN',
+          action: 'DISPATCH_BROADCAST_ALERT',
+          resource: 'Notification',
+          metadata: JSON.stringify({
+            audience: roleFilter,
+            recipientCount: matchingUsers.length,
+            title: cleanTitle
+          })
+        }
+      });
+
+      res.json({
+        success: true,
+        message: `Broadcast alert dispatched to ${matchingUsers.length} ${roleFilter === 'ALL' ? 'users' : roleFilter.toLowerCase() + 's'} successfully.`,
+        deliveredCount: matchingUsers.length
+      });
+      return;
+    }
+
+    // Single User Mode
+    if (!userId) {
+      res.status(400).json({ success: false, error: 'User ID or target audience role is required.' });
       return;
     }
 
@@ -948,12 +1026,14 @@ router.post('/alerts/send', async (req: AuthRequest, res: Response): Promise<voi
     const newNotif = await prisma.notification.create({
       data: {
         userId: targetUser.id,
-        title: String(title).trim(),
-        message: String(message).trim(),
+        title: cleanTitle,
+        message: cleanMsg,
         relatedId: relatedId ? String(relatedId) : null,
         type: String(type)
       }
     });
+
+    emitToUser(targetUser.id, 'notification', newNotif);
 
     await prisma.auditLog.create({
       data: {
@@ -965,7 +1045,7 @@ router.post('/alerts/send', async (req: AuthRequest, res: Response): Promise<voi
         metadata: JSON.stringify({
           recipientId: targetUser.id,
           recipientEmail: targetUser.email,
-          title
+          title: cleanTitle
         })
       }
     });
@@ -979,6 +1059,81 @@ router.post('/alerts/send', async (req: AuthRequest, res: Response): Promise<voi
     console.error('Send Admin Alert Error:', error);
     res.status(500).json({ success: false, error: 'Failed to dispatch administrative alert.' });
   }
+});
+
+// Alias for broadcast
+router.post('/alerts/broadcast', async (req: AuthRequest, res: Response): Promise<void> => {
+  req.body.targetRole = req.body.targetRole || req.body.target || 'ALL';
+  // Forward to /alerts/send handler logic
+  const { targetRole, title, message, relatedId, type = 'BROADCAST_ALERT' } = req.body;
+  if (!title || !String(title).trim() || !message || !String(message).trim()) {
+    res.status(400).json({ success: false, error: 'Headline title and message body are required.' });
+    return;
+  }
+  const cleanTitle = String(title).trim();
+  const cleanMsg = String(message).trim();
+  const roleFilter = (targetRole || 'ALL').toUpperCase().trim();
+  let whereClause: any = { isSuspended: false };
+
+  if (roleFilter === 'FARMER') {
+    whereClause.role = { in: ['FARMER', 'BOTH'] };
+  } else if (roleFilter === 'OWNER') {
+    whereClause.role = { in: ['OWNER', 'BOTH'] };
+  } else if (roleFilter === 'ADMIN') {
+    whereClause.role = 'ADMIN';
+  }
+
+  const matchingUsers = await prisma.user.findMany({
+    where: whereClause,
+    select: { id: true, name: true, email: true }
+  });
+
+  if (matchingUsers.length === 0) {
+    res.status(400).json({
+      success: false,
+      error: `No active users found for audience filter "${roleFilter}".`
+    });
+    return;
+  }
+
+  await prisma.notification.createMany({
+    data: matchingUsers.map(u => ({
+      userId: u.id,
+      title: cleanTitle,
+      message: cleanMsg,
+      relatedId: relatedId ? String(relatedId) : null,
+      type: String(type)
+    }))
+  });
+
+  for (const u of matchingUsers) {
+    emitToUser(u.id, 'notification', {
+      title: cleanTitle,
+      message: cleanMsg,
+      type: String(type),
+      createdAt: new Date()
+    });
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: req.prismaUser.id,
+      actorRole: 'ADMIN',
+      action: 'DISPATCH_BROADCAST_ALERT',
+      resource: 'Notification',
+      metadata: JSON.stringify({
+        audience: roleFilter,
+        recipientCount: matchingUsers.length,
+        title: cleanTitle
+      })
+    }
+  });
+
+  res.json({
+    success: true,
+    message: `Broadcast alert dispatched to ${matchingUsers.length} ${roleFilter === 'ALL' ? 'users' : roleFilter.toLowerCase() + 's'} successfully.`,
+    deliveredCount: matchingUsers.length
+  });
 });
 
 export default router;

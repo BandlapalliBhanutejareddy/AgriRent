@@ -1123,12 +1123,15 @@ class _GuideDetailSheetState extends State<_GuideDetailSheet> {
           if (relatedCrop.isNotEmpty) ...[
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.grass_rounded, size: 16, color: brandAccent),
                 const SizedBox(width: 6),
-                Text(
-                  'Best applied to: $relatedCrop',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: brandAccent),
+                Expanded(
+                  child: Text(
+                    'Best applied to: $relatedCrop',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: brandAccent),
+                  ),
                 ),
               ],
             ),

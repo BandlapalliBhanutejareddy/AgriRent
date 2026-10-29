@@ -717,38 +717,37 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
                 bgColor: const Color(0xFFFFF8E1),
                 isDark: isDark,
                 onTap: () {
-                  if (farm != null && farm.id.isNotEmpty) {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (ctx) => Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppTheme.darkCard : Colors.white,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                        ),
-                        child: SafeArea(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Weather Advisory',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
-                                ),
+                  final targetFarmId = (farm != null && farm.id.isNotEmpty) ? farm.id : 'current-lookup';
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (ctx) => Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.darkCard : Colors.white,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      child: SafeArea(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Weather Advisory',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppTheme.textDarkNavy,
                               ),
-                              const SizedBox(height: 12),
-                              WeatherWidget(farmId: farm.id),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 12),
+                            WeatherWidget(farmId: targetFarmId),
+                          ],
                         ),
                       ),
-                    );
-                  }
+                    ),
+                  );
                 },
               ),
             ),

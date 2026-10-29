@@ -182,10 +182,15 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         if (d['data'] is List) {
           list = d['data'] as List<dynamic>;
           total = (d['total'] as num?)?.toInt() ?? list.length;
+        } else if (d['users'] is List) {
+          list = d['users'] as List<dynamic>;
+          total = (d['total'] as num?)?.toInt() ?? list.length;
         } else if (d['data'] is Map) {
           final inner = d['data'] as Map;
           if (inner['data'] is List) {
             list = inner['data'] as List<dynamic>;
+          } else if (inner['users'] is List) {
+            list = inner['users'] as List<dynamic>;
           }
           total = (inner['total'] as num?)?.toInt() ?? list.length;
         }
@@ -426,6 +431,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       icon: Icons.people_alt_rounded,
                       color: const Color(0xFF1976D2),
                       isDark: isDark,
+                      onTap: () => setState(() => _currentIndex = 1),
                     ),
                     _buildStatCard(
                       title: 'All Equipment',
@@ -434,6 +440,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       icon: Icons.agriculture_rounded,
                       color: const Color(0xFF2E7D32),
                       isDark: isDark,
+                      onTap: () => _showEquipmentManagementModal(isDark, lang),
                     ),
                     _buildStatCard(
                       title: 'Active Rentals',
@@ -442,6 +449,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       icon: Icons.receipt_long_rounded,
                       color: const Color(0xFFF57C00),
                       isDark: isDark,
+                      onTap: () => _showBookingsManagementModal(isDark, lang),
                     ),
                     _buildStatCard(
                       title: 'open_complaints'.tr(lang),
@@ -450,6 +458,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       icon: Icons.warning_amber_rounded,
                       color: const Color(0xFFD32F2F),
                       isDark: isDark,
+                      onTap: () => setState(() => _currentIndex = 2),
                     ),
                   ],
                 ),
@@ -635,9 +644,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     required IconData icon,
     required Color color,
     required bool isDark,
+    VoidCallback? onTap,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -652,54 +661,64 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white60 : AppTheme.textMutedGray,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white60 : AppTheme.textMutedGray,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, color: color, size: 16),
+                    ),
+                  ],
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: isDark ? Colors.white54 : AppTheme.textMutedGray,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                child: Icon(icon, color: color, size: 16),
-              ),
-            ],
+              ],
+            ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  color: isDark ? Colors.white54 : AppTheme.textMutedGray,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1310,89 +1329,150 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     final titleCtrl = TextEditingController();
     final msgCtrl = TextEditingController();
     String target = 'ALL';
+    bool isSending = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          title: const Text('Send Broadcast Alert', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.campaign_rounded, color: Color(0xFF2563EB), size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Send Broadcast Alert',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Target Audience:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
-              Row(
-                children: [
-                  ChoiceChip(
-                    label: const Text('All Users', style: TextStyle(fontSize: 11)),
-                    selected: target == 'ALL',
-                    onSelected: (_) => setDlgState(() => target = 'ALL'),
-                  ),
-                  const SizedBox(width: 6),
-                  ChoiceChip(
-                    label: const Text('Farmers', style: TextStyle(fontSize: 11)),
-                    selected: target == 'FARMER',
-                    onSelected: (_) => setDlgState(() => target = 'FARMER'),
-                  ),
-                  const SizedBox(width: 6),
-                  ChoiceChip(
-                    label: const Text('Owners', style: TextStyle(fontSize: 11)),
-                    selected: target == 'OWNER',
-                    onSelected: (_) => setDlgState(() => target = 'OWNER'),
-                  ),
-                ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('All Users', style: TextStyle(fontSize: 11)),
+                      selected: target == 'ALL',
+                      onSelected: isSending ? null : (_) => setDlgState(() => target = 'ALL'),
+                    ),
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      label: const Text('Farmers', style: TextStyle(fontSize: 11)),
+                      selected: target == 'FARMER',
+                      onSelected: isSending ? null : (_) => setDlgState(() => target = 'FARMER'),
+                    ),
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      label: const Text('Owners', style: TextStyle(fontSize: 11)),
+                      selected: target == 'OWNER',
+                      onSelected: isSending ? null : (_) => setDlgState(() => target = 'OWNER'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: titleCtrl,
+                enabled: !isSending,
+                decoration: const InputDecoration(
+                  labelText: 'Alert Headline',
+                  hintText: 'e.g. Critical Weather Advisory or Subsidy Update',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Alert Headline',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
                 controller: msgCtrl,
+                enabled: !isSending,
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Message Body',
+                  hintText: 'Details for intended farmers / owners...',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: isSending ? null : () => Navigator.pop(ctx),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () async {
-                if (titleCtrl.text.trim().isEmpty || msgCtrl.text.trim().isEmpty) return;
-                final messenger = ScaffoldMessenger.of(context);
-                Navigator.pop(ctx);
-                try {
-                  await ApiClient().dio.post('/admin/alerts/send', data: {
-                    'title': titleCtrl.text.trim(),
-                    'message': msgCtrl.text.trim(),
-                    'targetRole': target,
-                  });
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Broadcast alert dispatched successfully')),
-                  );
-                  ref.invalidate(adminAlertsProvider);
-                } catch (e) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text('Failed to send alert: $e')),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-              child: const Text('Dispatch Alert'),
+              onPressed: isSending
+                  ? null
+                  : () async {
+                      final title = titleCtrl.text.trim();
+                      final message = msgCtrl.text.trim();
+                      if (title.isEmpty || message.isEmpty) return;
+
+                      setDlgState(() => isSending = true);
+                      final messenger = ScaffoldMessenger.of(context);
+
+                      try {
+                        final res = await ApiClient().dio.post('/admin/alerts/broadcast', data: {
+                          'title': title,
+                          'message': message,
+                          'targetRole': target,
+                          'type': 'ADMIN_BROADCAST',
+                        });
+
+                        final successMsg = res.data?['message']?.toString() ?? 'Broadcast alert dispatched successfully.';
+
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(successMsg),
+                            backgroundColor: const Color(0xFF16A34A),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        ref.invalidate(adminAlertsProvider);
+                      } catch (e) {
+                        setDlgState(() => isSending = false);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to dispatch alert: $e'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: isSending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('Dispatch Alert', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
           ],
         ),

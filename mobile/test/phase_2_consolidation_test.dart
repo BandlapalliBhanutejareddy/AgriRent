@@ -63,7 +63,7 @@ class FakeWeatherNotifier extends StateNotifier<WeatherState> implements Weather
   FakeWeatherNotifier() : super(WeatherState());
 
   @override
-  Future<void> fetchWeather() async {}
+  Future<void> fetchWeather({bool requestGpsIfUnavailable = false}) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

@@ -1860,10 +1860,19 @@ router.get('/weather/lookup', async (req: AuthRequest, res: Response): Promise<v
           farmId: farm.id,
           bypassCache
         });
+        if (!weatherData.success) {
+          res.status(502).json(weatherData);
+          return;
+        }
         res.json(weatherData);
         return;
       } else if (farm.location) {
         const weatherData = await WeatherService.getFarmWeather(farm.id, farm.location);
+        if (!weatherData.success) {
+          const status = weatherData.code === 'WEATHER_LOCATION_UNAVAILABLE' || weatherData.code === 'GEOCODING_FAILED' ? 400 : 502;
+          res.status(status).json(weatherData);
+          return;
+        }
         res.json(weatherData);
         return;
       }

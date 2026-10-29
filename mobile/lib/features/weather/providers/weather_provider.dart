@@ -27,7 +27,7 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
     fetchWeather();
   }
 
-  Future<void> fetchWeather() async {
+  Future<void> fetchWeather({bool requestGpsIfUnavailable = false}) async {
     if (state.isLoading) return;
 
     // Retain old data if available while loading
@@ -38,30 +38,35 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
       state = state.copyWith(isLoading: false, weatherData: data);
     } catch (e) {
       final errStr = e.toString().replaceFirst('Exception: ', '');
-      // If location is unavailable for registered farm, try device GPS automatically if permission is already granted
-      if (errStr.contains('WEATHER_LOCATION_UNAVAILABLE')) {
-        final permission = await Geolocator.checkPermission().catchError((_) => LocationPermission.denied);
-        final isEnabled = await Geolocator.isLocationServiceEnabled().catchError((_) => false);
-        if (isEnabled && (permission == LocationPermission.always || permission == LocationPermission.whileInUse)) {
-          try {
-            Position? pos;
-            try {
-              pos = await Geolocator.getCurrentPosition(
-                locationSettings: const LocationSettings(
-                  accuracy: LocationAccuracy.medium,
-                  timeLimit: Duration(seconds: 7),
-                ),
-              );
-            } catch (_) {
-              pos = await Geolocator.getLastKnownPosition();
+      // If location is unavailable or geocoding failed for registered farm, fallback to device GPS
+      if (errStr.contains('WEATHER_LOCATION_UNAVAILABLE') || errStr.contains('GEOCODING_FAILED') || farmId == 'current-lookup') {
+        try {
+          final isEnabled = await Geolocator.isLocationServiceEnabled().catchError((_) => false);
+          if (isEnabled) {
+            var permission = await Geolocator.checkPermission().catchError((_) => LocationPermission.denied);
+            if (permission == LocationPermission.denied && requestGpsIfUnavailable) {
+              permission = await Geolocator.requestPermission().catchError((_) => LocationPermission.denied);
             }
-            if (pos != null) {
-              final gpsData = await _repository.getWeatherByCoordinates(pos.latitude, pos.longitude);
-              state = state.copyWith(isLoading: false, weatherData: gpsData);
-              return;
+            if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+              Position? pos;
+              try {
+                pos = await Geolocator.getCurrentPosition(
+                  locationSettings: const LocationSettings(
+                    accuracy: LocationAccuracy.medium,
+                    timeLimit: Duration(seconds: 7),
+                  ),
+                );
+              } catch (_) {
+                pos = await Geolocator.getLastKnownPosition();
+              }
+              if (pos != null) {
+                final gpsData = await _repository.getWeatherByCoordinates(pos.latitude, pos.longitude);
+                state = state.copyWith(isLoading: false, weatherData: gpsData);
+                return;
+              }
             }
-          } catch (_) {}
-        }
+          }
+        } catch (_) {}
       }
 
       state = state.copyWith(
