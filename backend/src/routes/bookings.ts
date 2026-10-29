@@ -507,8 +507,11 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
 
     // 5. Concurrency-safe atomic conditional update (Compare-And-Swap)
     let updateData: any = { status };
-    if (status === 'REJECTED' || status === 'CANCELLED') {
-      updateData.paymentStatus = 'CANCELLED';
+    if (['ACCEPTED', 'CONFIRMED', 'DISPATCHED', 'ACTIVE', 'RETURN_PENDING', 'COMPLETED'].includes(status)) {
+      updateData.paymentStatus = 'PAID';
+      updateData.amountPaid = booking.totalPrice;
+    } else if (status === 'REJECTED' || status === 'CANCELLED') {
+      updateData.paymentStatus = 'REFUNDED';
     }
 
     const updatedBooking = await prisma.$transaction(async (tx) => {
@@ -522,6 +525,34 @@ router.put('/:id/status', requireAuth, validate(updateBookingStatusSchema), asyn
 
       if (updateResult.count === 0) {
         throw new Error('CONCURRENCY_CONFLICT');
+      }
+
+      if (['ACCEPTED', 'CONFIRMED', 'DISPATCHED', 'ACTIVE', 'COMPLETED'].includes(status)) {
+        const existingTx = await tx.paymentTransaction.findFirst({
+          where: { bookingId }
+        });
+        if (!existingTx) {
+          await tx.paymentTransaction.create({
+            data: {
+              bookingId,
+              amount: booking.totalPrice ?? 0,
+              currency: 'INR',
+              status: 'SUCCESS',
+              paymentMethod: 'ESCROW_DIRECT',
+              transactionRef: `TXN-${bookingId.slice(-8).toUpperCase()}`
+            }
+          });
+        }
+      } else if (status === 'REJECTED' || status === 'CANCELLED') {
+        const existingTx = await tx.paymentTransaction.findFirst({
+          where: { bookingId }
+        });
+        if (existingTx) {
+          await tx.paymentTransaction.update({
+            where: { id: existingTx.id },
+            data: { status: 'REFUNDED' }
+          });
+        }
       }
 
       const b = await tx.booking.findUniqueOrThrow({
@@ -670,7 +701,11 @@ router.post('/:id/inspection', requireAuth, requireRole('OWNER'), validate(retur
           id: bookingId,
           status: { in: PERMITTED_INSPECTION_STATUSES }
         },
-        data: { status: 'COMPLETED' }
+        data: {
+          status: 'COMPLETED',
+          paymentStatus: 'PAID',
+          amountPaid: booking.totalPrice
+        }
       });
 
       if (updateResult.count === 0) {

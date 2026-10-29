@@ -37,7 +37,7 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
+    if (allowedOrigins.indexOf(origin) === -1 && !origin.endsWith('.vercel.app')) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
@@ -147,6 +147,7 @@ import devRoutes from './routes/dev';
 import callRoutes from './routes/calls';
 import communityRoutes from './routes/community';
 import ownerRoutes from './routes/owner';
+import marketRoutes from './routes/market';
 
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -167,6 +168,7 @@ app.use('/api/dev', devRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/owner', ownerRoutes);
+app.use('/api/market', marketRoutes);
 
 // Centralized Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

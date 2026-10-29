@@ -598,17 +598,493 @@ router.get('/crop-trends', requireAuth, requireFarmerRole, async (req: AuthReque
 
 /**
  * GET /api/community/market/prices
- * Real Agmarknet Indian mandi prices endpoint
+ * Real Agmarknet Indian mandi prices endpoint (backward-compatible alias)
  */
 router.get('/market/prices', async (req: any, res: Response): Promise<void> => {
   try {
     const commodity = req.query.commodity ? String(req.query.commodity) : undefined;
     const state = req.query.state ? String(req.query.state) : undefined;
-    const prices = await marketPriceService.getMarketPrices(commodity, state);
+    const district = req.query.district ? String(req.query.district) : undefined;
+    const market = req.query.market ? String(req.query.market) : undefined;
+    const variety = req.query.variety ? String(req.query.variety) : undefined;
+    const date = req.query.date ? String(req.query.date) : undefined;
+    const prices = await marketPriceService.getMarketPrices({
+      commodity,
+      state,
+      district,
+      market,
+      variety,
+      date
+    });
     res.json(prices);
   } catch (error) {
     console.error('Failed to fetch market prices:', error);
     res.status(500).json({ error: 'Failed to fetch market prices' });
+  }
+});
+
+/**
+ * ============================================================
+ * PHASE 4: PERSISTENT FARMER COMMUNITY POSTS, QUESTIONS & REPLIES
+ * ============================================================
+ */
+
+// 1. GET /api/community/posts - List paginated farming posts with search and category filters
+router.get('/posts', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const page = Math.max(parseInt(String(req.query.page || '1'), 10), 1);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || '15'), 10), 1), 50);
+    const skip = (page - 1) * limit;
+
+    const category = req.query.category ? String(req.query.category).toUpperCase() : undefined;
+    const search = req.query.search ? String(req.query.search).trim() : undefined;
+    const myPosts = req.query.myPosts === 'true';
+
+    const where: any = { status: 'ACTIVE' };
+
+    if (category && category !== 'ALL') {
+      where.category = category;
+    }
+
+    if (myPosts && req.prismaUser) {
+      where.authorId = req.prismaUser.id;
+    }
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { content: { contains: search, mode: 'insensitive' } },
+        { tags: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const [total, posts] = await Promise.all([
+      prisma.communityPost.count({ where }),
+      prisma.communityPost.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              profileImage: true,
+              role: true
+            }
+          },
+          _count: {
+            select: {
+              comments: true
+            }
+          }
+        }
+      })
+    ]);
+
+    res.json({
+      posts: posts.map((p) => ({
+        id: p.id,
+        authorId: p.authorId,
+        author: p.author,
+        title: p.title,
+        content: p.content,
+        category: p.category,
+        tags: p.tags ? p.tags.split(',').map((t) => t.trim()) : [],
+        imageUrl: p.imageUrl,
+        likesCount: p.likesCount,
+        viewsCount: p.viewsCount,
+        commentsCount: p._count.comments,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error: any) {
+    console.error('Failed to list community posts:', error);
+    res.status(500).json({ error: 'Failed to retrieve community posts' });
+  }
+});
+
+// 2. POST /api/community/posts - Create a farming post / question
+router.post('/posts', requireAuth, requireFarmerRole, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { title, content, category = 'GENERAL', tags, imageUrl } = req.body || {};
+
+    if (!title || typeof title !== 'string' || title.trim().length < 3) {
+      res.status(400).json({ error: 'Post title must be at least 3 characters long.' });
+      return;
+    }
+    if (title.trim().length > 150) {
+      res.status(400).json({ error: 'Post title cannot exceed 150 characters.' });
+      return;
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length < 10) {
+      res.status(400).json({ error: 'Post content must be at least 10 characters long to provide sufficient context.' });
+      return;
+    }
+    if (content.trim().length > 5000) {
+      res.status(400).json({ error: 'Post content cannot exceed 5000 characters.' });
+      return;
+    }
+
+    const validCategories = ['CROPS', 'EQUIPMENT', 'PESTS_DISEASES', 'IRRIGATION', 'WEATHER', 'MARKETS', 'GENERAL'];
+    const normalizedCategory = validCategories.includes(String(category).toUpperCase())
+      ? String(category).toUpperCase()
+      : 'GENERAL';
+
+    const authorId = req.prismaUser.id;
+
+    const newPost = await prisma.communityPost.create({
+      data: {
+        authorId,
+        title: title.trim(),
+        content: content.trim(),
+        category: normalizedCategory,
+        tags: tags ? (Array.isArray(tags) ? tags.join(', ') : String(tags)) : null,
+        imageUrl: imageUrl ? String(imageUrl).trim() : null
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    // Sync to legacy CommunityMessage for backwards compatibility with mobile stream
+    try {
+      await prisma.communityMessage.create({
+        data: {
+          senderId: authorId,
+          text: `[${normalizedCategory}] ${newPost.title}: ${newPost.content.slice(0, 250)}`
+        }
+      });
+    } catch (_) {}
+
+    // Real-time broadcast
+    try {
+      const io = getIo();
+      if (io) io.emit('new_community_post', newPost);
+    } catch (_) {}
+
+    res.status(201).json(newPost);
+  } catch (error: any) {
+    console.error('Failed to create community post:', error);
+    res.status(500).json({ error: 'Failed to create community post' });
+  }
+});
+
+// 3. GET /api/community/posts/:id - Get single post with chronological comments
+router.get('/posts/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const postId = String(req.params.id);
+
+    const post = await prisma.communityPost.findUnique({
+      where: { id: postId },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true,
+            role: true
+          }
+        },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true,
+                role: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!post || post.status !== 'ACTIVE') {
+      res.status(404).json({ error: 'Post not found or has been removed.' });
+      return;
+    }
+
+    // Increment views asynchronously
+    prisma.communityPost.update({
+      where: { id: postId },
+      data: { viewsCount: { increment: 1 } }
+    }).catch(() => {});
+
+    res.json(post);
+  } catch (error: any) {
+    console.error('Failed to get community post:', error);
+    res.status(500).json({ error: 'Failed to retrieve post details' });
+  }
+});
+
+// 4. PUT /api/community/posts/:id - Edit own post with strict authorization
+router.put('/posts/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const postId = String(req.params.id);
+    const { title, content, category } = req.body || {};
+
+    const post = await prisma.communityPost.findUnique({ where: { id: postId } });
+    if (!post) {
+      res.status(404).json({ error: 'Post not found.' });
+      return;
+    }
+
+    // Strictly enforce ownership or ADMIN role
+    if (post.authorId !== req.prismaUser.id && req.prismaUser.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Forbidden: You can only edit your own community posts.' });
+      return;
+    }
+
+    if (title && (typeof title !== 'string' || title.trim().length < 3 || title.trim().length > 150)) {
+      res.status(400).json({ error: 'Title must be between 3 and 150 characters.' });
+      return;
+    }
+
+    if (content && (typeof content !== 'string' || content.trim().length < 10 || content.trim().length > 5000)) {
+      res.status(400).json({ error: 'Content must be between 10 and 5000 characters.' });
+      return;
+    }
+
+    const updated = await prisma.communityPost.update({
+      where: { id: postId },
+      data: {
+        ...(title && { title: title.trim() }),
+        ...(content && { content: content.trim() }),
+        ...(category && { category: String(category).toUpperCase() })
+      },
+      include: {
+        author: {
+          select: { id: true, name: true, profileImage: true, role: true }
+        }
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Failed to update community post:', error);
+    res.status(500).json({ error: 'Failed to update post' });
+  }
+});
+
+// 5. DELETE /api/community/posts/:id - Delete own post with strict authorization
+router.delete('/posts/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const postId = String(req.params.id);
+
+    const post = await prisma.communityPost.findUnique({ where: { id: postId } });
+    if (!post) {
+      res.status(404).json({ error: 'Post not found.' });
+      return;
+    }
+
+    // Strict ownership enforcement
+    if (post.authorId !== req.prismaUser.id && req.prismaUser.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Forbidden: You can only delete your own community posts.' });
+      return;
+    }
+
+    await prisma.communityPost.delete({ where: { id: postId } });
+    res.json({ success: true, message: 'Community post removed successfully.' });
+  } catch (error: any) {
+    console.error('Failed to delete community post:', error);
+    res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+
+// 6. POST /api/community/posts/:id/comments - Add reply and notify post author
+router.post('/posts/:id/comments', requireAuth, requireFarmerRole, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const postId = String(req.params.id);
+    const { content, parentCommentId } = req.body || {};
+
+    if (!content || typeof content !== 'string' || content.trim().length < 2) {
+      res.status(400).json({ error: 'Comment must be at least 2 characters long.' });
+      return;
+    }
+    if (content.trim().length > 2000) {
+      res.status(400).json({ error: 'Comment cannot exceed 2000 characters.' });
+      return;
+    }
+
+    const post = await prisma.communityPost.findUnique({ where: { id: postId } });
+    if (!post || post.status !== 'ACTIVE') {
+      res.status(404).json({ error: 'Post not found or is no longer active.' });
+      return;
+    }
+
+    const authorId = req.prismaUser.id;
+    const authorName = req.prismaUser.name || 'A fellow farmer';
+
+    const comment = await prisma.communityComment.create({
+      data: {
+        postId,
+        authorId,
+        content: content.trim(),
+        parentCommentId: parentCommentId ? String(parentCommentId) : null
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    // Notify post author if commenter is someone else
+    if (post.authorId !== authorId) {
+      const preview = content.trim().length > 60 ? `${content.trim().slice(0, 60)}...` : content.trim();
+      await prisma.notification.create({
+        data: {
+          userId: post.authorId,
+          title: `New Reply on "${post.title.slice(0, 35)}"`,
+          message: `${authorName}: "${preview}"`,
+          relatedId: post.id,
+          type: 'COMMUNITY_REPLY'
+        }
+      }).catch(() => {});
+    }
+
+    res.status(201).json(comment);
+  } catch (error: any) {
+    console.error('Failed to post community comment:', error);
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
+});
+
+// 7. PUT /api/community/comments/:id - Edit own comment
+router.put('/comments/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const commentId = String(req.params.id);
+    const { content } = req.body || {};
+
+    const comment = await prisma.communityComment.findUnique({ where: { id: commentId } });
+    if (!comment) {
+      res.status(404).json({ error: 'Comment not found.' });
+      return;
+    }
+
+    if (comment.authorId !== req.prismaUser.id && req.prismaUser.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Forbidden: You can only edit your own comments.' });
+      return;
+    }
+
+    if (!content || typeof content !== 'string' || content.trim().length < 2) {
+      res.status(400).json({ error: 'Comment text cannot be empty.' });
+      return;
+    }
+
+    const updated = await prisma.communityComment.update({
+      where: { id: commentId },
+      data: { content: content.trim() },
+      include: {
+        author: { select: { id: true, name: true, profileImage: true, role: true } }
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Failed to edit comment:', error);
+    res.status(500).json({ error: 'Failed to edit comment' });
+  }
+});
+
+// 8. DELETE /api/community/comments/:id - Delete own comment
+router.delete('/comments/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const commentId = String(req.params.id);
+
+    const comment = await prisma.communityComment.findUnique({ where: { id: commentId } });
+    if (!comment) {
+      res.status(404).json({ error: 'Comment not found.' });
+      return;
+    }
+
+    if (comment.authorId !== req.prismaUser.id && req.prismaUser.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Forbidden: You can only delete your own comments.' });
+      return;
+    }
+
+    await prisma.communityComment.delete({ where: { id: commentId } });
+    res.json({ success: true, message: 'Comment deleted successfully.' });
+  } catch (error: any) {
+    console.error('Failed to delete comment:', error);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
+// 9. POST /api/community/reports - Report inappropriate post or comment
+router.post('/reports', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { postId, commentId, reason } = req.body || {};
+
+    if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+      res.status(400).json({ error: 'Please provide a clear reason for the report (minimum 5 characters).' });
+      return;
+    }
+
+    if (!postId && !commentId) {
+      res.status(400).json({ error: 'Target postId or commentId is required.' });
+      return;
+    }
+
+    const reporterId = req.prismaUser.id;
+
+    const report = await prisma.communityReport.create({
+      data: {
+        reporterId,
+        postId: postId ? String(postId) : null,
+        commentId: commentId ? String(commentId) : null,
+        reason: reason.trim()
+      }
+    });
+
+    if (postId) {
+      await prisma.communityPost.update({
+        where: { id: String(postId) },
+        data: { isReported: true }
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, message: 'Report submitted for moderation review.', reportId: report.id });
+  } catch (error: any) {
+    console.error('Failed to report content:', error);
+    res.status(500).json({ error: 'Failed to submit report' });
+  }
+});
+
+// 10. POST /api/community/posts/:id/like - Like a community post
+router.post('/posts/:id/like', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const postId = String(req.params.id);
+    const post = await prisma.communityPost.update({
+      where: { id: postId },
+      data: { likesCount: { increment: 1 } },
+      select: { id: true, likesCount: true }
+    });
+    res.json({ success: true, likesCount: post.likesCount });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to update like count' });
   }
 });
 

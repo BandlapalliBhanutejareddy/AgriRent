@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import {
   Tractor, CheckCircle, Search, MapPin,
   Activity, CheckCircle2, Clock3, AlertTriangle, DollarSign, Calendar,
-  ArrowRight, ShieldCheck, Sparkles, CloudSun, BookOpen
+  ArrowRight, ShieldCheck, Sparkles, CloudSun, BookOpen, ShieldAlert, X
 } from 'lucide-react';
 import Link from 'next/link';
 import { useStore } from '@/store/useStore';
@@ -48,6 +48,34 @@ export default function FarmerDashboard() {
   const [drillDownTitle, setDrillDownTitle] = useState('');
   const [drillDownHeaders, setDrillDownHeaders] = useState<string[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
+
+  // Active risk & weather alerts
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+
+  async function loadAlerts() {
+    try {
+      setAlertsLoading(true);
+      const res = await api.get('/farms/alerts/list');
+      if (res.data?.alerts) {
+        setAlerts(res.data.alerts);
+      }
+    } catch (e) {
+      console.error('Failed to load farmer alerts', e);
+    } finally {
+      setAlertsLoading(false);
+    }
+  }
+
+  async function handleDismissAlert(alertId: string) {
+    try {
+      await api.put(`/farms/alerts/${alertId}/dismiss`);
+      setAlerts(prev => prev.filter(a => a.id !== alertId));
+      showToast('Alert dismissed', 'info');
+    } catch (e) {
+      showToast('Failed to dismiss alert', 'error');
+    }
+  }
 
   async function fetchDrillDown() {
     try {
@@ -172,6 +200,8 @@ export default function FarmerDashboard() {
     api.get(`/analytics/farmer`)
       .then(r => setAnalytics(r.data))
       .catch(() => setAnalytics(null));
+
+    loadAlerts();
   }
 
   async function handleMarkCompleted() {
@@ -311,6 +341,70 @@ export default function FarmerDashboard() {
           </div>
         )}
       </div>
+
+      {/* Risk & Weather Alert Center */}
+      {alerts.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-5 shadow-card space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <ShieldAlert size={16} className="text-amber-500" />
+              Active Farm & Risk Alerts ({alerts.length})
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {alerts.map((alert: any) => {
+              const isCritical = alert.severity === 'CRITICAL';
+              const isWarning = alert.severity === 'WARNING';
+              return (
+                <div
+                  key={alert.id}
+                  className={`p-4 rounded-xl border transition-all relative ${
+                    isCritical
+                      ? 'bg-red-50/80 dark:bg-red-950/30 border-red-200 dark:border-red-800/50'
+                      : isWarning
+                      ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/50'
+                      : 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          isCritical
+                            ? 'bg-red-600 text-white'
+                            : isWarning
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-blue-600 text-white'
+                        }`}
+                      >
+                        {alert.severity}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {alert.category}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleDismissAlert(alert.id)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                      title="Dismiss alert"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1.5">{alert.title}</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">{alert.message}</p>
+                  {alert.advisory && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      <span className="font-bold">Recommendation: </span>
+                      {alert.advisory}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* My Farm Journey Timeline */}
       <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card">

@@ -236,7 +236,7 @@ export class AIProviderService {
       }
 
       try {
-        const marketRes = await marketPriceService.getMarketPrices(com, location);
+        const marketRes = await marketPriceService.getMarketPrices({ commodity: com, state: location });
         let mReply = '';
         if (marketRes.records && marketRes.records.length > 0) {
           const recs = marketRes.records.slice(0, 3).map((r, i) =>

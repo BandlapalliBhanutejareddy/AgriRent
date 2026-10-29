@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import ChatModal from '@/components/ChatModal';
 import BookingTrackingTimeline from '@/components/BookingTrackingTimeline';
@@ -156,38 +156,38 @@ export default function MyRentalsPage() {
   function getBookingStatusBadge(status: string) {
     switch (status) {
       case 'PENDING':
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200">Pending Approval</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/30">Pending Approval</span>;
       case 'ACCEPTED':
       case 'CONFIRMED':
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200">Confirmed</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/30">Confirmed</span>;
       case 'DISPATCHED':
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200">Dispatched</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">Dispatched</span>;
       case 'ACTIVE':
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200">Active Lease</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Active Lease</span>;
       case 'RETURN_PENDING':
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200">Return Pending</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/30">Return Pending</span>;
       case 'COMPLETED':
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300">Completed</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">Completed</span>;
       case 'CANCELLED':
       case 'REJECTED':
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200">{status}</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30">{status}</span>;
       default:
-        return <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">{status}</span>;
+        return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[120px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/30">{status}</span>;
     }
   }
 
   function getPaymentBadge(status: string) {
     const s = (status || 'PENDING').toUpperCase();
     if (s === 'PAID' || s === 'SUCCESS') {
-      return <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200">Paid Escrow</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[110px] px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Paid Escrow</span>;
     }
     if (s === 'REFUNDED') {
-      return <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-200">Refunded</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[110px] px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">Refunded</span>;
     }
     if (s === 'FAILED') {
-      return <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-200">Failed</span>;
+      return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[110px] px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30">Failed</span>;
     }
-    return <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-600 border border-amber-200">Payment Pending</span>;
+    return <span className="inline-flex items-center justify-center whitespace-nowrap min-w-[110px] px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30">Payment Pending</span>;
   }
 
   if (loading) {
@@ -342,11 +342,11 @@ export default function MyRentalsPage() {
                 <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-800/30">
                   <th className="py-3.5 px-4">Equipment & Booking ID</th>
                   <th className="py-3.5 px-4">Owner Contact</th>
-                  <th className="py-3.5 px-4">Rental Dates</th>
-                  <th className="py-3.5 px-4 text-right">Rental Total</th>
-                  <th className="py-3.5 px-4 text-center">Booking Status</th>
-                  <th className="py-3.5 px-4 text-center">Payment Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Rental Dates</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Rental Total</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Booking Status</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Payment Status</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
@@ -358,7 +358,8 @@ export default function MyRentalsPage() {
                   const isCompleted = booking.status === 'COMPLETED';
 
                   return (
-                    <tr key={booking.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <React.Fragment key={booking.id}>
+                      <tr className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                       {/* Equipment */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
@@ -411,12 +412,12 @@ export default function MyRentalsPage() {
                       </td>
 
                       {/* Booking Status */}
-                      <td className="py-4 px-4 text-center">
+                      <td className="py-4 px-4 text-center whitespace-nowrap">
                         {getBookingStatusBadge(booking.status)}
                       </td>
 
                       {/* Payment Status */}
-                      <td className="py-4 px-4 text-center">
+                      <td className="py-4 px-4 text-center whitespace-nowrap">
                         {getPaymentBadge(booking.paymentStatus)}
                       </td>
 
@@ -484,7 +485,47 @@ export default function MyRentalsPage() {
                         </div>
                       </td>
                     </tr>
-                  );
+                    {isExpanded && (
+                      <tr key={`expanded-${booking.id}`} className="bg-slate-50/90 dark:bg-slate-850/90 border-b border-blue-200/50 dark:border-blue-900/50">
+                        <td colSpan={7} className="p-6">
+                          <div className="space-y-4 max-w-4xl">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                <Truck size={14} className="text-blue-500" />
+                                <span>Lifecycle Timeline — {booking.equipment?.title}</span>
+                              </h4>
+                              <button
+                                onClick={() => setExpandedBookingId(null)}
+                                className="text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                              >
+                                Close ✕
+                              </button>
+                            </div>
+                            <BookingTrackingTimeline
+                              status={booking.status}
+                              statusHistory={booking.statusHistory}
+                              startDate={booking.startDate}
+                              endDate={booking.endDate}
+                              returnInspection={booking.returnInspection}
+                            />
+                            {booking.equipment?.latitude && booking.equipment?.longitude && (
+                              <div className="pt-2">
+                                <EquipmentLocationMap
+                                  equipmentId={booking.equipment.id}
+                                  title={booking.equipment.title}
+                                  location={booking.equipment.location}
+                                  latitude={booking.equipment.latitude}
+                                  longitude={booking.equipment.longitude}
+                                  isOwner={false}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
                 })}
               </tbody>
             </table>

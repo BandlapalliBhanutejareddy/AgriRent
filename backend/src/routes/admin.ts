@@ -395,7 +395,8 @@ router.get('/bookings', async (req: AuthRequest, res: Response): Promise<void> =
       where.OR = [
         { id: { contains: String(search), mode: 'insensitive' } },
         { farmer: { name: { contains: String(search), mode: 'insensitive' } } },
-        { owner: { name: { contains: String(search), mode: 'insensitive' } } }
+        { equipment: { title: { contains: String(search), mode: 'insensitive' } } },
+        { equipment: { owner: { name: { contains: String(search), mode: 'insensitive' } } } }
       ];
     }
 
@@ -423,10 +424,11 @@ router.get('/bookings', async (req: AuthRequest, res: Response): Promise<void> =
       id: b.id,
       createdAt: b.createdAt,
       status: b.status,
+      totalPrice: b.totalPrice,
       equipment: { title: b.equipment?.title },
       owner: b.equipment?.owner,
       farmer: b.farmer,
-      payment: b.payments?.[0] || { amount: b.amountPaid, status: b.paymentStatus }
+      payment: b.payments?.[0] || { amount: b.amountPaid ?? b.totalPrice, status: b.paymentStatus }
     }));
 
     res.json({ data: formattedBookings, total, page: pageNum, limit: limitNum });

@@ -246,8 +246,8 @@ export default function OwnerRentalHistoryPage() {
                     <td className="py-4 px-6 text-right font-black text-slate-900 dark:text-white">
                       {formatCurrency(b.totalPrice)}
                     </td>
-                    <td className="py-4 px-6 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    <td className="py-4 px-6 text-center whitespace-nowrap">
+                      <span className={`inline-flex items-center justify-center whitespace-nowrap min-w-[110px] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                         b.status === 'COMPLETED' ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' :
                         b.status === 'ACTIVE' || b.status === 'DISPATCHED' ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400' :
                         b.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400' :
@@ -256,8 +256,8 @@ export default function OwnerRentalHistoryPage() {
                         {b.status}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                    <td className="py-4 px-6 text-center whitespace-nowrap">
+                      <span className={`inline-flex items-center justify-center whitespace-nowrap min-w-[100px] px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
                         b.paymentStatus === 'PAID' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
                         'bg-slate-100 text-slate-600'
                       }`}>

@@ -547,11 +547,11 @@ export default function AdminDashboard() {
                       {b.crop ? b.crop.name : 'Not available'}
                     </td>
                     <td className="p-4">
-                      <div className="font-bold text-emerald-600">{b.payment?.amount ? formatCurrency(b.payment.amount) : '-'}</div>
-                      <div className="text-[10px] text-slate-400 uppercase tracking-widest">{b.payment?.status || 'UNPAID'}</div>
+                      <div className="font-bold text-emerald-600">{b.payment?.amount != null ? formatCurrency(b.payment.amount) : (b.totalPrice != null ? formatCurrency(b.totalPrice) : '-')}</div>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-widest">{b.payment?.status || (b.status === 'COMPLETED' ? 'PAID' : 'PENDING')}</div>
                     </td>
-                    <td className="p-4">
-                      <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[9px] font-black uppercase tracking-widest">{b.status}</span>
+                    <td className="p-4 whitespace-nowrap">
+                      <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[9px] font-black uppercase tracking-widest whitespace-nowrap">{b.status}</span>
                     </td>
                   </tr>
                 ))}

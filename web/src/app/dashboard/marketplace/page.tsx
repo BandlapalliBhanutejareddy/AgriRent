@@ -29,6 +29,7 @@ import ChatModal from '@/components/ChatModal';
 import EquipmentLocationMap from '@/components/EquipmentLocationMap';
 import { MessageSquare } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
+import { AGRICULTURAL_CATEGORIES, getEquipmentDefaultImage } from '@/constants/agriculturalCatalog';
 
 const formatDateInput = (date: Date) => date.toISOString().slice(0, 10);
 const parseDate = (date: string) => new Date(date + 'T00:00:00');
@@ -138,7 +139,7 @@ function MarketplaceContent() {
           page,
           limit: 20,
           search: search || undefined,
-          category: category === 'All Categories' || category === (t('categories.all', 'All Categories')) ? undefined : category
+          category: (category === 'ALL' || category === 'All Categories' || category === (t('categories.all', 'All Categories'))) ? undefined : category
         }
       });
       const data = response.data?.data || [];
@@ -182,10 +183,19 @@ function MarketplaceContent() {
     setBookingDrafts(draftState);
   };
 
-  const categories = useMemo(() => {
+  const categoryOptions = useMemo(() => {
     return [
-      t('categories.all', 'All Categories'),
-      'TRACTOR', 'HARVESTER', 'IMPLEMENT', 'ROTAVATOR', 'CULTIVATOR', 'SEED DRILL', 'SPRAYER', 'POWER TILLER', 'RICE TRANSPLANTER'
+      { id: 'ALL', name: t('categories.all', 'All Categories') },
+      ...AGRICULTURAL_CATEGORIES.map(c => ({ id: c.id, name: c.name })),
+      { id: 'TRACTOR', name: 'Tractor (Legacy)' },
+      { id: 'HARVESTER', name: 'Harvester (Legacy)' },
+      { id: 'IMPLEMENT', name: 'Implement (Legacy)' },
+      { id: 'ROTAVATOR', name: 'Rotavator' },
+      { id: 'CULTIVATOR', name: 'Cultivator' },
+      { id: 'SEED DRILL', name: 'Seed Drill' },
+      { id: 'SPRAYER', name: 'Sprayer' },
+      { id: 'POWER TILLER', name: 'Power Tiller' },
+      { id: 'RICE TRANSPLANTER', name: 'Rice Transplanter' },
     ];
   }, [t]);
 
@@ -402,8 +412,8 @@ function MarketplaceContent() {
               onChange={(event) => setCategory(event.target.value)}
               className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 text-xs text-slate-800 dark:text-white outline-none focus:border-emerald-500 cursor-pointer"
             >
-              {categories.map((option) => (
-                <option key={option} value={option}>{option}</option>
+              {categoryOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.name}</option>
               ))}
             </select>
           </div>
@@ -439,20 +449,9 @@ function MarketplaceContent() {
               </button>
             </div>
           ) : filteredEquipment.map((item) => {
-            const hasOwnerImage = item.imageUrl && item.imageUrl.trim() !== '' && !item.imageUrl.includes('images.unsplash.com');
-            const cat = item.category ? item.category.toLowerCase() : '';
-            let staticImage = '/equipment/default.jpg';
-            if (cat.includes('harvester')) staticImage = '/equipment/harvester.jpg';
-            else if (cat.includes('rotavator')) staticImage = '/equipment/rotavator.jpg';
-            else if (cat.includes('cultivator')) staticImage = '/equipment/cultivator.jpg';
-            else if (cat.includes('sprayer')) staticImage = '/equipment/sprayer.jpg';
-            else if (cat.includes('thresher')) staticImage = '/equipment/thresher.jpg';
-            else if (cat.includes('seed drill') || cat.includes('seeder')) staticImage = '/equipment/seed-drill.jpg';
-            else if (cat.includes('power tiller')) staticImage = '/equipment/power-tiller.jpg';
-            else if (cat.includes('rice transplanter') || cat.includes('transplanter')) staticImage = '/equipment/rice-transplanter.jpg';
-            else if (cat.includes('tractor')) staticImage = '/equipment/tractor.jpg';
-
-            const displayImage = hasOwnerImage ? item.imageUrl : staticImage;
+            const displayImage = (item.imageUrl && item.imageUrl.trim() !== '')
+              ? item.imageUrl
+              : getEquipmentDefaultImage(item.title, item.category);
 
             return (
             <div key={item.id} className="rounded-[32px] border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-lg transition-all duration-350">

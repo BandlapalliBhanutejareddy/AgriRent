@@ -23,6 +23,7 @@ import { useToast } from '@/components/ToastProvider';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/formatters';
 import EquipmentLocationMap from '@/components/EquipmentLocationMap';
+import { AGRICULTURAL_CATEGORIES, getEquipmentDefaultImage } from '@/constants/agriculturalCatalog';
 
 export default function EquipmentManagement() {
   const { t } = useTranslation();
@@ -31,7 +32,7 @@ export default function EquipmentManagement() {
   const [filteredEquipment, setFilteredEquipment] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState(t('all_categories', { defaultValue: 'All Categories' }));
+  const [category, setCategory] = useState('ALL');
 
   // Modals & Drawers State
   const [editingItem, setEditingItem] = useState<any | null>(null);
@@ -45,17 +46,8 @@ export default function EquipmentManagement() {
   const [editDescription, setEditDescription] = useState('');
   const [editAvailable, setEditAvailable] = useState(true);
 
-  function getFallbackImage(category: string) {
-    const stockImages: Record<string, string> = {
-      "TRACTOR": "https://images.unsplash.com/photo-1592860956272-9eb5d8c366ff?auto=format&fit=crop&q=80&w=800",
-      "HARVESTER": "https://images.unsplash.com/photo-1625244724120-1fd1d34d00f6?auto=format&fit=crop&q=80&w=800",
-      "IMPLEMENT": "https://images.unsplash.com/photo-1589922253303-3b03867dfb61?auto=format&fit=crop&q=80&w=800",
-      "CULTIVATOR": "https://images.unsplash.com/photo-1590089851695-1f9e80c8df63?auto=format&fit=crop&q=80&w=800",
-      "ROTAVATOR": "https://images.unsplash.com/photo-1586016335359-54bc72159670?auto=format&fit=crop&q=80&w=800",
-      "SEEDER": "https://images.unsplash.com/photo-1589922253303-3b03867dfb61?auto=format&fit=crop&q=80&w=800",
-      "IRRIGATION": "https://images.unsplash.com/photo-1473167527633-87a1fae80735?auto=format&fit=crop&q=80&w=800"
-    };
-    return stockImages[category?.toUpperCase()] || stockImages["TRACTOR"];
+  function getFallbackImage(catName: string, title?: string) {
+    return getEquipmentDefaultImage(title || catName, catName);
   };
 
   useEffect(() => {
@@ -70,8 +62,18 @@ export default function EquipmentManagement() {
         item.description?.toLowerCase().includes(search.toLowerCase())
       );
     }
-    if (category !== t('all_categories', { defaultValue: 'All Categories' })) {
-      filtered = filtered.filter(item => item.category === category);
+    if (category && category !== 'ALL' && category !== t('all_categories', { defaultValue: 'All Categories' })) {
+      filtered = filtered.filter(item => {
+        const itemCat = (item.category || '').toUpperCase();
+        const selected = category.toUpperCase();
+        if (itemCat === selected) return true;
+        // Aliases between unified and legacy
+        if (selected === 'TRACTORS_AND_POWER_UNITS' && (itemCat === 'TRACTOR' || itemCat.includes('TRACTOR'))) return true;
+        if (selected === 'HARVESTING_EQUIPMENT' && (itemCat === 'HARVESTER' || itemCat.includes('HARVEST'))) return true;
+        if (selected === 'LAND_PREPARATION' && (itemCat === 'IMPLEMENT' || itemCat.includes('TILL') || itemCat.includes('PLOUGH'))) return true;
+        if (selected === 'IRRIGATION_EQUIPMENT' && (itemCat === 'IRRIGATION' || itemCat.includes('PUMP'))) return true;
+        return false;
+      });
     }
     setFilteredEquipment(filtered);
   }, [search, category, equipment]);
@@ -199,14 +201,19 @@ export default function EquipmentManagement() {
         </div>
         <div className="flex gap-2">
             <select
-              className="bg-white dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-900 dark:text-slate-50 outline-none cursor-pointer shadow-sm"
+              className="bg-white dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-900 dark:text-slate-50 outline-none cursor-pointer shadow-sm max-w-xs"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
-                <option>{t('all_categories', { defaultValue: 'All Categories' })}</option>
-                <option value="TRACTOR">{t('tractor', { defaultValue: 'Tractor' })}</option>
-                <option value="HARVESTER">{t('harvester', { defaultValue: 'Harvester' })}</option>
-                <option value="IMPLEMENT">{t('implement', { defaultValue: 'Implement' })}</option>
+                <option value="ALL">{t('all_categories', { defaultValue: 'All Categories' })}</option>
+                {AGRICULTURAL_CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+                <option value="TRACTOR">{t('tractor', { defaultValue: 'Tractor' })} (Legacy)</option>
+                <option value="HARVESTER">{t('harvester', { defaultValue: 'Harvester' })} (Legacy)</option>
+                <option value="IMPLEMENT">{t('implement', { defaultValue: 'Implement' })} (Legacy)</option>
             </select>
         </div>
       </div>
@@ -235,7 +242,7 @@ export default function EquipmentManagement() {
                 {item.imageUrl && item.imageUrl.trim() !== '' ? (
                   <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                 ) : (
-                  <img src={getFallbackImage(item.category)} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90" />
+                  <img src={getFallbackImage(item.category, item.title)} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90" />
                 )}
                 <div className="absolute top-4 right-4">
                   <span className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg ${item.available ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
@@ -362,11 +369,16 @@ export default function EquipmentManagement() {
                     <select
                       value={editCategory}
                       onChange={e => setEditCategory(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-xs font-bold text-slate-900 dark:text-slate-50 cursor-pointer"
+                      className="w-full px-4 py-3 bg-white dark:bg-slate-850 border border-slate-300 dark:border-slate-750 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400 text-xs font-bold text-slate-900 dark:text-slate-50 cursor-pointer"
                     >
-                      <option value="TRACTOR">{t('tractor', { defaultValue: 'Tractor' })}</option>
-                      <option value="HARVESTER">{t('harvester', { defaultValue: 'Harvester' })}</option>
-                      <option value="IMPLEMENT">{t('implement', { defaultValue: 'Implement' })}</option>
+                      {AGRICULTURAL_CATEGORIES.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                      <option value="TRACTOR">{t('tractor', { defaultValue: 'Tractor' })} (Legacy)</option>
+                      <option value="HARVESTER">{t('harvester', { defaultValue: 'Harvester' })} (Legacy)</option>
+                      <option value="IMPLEMENT">{t('implement', { defaultValue: 'Implement' })} (Legacy)</option>
                     </select>
                   </div>
                 </div>

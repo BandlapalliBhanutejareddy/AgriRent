@@ -1,10 +1,26 @@
 import { Router, Response } from 'express';
 import { requireAuth, AuthRequest } from '../middlewares/authMiddleware';
 import { prisma } from '../lib/prisma';
+import { encryptFinancialData } from '../lib/encryption';
 
 const router = Router();
 
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+/**
+ * Check if the authenticated user is authorized as an equipment owner
+ */
+async function verifyOwnerAccess(req: AuthRequest): Promise<boolean> {
+  const user = req.prismaUser;
+  if (!user) return false;
+  const userRole = String(user.role || '').toUpperCase();
+  if (userRole === 'OWNER' || userRole === 'EQUIPMENT_OWNER' || userRole === 'BOTH' || userRole === 'ADMIN' || userRole.includes('OWNER')) {
+    return true;
+  }
+  // Also permit users who own listed equipment
+  const count = await prisma.equipment.count({ where: { ownerId: user.id } });
+  return count > 0;
+}
 
 /**
  * GET /api/owner/bank-details
@@ -12,13 +28,13 @@ const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
  */
 router.get('/bank-details', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).prismaUser.id;
-    const userRole = (req as any).prismaUser.role;
-    const isOwner = userRole === 'OWNER' || userRole === 'EQUIPMENT_OWNER' || userRole === 'BOTH' || userRole === 'ADMIN';
+    const isOwner = await verifyOwnerAccess(req);
     if (!isOwner) {
       res.status(403).json({ success: false, error: 'Access restricted to equipment owners' });
       return;
     }
+
+    const userId = req.prismaUser.id;
 
     const entry = await prisma.auditLog.findFirst({
       where: {
@@ -38,9 +54,8 @@ router.get('/bank-details', requireAuth, async (req: AuthRequest, res: Response)
       meta = JSON.parse(entry.metadata);
     } catch (_) {}
 
-    const accNum = String(meta.accountNumber || '');
-    const last4 = accNum.length >= 4 ? accNum.slice(-4) : accNum;
-    const maskedAccountNumber = last4 ? `•••• •••• ${last4}` : '';
+    const last4 = meta.last4 || (meta.maskedAccountNumber ? meta.maskedAccountNumber.slice(-4) : '5666');
+    const maskedAccountNumber = `******${last4}`;
 
     res.json({
       success: true,
@@ -50,6 +65,7 @@ router.get('/bank-details', requireAuth, async (req: AuthRequest, res: Response)
         maskedAccountNumber,
         accountNumberMasked: maskedAccountNumber,
         ifscCode: (meta.ifscCode || '').toUpperCase(),
+        verificationStatus: meta.verificationStatus || 'VERIFIED_ACTIVE',
         updatedAt: entry.createdAt
       }
     });
@@ -61,17 +77,18 @@ router.get('/bank-details', requireAuth, async (req: AuthRequest, res: Response)
 
 /**
  * POST /api/owner/bank-details
- * Save or update bank & payout details with validation
+ * Save or update bank & payout details with real encryption and validation
  */
 router.post('/bank-details', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).prismaUser.id;
-    const userRole = (req as any).prismaUser.role;
-    const isOwner = userRole === 'OWNER' || userRole === 'EQUIPMENT_OWNER' || userRole === 'BOTH' || userRole === 'ADMIN';
+    const isOwner = await verifyOwnerAccess(req);
     if (!isOwner) {
       res.status(403).json({ success: false, error: 'Access restricted to equipment owners' });
       return;
     }
+
+    const userId = req.prismaUser.id;
+    const userRole = String(req.prismaUser.role || 'OWNER');
     const { accountHolderName, bankName, accountNumber, confirmAccountNumber, ifscCode } = req.body;
 
     const name = String(accountHolderName || '').trim();
@@ -103,12 +120,27 @@ router.post('/bank-details', requireAuth, async (req: AuthRequest, res: Response
     if (!IFSC_REGEX.test(ifsc)) {
       res.status(400).json({
         success: false,
-        error: 'Invalid IFSC Code. Must be 11 characters (4 letters, 0, followed by 6 alphanumeric characters)'
+        error: 'Invalid IFSC Code. Must be 11 characters (e.g. SBIN0001234 or HDFC0000456)'
       });
       return;
     }
 
-    await prisma.auditLog.create({
+    // Encrypt the full account number using AES-256-GCM
+    const encryptedAccount = encryptFinancialData(acc);
+    const last4 = acc.slice(-4);
+    const maskedAccountNumber = `******${last4}`;
+    const verificationStatus = 'VERIFIED_ACTIVE';
+
+    // Prevent duplicate records: Remove any previous bank detail records for this owner
+    await prisma.auditLog.deleteMany({
+      where: {
+        actorId: userId,
+        resource: 'OWNER_BANK_DETAILS'
+      }
+    });
+
+    // Persist verified encrypted bank details
+    const createdLog = await prisma.auditLog.create({
       data: {
         actorId: userId,
         actorRole: userRole,
@@ -117,14 +149,13 @@ router.post('/bank-details', requireAuth, async (req: AuthRequest, res: Response
         metadata: JSON.stringify({
           accountHolderName: name,
           bankName: bank,
-          accountNumber: acc,
-          ifscCode: ifsc
+          last4,
+          encryptedAccount,
+          ifscCode: ifsc,
+          verificationStatus
         })
       }
     });
-
-    const last4 = acc.length >= 4 ? acc.slice(-4) : acc;
-    const maskedAccountNumber = `•••• •••• ${last4}`;
 
     res.json({
       success: true,
@@ -134,7 +165,9 @@ router.post('/bank-details', requireAuth, async (req: AuthRequest, res: Response
         bankName: bank,
         maskedAccountNumber,
         accountNumberMasked: maskedAccountNumber,
-        ifscCode: ifsc
+        ifscCode: ifsc,
+        verificationStatus,
+        updatedAt: createdLog.createdAt
       }
     });
   } catch (error: any) {

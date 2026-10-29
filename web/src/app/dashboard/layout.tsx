@@ -30,7 +30,8 @@ import {
   MessageSquare,
   Bookmark,
   CloudSun,
-  Landmark
+  Landmark,
+  TrendingUp
 } from 'lucide-react';
 import { useStore, useThemeStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
@@ -211,7 +212,8 @@ export default function DashboardLayout({
           <NavLink href="/dashboard/marketplace" icon={Search} label={t('marketplace', 'Marketplace')} />
           <NavLink href="/dashboard/rentals" icon={CalendarDays} label={t('my_rentals', 'My Rentals')} />
           <NavLink href="/dashboard/saved" icon={Bookmark} label={t('saved_machinery', 'Saved Machinery')} />
-          <NavLink href="/dashboard/weather" icon={CloudSun} label={t('weather_mandi', 'Weather & Mandi')} />
+          <NavLink href="/dashboard/weather" icon={CloudSun} label={t('weather_forecast', 'Weather Forecast')} />
+          <NavLink href="/dashboard/community" icon={Users} label={t('farmer_community', 'Farmer Community')} />
           <NavLink href="/dashboard/guides" icon={BookOpen} label={t('crop_guides', 'Crop Guides')} />
           <NavLink href="/dashboard/ai-advisor" icon={Sparkles} label={t('farmer_assistant', 'Farmer Assistant')} />
           <NavLink href="/dashboard/notifications" icon={Bell} label={t('notifications', 'Notifications')} />

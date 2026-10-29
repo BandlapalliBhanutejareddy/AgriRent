@@ -30,11 +30,13 @@ router.use(requireAuth);
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const ownerId = (req as any).prismaUser.id;
-    const { name, location, area, areaUnit, soilType, cropName, season, stage, totalBudget } = req.body;
+    const { name, location, latitude, longitude, area, areaUnit, soilType, cropName, season, stage, totalBudget } = req.body;
 
     const farm = await farmDigitalTwinService.createFarm(ownerId, {
       name,
       location,
+      latitude: latitude != null ? Number(latitude) : undefined,
+      longitude: longitude != null ? Number(longitude) : undefined,
       area,
       areaUnit,
       soilType,
@@ -100,11 +102,13 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const farmId = String(req.params.id);
     const ownerId = (req as any).prismaUser.id;
-    const { name, location, area, areaUnit, soilType, cropName, season, stage, totalBudget } = req.body;
+    const { name, location, latitude, longitude, area, areaUnit, soilType, cropName, season, stage, totalBudget } = req.body;
 
     const updatedFarm = await farmDigitalTwinService.updateFarm(farmId, ownerId, {
       name,
       location,
+      latitude: latitude != null ? Number(latitude) : undefined,
+      longitude: longitude != null ? Number(longitude) : undefined,
       area,
       areaUnit,
       soilType,
@@ -1759,55 +1763,305 @@ router.get('/:farmId/spending-report', async (req, res) => {
 
 
 
-// GET /api/farms/weather/lookup?location=...
-router.get('/weather/lookup', async (req: AuthRequest, res: Response) => {
+// GET /api/farms/weather/geocode?query=...
+router.get('/weather/geocode', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const locationQuery = (req.query.location as string) || '';
-    let locText = locationQuery.trim();
+    const query = (req.query.query as string) || (req.query.q as string) || '';
+    if (!query.trim() || query.trim().length < 2) {
+      res.json({ success: true, data: { results: [] }, results: [] });
+      return;
+    }
+    const results = await WeatherService.geocode(query.trim(), 5);
+    res.json({ success: true, data: { results }, results });
+  } catch (err: any) {
+    console.error('Geocoding route error:', err);
+    res.status(500).json({ success: false, error: 'Geocoding failed', details: err.message });
+  }
+});
 
-    if (!locText) {
-      const farm = await prisma.farm.findFirst({
-        where: { ownerId: req.user!.id },
-        orderBy: { createdAt: 'desc' }
+// GET /api/farms/weather/reverse-geocode?lat=...&lng=...
+router.get('/weather/reverse-geocode', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const lat = parseFloat(String(req.query.lat));
+    const lng = parseFloat(String(req.query.lng));
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      res.status(400).json({ success: false, error: 'Invalid coordinates' });
+      return;
+    }
+    const locationName = await WeatherService.reverseGeocode(lat, lng);
+    res.json({ success: true, data: { locationName }, locationName });
+  } catch (err: any) {
+    console.error('Reverse geocoding error:', err);
+    res.status(500).json({ success: false, error: 'Reverse geocoding failed', details: err.message });
+  }
+});
+
+// GET /api/farms/weather/lookup?lat=...&lng=... OR ?location=...
+router.get('/weather/lookup', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const latParam = req.query.lat ? parseFloat(String(req.query.lat)) : NaN;
+    const lngParam = req.query.lng ? parseFloat(String(req.query.lng)) : NaN;
+    const locationQuery = req.query.location ? String(req.query.location).trim() : '';
+    const nameParam = req.query.name ? String(req.query.name).trim() : undefined;
+    const bypassCache = req.query.bypassCache === 'true';
+
+    // 1. Direct coordinate lookup (GPS or map click)
+    if (!isNaN(latParam) && !isNaN(lngParam)) {
+      if (latParam < -90 || latParam > 90 || lngParam < -180 || lngParam > 180) {
+        res.status(400).json({
+          success: false,
+          error: 'Latitude must be between -90 and 90, Longitude between -180 and 180.',
+          code: 'INVALID_COORDINATES'
+        });
+        return;
+      }
+      const weatherData = await WeatherService.getWeatherByCoordinates({
+        latitude: latParam,
+        longitude: lngParam,
+        locationName: nameParam,
+        farmId: 'current-lookup',
+        bypassCache
       });
-      locText = farm?.location || 'Guntur, Andhra Pradesh';
+      if (!weatherData.success) {
+        res.status(502).json(weatherData);
+        return;
+      }
+      res.json(weatherData);
+      return;
     }
 
-    const weatherData = await WeatherService.getFarmWeather('current-lookup', locText);
-    return res.json(weatherData);
-  } catch (err) {
+    // 2. Explicit text search lookup
+    if (locationQuery) {
+      const weatherData = await WeatherService.getFarmWeather('current-lookup', locationQuery);
+      if (!weatherData.success && weatherData.code === 'GEOCODING_FAILED') {
+        res.status(400).json(weatherData);
+        return;
+      }
+      res.json(weatherData);
+      return;
+    }
+
+    // 3. Fallback to authenticated user's saved farm (WITHOUT fake hardcoded Guntur)
+    const farm = await prisma.farm.findFirst({
+      where: { ownerId: req.user!.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (farm) {
+      if (farm.latitude != null && farm.longitude != null) {
+        const weatherData = await WeatherService.getWeatherByCoordinates({
+          latitude: farm.latitude,
+          longitude: farm.longitude,
+          locationName: farm.location,
+          farmId: farm.id,
+          bypassCache
+        });
+        res.json(weatherData);
+        return;
+      } else if (farm.location) {
+        const weatherData = await WeatherService.getFarmWeather(farm.id, farm.location);
+        res.json(weatherData);
+        return;
+      }
+    }
+
+    // 4. Honest error when no location is available - never silently substitute
+    res.status(400).json({
+      success: false,
+      error: 'Please select a location using GPS, search for a place, or select a point on the map.',
+      code: 'WEATHER_LOCATION_UNAVAILABLE'
+    });
+  } catch (err: any) {
     console.error('Weather lookup error:', err);
-    return res.status(500).json({ success: false, error: 'Internal server error.' });
+    res.status(500).json({ success: false, error: 'Internal server error.', details: err.message });
   }
 });
 
 // GET /api/farms/:farmId/weather
-router.get('/:farmId/weather', async (req: AuthRequest, res: Response) => {
+router.get('/:farmId/weather', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const farmId = req.params.farmId as string;
     const farm = await prisma.farm.findUnique({ where: { id: farmId } });
     if (!farm) {
-      return res.status(404).json({ success: false, error: 'Farm not found.' });
+      res.status(404).json({ success: false, error: 'Farm not found.' });
+      return;
     }
-    if (farm.ownerId !== req.user!.id) {
-      return res.status(403).json({ success: false, error: 'Access denied.' });
+    if (farm.ownerId !== req.user!.id && req.prismaUser.role !== 'ADMIN') {
+      res.status(403).json({ success: false, error: 'Access denied.' });
+      return;
     }
-    if (!farm.location) {
-      return res.status(400).json({ success: false, error: 'Weather location unavailable.', code: 'WEATHER_LOCATION_UNAVAILABLE' });
+    if (farm.latitude == null && farm.longitude == null && !farm.location) {
+      res.status(400).json({
+        success: false,
+        error: 'Farm does not have coordinates or location registered.',
+        code: 'WEATHER_LOCATION_UNAVAILABLE'
+      });
+      return;
     }
-    const weatherData = await WeatherService.getFarmWeather(farm.id, farm.location);
+
+    let weatherData: any;
+    if (farm.latitude != null && farm.longitude != null) {
+      weatherData = await WeatherService.getWeatherByCoordinates({
+        latitude: farm.latitude,
+        longitude: farm.longitude,
+        locationName: farm.location,
+        farmId: farm.id
+      });
+    } else {
+      weatherData = await WeatherService.getFarmWeather(farm.id, farm.location);
+    }
+
     if (!weatherData.success) {
-      const status = weatherData.code === 'WEATHER_LOCATION_UNAVAILABLE' ? 400 : 502;
-      return res.status(status).json(weatherData);
+      const status = weatherData.code === 'WEATHER_LOCATION_UNAVAILABLE' || weatherData.code === 'GEOCODING_FAILED' ? 400 : 502;
+      res.status(status).json(weatherData);
+      return;
     }
-    
-    // Phase 14B-2: Evaluate weather rules
+
+    // Evaluate weather rules and farmer alerts
     await WeatherAlertService.evaluate(req.user!.id, farm.id, farm.name, weatherData);
 
-    return res.json(weatherData);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false, error: 'Internal server error.' });
+    res.json(weatherData);
+  } catch (err: any) {
+    console.error('Farm weather error:', err);
+    res.status(500).json({ success: false, error: 'Internal server error.', details: err.message });
+  }
+});
+
+/**
+ * ============================================================
+ * PHASE 5: ACTIONABLE FARMER ALERT CENTER & PREFERENCES
+ * ============================================================
+ */
+
+// GET /api/farms/alerts - List all actionable alerts for authenticated farmer
+router.get('/alerts/list', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const alerts = await prisma.farmerAlert.findMany({
+      where: {
+        userId,
+        isDismissed: false
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    res.json({ alerts });
+  } catch (err: any) {
+    console.error('Fetch alerts error:', err);
+    res.status(500).json({ error: 'Failed to fetch alerts', details: err.message });
+  }
+});
+
+// PUT /api/farms/alerts/:id/read - Mark alert as read
+router.put('/alerts/:id/read', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const alertId = String(req.params.id);
+    const userId = req.user!.id;
+    await prisma.farmerAlert.updateMany({
+      where: { id: alertId, userId },
+      data: { isRead: true }
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to mark alert as read' });
+  }
+});
+
+// PUT /api/farms/alerts/:id/dismiss - Dismiss an alert
+router.put('/alerts/:id/dismiss', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const alertId = String(req.params.id);
+    const userId = req.user!.id;
+    await prisma.farmerAlert.updateMany({
+      where: { id: alertId, userId },
+      data: { isDismissed: true }
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to dismiss alert' });
+  }
+});
+
+// GET /api/farms/alerts/preferences - Get farmer alert preferences
+router.get('/alerts/preferences', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    let prefs = await prisma.farmerAlertPreference.findUnique({
+      where: { userId }
+    });
+    if (!prefs) {
+      prefs = await prisma.farmerAlertPreference.create({
+        data: { userId }
+      });
+    }
+    res.json(prefs);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch alert preferences' });
+  }
+});
+
+// PUT /api/farms/alerts/preferences - Update farmer alert preferences
+router.put('/alerts/preferences', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const {
+      preferredLanguage,
+      inAppEnabled,
+      pushEnabled,
+      heavyRainAlerts,
+      strongWindAlerts,
+      heatStressAlerts,
+      frostAlerts,
+      dryConditionsAlerts,
+      sprayingAdvisoryAlerts,
+      cropStageAlerts,
+      pestDiseaseAlerts,
+      marketUpdateAlerts,
+      quietHoursStart,
+      quietHoursEnd
+    } = req.body || {};
+
+    const updated = await prisma.farmerAlertPreference.upsert({
+      where: { userId },
+      create: {
+        userId,
+        preferredLanguage: preferredLanguage || 'en',
+        inAppEnabled: inAppEnabled ?? true,
+        pushEnabled: pushEnabled ?? false,
+        heavyRainAlerts: heavyRainAlerts ?? true,
+        strongWindAlerts: strongWindAlerts ?? true,
+        heatStressAlerts: heatStressAlerts ?? true,
+        frostAlerts: frostAlerts ?? true,
+        dryConditionsAlerts: dryConditionsAlerts ?? true,
+        sprayingAdvisoryAlerts: sprayingAdvisoryAlerts ?? true,
+        cropStageAlerts: cropStageAlerts ?? true,
+        pestDiseaseAlerts: pestDiseaseAlerts ?? true,
+        marketUpdateAlerts: marketUpdateAlerts ?? true,
+        quietHoursStart: quietHoursStart || null,
+        quietHoursEnd: quietHoursEnd || null
+      },
+      update: {
+        ...(preferredLanguage && { preferredLanguage }),
+        ...(inAppEnabled !== undefined && { inAppEnabled }),
+        ...(pushEnabled !== undefined && { pushEnabled }),
+        ...(heavyRainAlerts !== undefined && { heavyRainAlerts }),
+        ...(strongWindAlerts !== undefined && { strongWindAlerts }),
+        ...(heatStressAlerts !== undefined && { heatStressAlerts }),
+        ...(frostAlerts !== undefined && { frostAlerts }),
+        ...(dryConditionsAlerts !== undefined && { dryConditionsAlerts }),
+        ...(sprayingAdvisoryAlerts !== undefined && { sprayingAdvisoryAlerts }),
+        ...(cropStageAlerts !== undefined && { cropStageAlerts }),
+        ...(pestDiseaseAlerts !== undefined && { pestDiseaseAlerts }),
+        ...(marketUpdateAlerts !== undefined && { marketUpdateAlerts }),
+        ...(quietHoursStart !== undefined && { quietHoursStart }),
+        ...(quietHoursEnd !== undefined && { quietHoursEnd })
+      }
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update preferences error:', err);
+    res.status(500).json({ error: 'Failed to update alert preferences' });
   }
 });
 

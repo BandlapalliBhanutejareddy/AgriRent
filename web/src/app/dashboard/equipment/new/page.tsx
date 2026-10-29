@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ToastProvider';
-import { ArrowLeft, Save, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Upload, Loader2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslation } from "react-i18next";
+import { AGRICULTURAL_CATEGORIES, EQUIPMENT_CATALOG_ITEMS, getEquipmentDefaultImage } from '@/constants/agriculturalCatalog';
 
 export default function AddEquipment() {
     const { t } = useTranslation();
@@ -15,11 +16,12 @@ export default function AddEquipment() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
-    category: 'TRACTOR',
+    category: 'TRACTORS_AND_POWER_UNITS',
     pricePerDay: '',
     description: '',
     location: '',
   });
+  const [selectedCatalogItemId, setSelectedCatalogItemId] = useState<string>('');
 
   const isDirty = formData.title || formData.description || formData.pricePerDay;
 
@@ -36,6 +38,32 @@ export default function AddEquipment() {
 
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleCategoryChange = (newCat: string) => {
+    setFormData(prev => ({ ...prev, category: newCat }));
+    setSelectedCatalogItemId('');
+    // Auto populate preview image from default category photo if no custom file uploaded
+    if (!image) {
+      setImagePreview(getEquipmentDefaultImage('', newCat));
+    }
+  };
+
+  const handleSelectCatalogItem = (itemId: string) => {
+    setSelectedCatalogItemId(itemId);
+    if (!itemId) return;
+    const item = EQUIPMENT_CATALOG_ITEMS.find(c => c.id === itemId);
+    if (item) {
+      setFormData(prev => ({
+        ...prev,
+        title: item.name,
+        pricePerDay: item.defaultPricePerDay.toString(),
+        description: item.description,
+      }));
+      if (!image) {
+        setImagePreview(item.defaultImageUrl);
+      }
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,7 +102,7 @@ export default function AddEquipment() {
     try {
       let imageUrl = '';
       
-      // 1. Upload Image if present
+      // 1. Upload custom image if provided
       if (image) {
         const formDataUpload = new FormData();
         formDataUpload.append('image', image);
@@ -82,16 +110,18 @@ export default function AddEquipment() {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         imageUrl = uploadRes.data.data?.url || uploadRes.data.url;
+      } else if (imagePreview && imagePreview.startsWith('http')) {
+        imageUrl = imagePreview;
+      } else {
+        imageUrl = getEquipmentDefaultImage(formData.title, formData.category);
       }
 
       // 2. Create Equipment
       const payload: any = {
         ...formData,
         pricePerDay: Number(formData.pricePerDay),
+        imageUrl
       };
-      if (imageUrl) {
-        payload.imageUrl = imageUrl;
-      }
       
       await api.post('/equipment', payload);
       
@@ -141,6 +171,49 @@ export default function AddEquipment() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700 ml-1">{t('category')}</label>
+              <select
+                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-slate-900 dark:text-slate-50 font-medium"
+                value={formData.category}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+              >
+                {AGRICULTURAL_CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+                {/* Legacy options */}
+                <option value="TRACTOR">{t('tractor')} (Legacy)</option>
+                <option value="HARVESTER">{t('harvester')} (Legacy)</option>
+                <option value="IMPLEMENT">{t('implement')} (Legacy)</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700 ml-1 flex items-center gap-1.5">
+                <Sparkles size={14} className="text-emerald-500" />
+                <span>Machinery Template (Auto-fill specs & photo)</span>
+              </label>
+              <select
+                className="w-full px-4 py-3 bg-emerald-50/50 dark:bg-slate-800/80 border border-emerald-200 dark:border-emerald-800/60 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-slate-900 dark:text-slate-50 font-medium"
+                value={selectedCatalogItemId}
+                onChange={(e) => handleSelectCatalogItem(e.target.value)}
+              >
+                <option value="">-- Select standard machinery model --</option>
+                {EQUIPMENT_CATALOG_ITEMS.filter(
+                  item => item.categoryId === formData.category ||
+                  (formData.category === 'TRACTOR' && item.categoryId === 'TRACTORS_AND_POWER_UNITS') ||
+                  (formData.category === 'HARVESTER' && item.categoryId === 'HARVESTING_EQUIPMENT') ||
+                  (formData.category === 'IMPLEMENT' && item.categoryId === 'LAND_PREPARATION')
+                ).map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} — ₹{item.defaultPricePerDay}/day
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700 ml-1">{t('equipment_title')}</label>
               <input
                 required
@@ -150,21 +223,6 @@ export default function AddEquipment() {
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">{t('category')}</label>
-              <select
-                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-slate-900 dark:text-slate-50 font-medium"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                <option value="TRACTOR">{t('tractor')}</option>
-                <option value="HARVESTER">{t('harvester')}</option>
-                <option value="IMPLEMENT">{t('implement')}</option>
-                <option value="SEEDER">{t('seeder')}</option>
-                <option value="OTHER">{t('other')}</option>
-              </select>
             </div>
 
             <div className="space-y-2">
@@ -179,7 +237,7 @@ export default function AddEquipment() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-bold text-slate-700 ml-1">{t('location')}</label>
               <input
                 required

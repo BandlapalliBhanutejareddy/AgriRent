@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 export interface CreateFarmInput {
   name: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   area: number;
   areaUnit?: string;
   soilType: string;
@@ -16,6 +18,8 @@ export interface CreateFarmInput {
 export interface UpdateFarmInput {
   name?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   area?: number;
   areaUnit?: string;
   soilType?: string;
@@ -52,6 +56,8 @@ export class FarmDigitalTwinService {
           ownerId,
           name: input.name,
           location: input.location,
+          latitude: input.latitude != null ? Number(input.latitude) : null,
+          longitude: input.longitude != null ? Number(input.longitude) : null,
           area: Number(input.area),
           areaUnit: input.areaUnit || 'acres',
           soilType: input.soilType
@@ -223,6 +229,8 @@ export class FarmDigitalTwinService {
         data: {
           ...(input.name && { name: input.name }),
           ...(input.location && { location: input.location }),
+          ...(input.latitude !== undefined && { latitude: input.latitude != null ? Number(input.latitude) : null }),
+          ...(input.longitude !== undefined && { longitude: input.longitude != null ? Number(input.longitude) : null }),
           ...(input.area && { area: Number(input.area) }),
           ...(input.areaUnit && { areaUnit: input.areaUnit }),
           ...(input.soilType && { soilType: input.soilType })

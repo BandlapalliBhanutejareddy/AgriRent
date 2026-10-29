@@ -1,371 +1,292 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CloudSun, CloudRain, Wind, Droplets, Thermometer, MapPin, TrendingUp, Search, AlertCircle, Info, RefreshCw, Calendar, Sparkles } from 'lucide-react';
+import {
+  CloudSun,
+  CloudRain,
+  RefreshCw,
+  Calendar,
+  Sparkles
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ToastProvider';
-import { formatCurrency } from '@/lib/formatters';
+import FarmLocationSelector, { LocationSelectedData } from '@/components/FarmLocationSelector';
 
-export default function WeatherAndMarketPage() {
+export default function WeatherPage() {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'WEATHER' | 'MARKET'>('WEATHER');
 
   // Weather state
-  const [locationInput, setLocationInput] = useState('Guntur, Andhra Pradesh');
+  const [selectedLocation, setSelectedLocation] = useState<LocationSelectedData | null>(null);
   const [weatherData, setWeatherData] = useState<any>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
-
-  // Market prices state
-  const [commodityInput, setCommodityInput] = useState('');
-  const [stateInput, setStateInput] = useState('');
-  const [marketResult, setMarketResult] = useState<any>(null);
-  const [marketLoading, setMarketLoading] = useState(true);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchWeather(locationInput);
-    fetchMarketPrices();
+    fetchInitialWeather();
   }, []);
 
-  async function fetchWeather(loc: string) {
+  async function fetchInitialWeather() {
     try {
       setWeatherLoading(true);
-      const res = await api.get(`/farms/weather/lookup?location=${encodeURIComponent(loc)}`);
-      setWeatherData(res.data?.data || res.data);
+      setWeatherError(null);
+      const res = await api.get('/farms/weather/lookup');
+      const payload = res.data?.data || res.data;
+      if (payload && (payload.location || payload.current)) {
+        setWeatherData(payload);
+        if (payload.location) {
+          setSelectedLocation({
+            latitude: payload.location.latitude,
+            longitude: payload.location.longitude,
+            name: payload.location.name
+          });
+        }
+      }
     } catch (err: any) {
-      console.error('Failed to fetch weather:', err);
-      showToast('Unable to load live weather. Showing cached forecast.', 'warning');
+      console.warn('Initial weather lookup prompt:', err.response?.data?.error);
+      if (err.response?.data?.code === 'WEATHER_LOCATION_UNAVAILABLE') {
+        setWeatherError('Please select a location above using GPS, Search, or Map Pin to view weather.');
+      } else {
+        setWeatherError('Weather service is currently offline. Please try selecting a location.');
+      }
     } finally {
       setWeatherLoading(false);
     }
   }
 
-  async function fetchMarketPrices(commodity?: string, state?: string) {
+  async function fetchWeatherByLocation(lat: number, lng: number, name?: string) {
     try {
-      setMarketLoading(true);
+      setWeatherLoading(true);
+      setWeatherError(null);
       const params = new URLSearchParams();
-      if (commodity) params.append('commodity', commodity);
-      if (state) params.append('state', state);
+      params.append('lat', String(lat));
+      params.append('lng', String(lng));
+      if (name) params.append('name', name);
 
-      const res = await api.get(`/community/market/prices?${params.toString()}`);
-      setMarketResult(res.data);
+      const res = await api.get(`/farms/weather/lookup?${params.toString()}`);
+      const payload = res.data?.data || res.data;
+      if (payload && (payload.location || payload.current)) {
+        setWeatherData(payload);
+        setSelectedLocation({ latitude: lat, longitude: lng, name: payload.location?.name || name || '' });
+      } else {
+        setWeatherError(res.data?.error || 'Failed to retrieve weather for selected coordinates.');
+      }
     } catch (err: any) {
-      console.error('Failed to fetch market prices:', err);
+      console.error('Failed to fetch weather:', err);
+      setWeatherError(err.response?.data?.error || 'Unable to retrieve weather. Please check your network.');
     } finally {
-      setMarketLoading(false);
+      setWeatherLoading(false);
     }
   }
 
-  const handleWeatherSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!locationInput.trim()) return;
-    fetchWeather(locationInput.trim());
-  };
-
-  const handleMarketSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchMarketPrices(commodityInput.trim(), stateInput.trim());
+  const handleLocationSelected = (data: LocationSelectedData) => {
+    setSelectedLocation(data);
+    fetchWeatherByLocation(data.latitude, data.longitude, data.name);
   };
 
   const current = weatherData?.current;
   const forecast = weatherData?.forecast || [];
+  const locInfo = weatherData?.location;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 p-8 rounded-[32px] text-white shadow-xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <span className="px-3 py-1 bg-teal-500/20 text-teal-400 rounded-xl text-xs font-black uppercase tracking-wider border border-teal-500/30 inline-flex items-center gap-1.5">
-            <CloudSun size={13} /> Agronomic Climate & Market Intelligence
+            <CloudSun size={13} /> Agronomic Climate & Micro-Weather Intelligence
           </span>
           <h1 className="text-3xl font-black tracking-tight mt-2">
-            Weather & Crop Market Hub
+            Field Weather & Agricultural Advisories
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">
-            Access multi-day weather conditions for machinery planning and verified mandi selling prices.
+            Coordinate-accurate 7-day agricultural forecasts and machinery operational spraying windows powered by Open-Meteo.
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center p-1.5 bg-slate-800/80 rounded-2xl border border-slate-700/60 shrink-0">
+        {selectedLocation && (
           <button
-            type="button"
-            onClick={() => setActiveTab('WEATHER')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'WEATHER'
-                ? 'bg-teal-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            onClick={() => fetchWeatherByLocation(selectedLocation.latitude, selectedLocation.longitude, selectedLocation.name)}
+            disabled={weatherLoading}
+            className="px-4 py-2.5 bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 border border-teal-500/30 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
           >
-            <CloudSun size={16} />
-            <span>Weather Forecast</span>
+            <RefreshCw size={14} className={weatherLoading ? 'animate-spin' : ''} />
+            <span>Refresh Forecast</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('MARKET')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'MARKET'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <TrendingUp size={16} />
-            <span>Mandi Market Rates</span>
-          </button>
-        </div>
+        )}
       </div>
 
-      {activeTab === 'WEATHER' && (
-        <div className="space-y-6">
-          {/* Location Search Form */}
-          <form onSubmit={handleWeatherSearch} className="flex gap-3 max-w-xl">
-            <div className="relative flex-1">
-              <MapPin size={18} className="absolute left-4 top-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={locationInput}
-                onChange={(e) => setLocationInput(e.target.value)}
-                placeholder="Enter district, village, or state (e.g. Guntur, AP)"
-                className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={weatherLoading}
-              className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {weatherLoading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
-              <span>Update Weather</span>
-            </button>
-          </form>
+      <div className="space-y-6">
+        {/* Location Selection (GPS / Search / Map) */}
+        <FarmLocationSelector
+          initialLatitude={selectedLocation?.latitude}
+          initialLongitude={selectedLocation?.longitude}
+          initialName={selectedLocation?.name}
+          onLocationSelected={handleLocationSelected}
+        />
 
-          {weatherLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-pulse">
-              <div className="md:col-span-2 h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
-              <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
-              <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
-            </div>
-          ) : current ? (
-            <>
-              {/* Primary Current Weather Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="md:col-span-2 bg-gradient-to-br from-teal-600 to-emerald-700 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-xl text-[10px] font-black uppercase tracking-wider">
-                        Current Farm Conditions
-                      </span>
-                      <h2 className="text-4xl font-black tracking-tight mt-3">
-                        {current.temperature != null ? `${Math.round(current.temperature)}°C` : '28°C'}
-                      </h2>
-                      <p className="text-teal-100 text-xs font-medium mt-1">
-                        Feels like {current.apparentTemperature != null ? `${Math.round(current.apparentTemperature)}°C` : '30°C'} • {locationInput}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-md">
-                      <CloudSun size={48} />
-                    </div>
-                  </div>
-
-                  <div className="pt-6 border-t border-white/20 grid grid-cols-3 gap-2 text-center text-xs">
-                    <div>
-                      <span className="text-teal-200 block text-[10px] uppercase font-bold">Humidity</span>
-                      <span className="text-base font-black">{current.humidity ?? 65}%</span>
-                    </div>
-                    <div>
-                      <span className="text-teal-200 block text-[10px] uppercase font-bold">Wind Speed</span>
-                      <span className="text-base font-black">{current.windSpeed ?? 12} km/h</span>
-                    </div>
-                    <div>
-                      <span className="text-teal-200 block text-[10px] uppercase font-bold">Precipitation</span>
-                      <span className="text-base font-black">{current.precipitation ?? 0} mm</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Agricultural Field Recommendation */}
-                <div className="md:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+        {weatherLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-pulse">
+            <div className="md:col-span-2 h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
+            <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
+            <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />
+          </div>
+        ) : current ? (
+          <>
+            {/* Primary Current Weather Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="md:col-span-2 bg-gradient-to-br from-teal-600 to-emerald-700 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-start">
                   <div>
-                    <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1">
-                      <Sparkles size={12} /> Machinery Advisory
-                    </span>
-                    <h3 className="text-base font-black text-slate-800 dark:text-white mt-2">
-                      Optimal Field Work Windows
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                      {(current.precipitation ?? 0) > 2
-                        ? 'Heavy precipitation expected. Postpone tractor tilling and cultivator passes until topsoil moisture drops to prevent severe soil compaction.'
-                        : 'Weather conditions are optimal for tractor cultivation, rotavator preparation, and boom spraying activities.'}
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-xl text-[10px] font-black uppercase tracking-wider">
+                        Current Field Conditions
+                      </span>
+                      {weatherData?.isCached && (
+                        <span className="px-2 py-0.5 bg-black/20 rounded-md text-[9px] font-mono">
+                          Cached
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-5xl font-black tracking-tight mt-4">
+                      {current.temperature != null ? `${Math.round(current.temperature)}°C` : 'N/A'}
+                    </div>
+                    <p className="text-teal-100 font-bold text-sm mt-1">
+                      {current.weatherDescription}
                     </p>
                   </div>
+                  <CloudSun size={64} className="text-white/80" />
+                </div>
 
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
-                    <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                      <span className="font-semibold">Spraying Condition:</span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                        {(current.windSpeed ?? 10) < 15 ? 'Favorable (<15 km/h)' : 'Caution (High Drift Risk)'}
+                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/10 text-xs">
+                  <div>
+                    <span className="text-teal-200 text-[10px] block font-bold uppercase">Humidity</span>
+                    <span className="text-base font-black">{current.humidity ?? 0}%</span>
+                  </div>
+                  <div>
+                    <span className="text-teal-200 text-[10px] block font-bold uppercase">Wind Velocity</span>
+                    <span className="text-base font-black">{current.windSpeed ?? 0} km/h</span>
+                  </div>
+                  <div>
+                    <span className="text-teal-200 text-[10px] block font-bold uppercase">Precipitation</span>
+                    <span className="text-base font-black">{current.precipitation ?? 0} mm</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agricultural Field & Machinery Advisory */}
+              <div className="md:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+                <div>
+                  <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1">
+                    <Sparkles size={12} /> Agricultural Machinery Advisory
+                  </span>
+                  <h3 className="text-base font-black text-slate-800 dark:text-white mt-2">
+                    Optimal Field Work Windows
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    {(current.precipitation ?? 0) > 2
+                      ? 'Heavy precipitation detected. Postpone tractor rotavator, cultivator passes, and seeding operations to avoid severe topsoil compaction.'
+                      : (current.windSpeed ?? 0) > 20
+                      ? 'High wind velocity detected. Pause chemical knapsack or tractor boom spraying to eliminate pesticide drift risks.'
+                      : 'Weather conditions are optimal for tractor cultivation, rotavator soil preparation, seed drill passes, and boom spraying.'}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                  <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                    <span className="font-semibold">Spraying Condition:</span>
+                    <span className={`font-bold ${
+                      (current.windSpeed ?? 10) < 15 && (current.precipitation ?? 0) === 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {(current.windSpeed ?? 10) < 15 && (current.precipitation ?? 0) === 0
+                        ? 'Optimal (<15 km/h, No Rain)'
+                        : 'Caution (Drift or Rain Risk)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                    <span className="font-semibold">Harvester Operations:</span>
+                    <span className={`font-bold ${
+                      (current.precipitation ?? 0) === 0
+                        ? 'text-teal-600 dark:text-teal-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {(current.precipitation ?? 0) === 0 ? 'Favorable Dry Canopy' : 'Wait for Crop to Dry'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 7-Day Forecast Strip */}
+            {forecast.length > 0 && (
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <Calendar size={16} /> 7-Day Agricultural Forecast
+                  </h3>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    Timezone: {locInfo?.timezone || 'Local'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                  {forecast.slice(0, 7).map((day: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-center space-y-2"
+                    >
+                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">
+                        {day.date ? new Date(day.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : `Day ${idx + 1}`}
+                      </span>
+                      <div className="my-1 flex justify-center text-teal-500">
+                        {day.precipitation > 1 || day.precipitationProbability > 50 ? (
+                          <CloudRain size={28} />
+                        ) : (
+                          <CloudSun size={28} />
+                        )}
+                      </div>
+                      <div className="text-xs font-black text-slate-800 dark:text-white">
+                        {Math.round(day.maxTemperature ?? 30)}° / {Math.round(day.minTemperature ?? 20)}°
+                      </div>
+                      <span className="text-[10px] text-slate-400 block font-semibold">
+                        Rain: {day.precipitationProbability ?? 0}%
+                      </span>
+                      <span className="text-[9px] text-teal-600 dark:text-teal-400 block truncate font-medium">
+                        {day.weatherDescription}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                      <span className="font-semibold">Harvesting Window:</span>
-                      <span className="font-bold text-teal-600 dark:text-teal-400">Open for Harvester Operations</span>
-                    </div>
-                  </div>
+                  ))}
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-[10px] text-slate-400">
+                  <span>Data Source: {weatherData?.source || 'Open-Meteo'}</span>
+                  <span>Retrieved: {new Date(weatherData?.fetchedAt || Date.now()).toLocaleString()}</span>
                 </div>
               </div>
-
-              {/* 5-Day Forecast Strip */}
-              {forecast.length > 0 && (
-                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <Calendar size={16} /> 5-Day Agricultural Forecast
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                    {forecast.slice(0, 5).map((day: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-center space-y-2"
-                      >
-                        <span className="text-[11px] font-bold text-slate-400 block">
-                          {day.date ? new Date(day.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : `Day ${idx + 1}`}
-                        </span>
-                        <div className="my-1 flex justify-center text-teal-500">
-                          {day.precipitationSum > 1 ? <CloudRain size={28} /> : <CloudSun size={28} />}
-                        </div>
-                        <div className="text-xs font-black text-slate-800 dark:text-white">
-                          {Math.round(day.tempMax ?? 32)}° / {Math.round(day.tempMin ?? 22)}°
-                        </div>
-                        <span className="text-[10px] text-slate-400 block font-semibold">
-                          Rain: {day.precipitationProbability ?? 10}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
-              <CloudSun size={36} className="text-slate-400 mx-auto mb-2" />
-              <p className="text-xs text-slate-500">Weather data temporarily offline.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'MARKET' && (
-        <div className="space-y-6">
-          {/* Commodity and State Search */}
-          <form onSubmit={handleMarketSearch} className="flex flex-wrap gap-3 max-w-2xl">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search size={18} className="absolute left-4 top-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={commodityInput}
-                onChange={(e) => setCommodityInput(e.target.value)}
-                placeholder="Commodity (e.g. Paddy, Cotton, Maize, Chilli)"
-                className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-              />
-            </div>
-            <div className="min-w-[150px]">
-              <input
-                type="text"
-                value={stateInput}
-                onChange={(e) => setStateInput(e.target.value)}
-                placeholder="State (e.g. Andhra Pradesh)"
-                className="w-full px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={marketLoading}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {marketLoading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
-              <span>Query Mandi</span>
-            </button>
-          </form>
-
-          {/* Data Honesty Disclaimer Card */}
-          {marketResult && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 rounded-2xl flex items-start gap-3 text-xs text-blue-900 dark:text-blue-300">
-              <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold">Official Agmarknet / APMC Data Feed: </span>
-                <span>{marketResult.disclaimer || 'Prices reflect real official Mandi auction records when connected. No synthetic numbers are fabricated.'}</span>
-                <span className="block text-[10px] font-bold text-blue-500 mt-0.5 uppercase tracking-wider">
-                  Source: {marketResult.dataSource || 'Agricultural Market Price Network'} • Status: {marketResult.status || 'CONNECTED'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Prices Table / Grid */}
-          {marketLoading ? (
-            <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl animate-pulse" />
-          ) : (marketResult?.records?.length > 0 || marketResult?.prices?.length > 0) ? (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-100 dark:border-slate-800">
-                    <tr>
-                      <th className="py-4 px-6">Commodity</th>
-                      <th className="py-4 px-6">Mandi / Market</th>
-                      <th className="py-4 px-6">District & State</th>
-                      <th className="py-4 px-6">Arrival Date</th>
-                      <th className="py-4 px-6 text-right">Min Price</th>
-                      <th className="py-4 px-6 text-right">Max Price</th>
-                      <th className="py-4 px-6 text-right">Modal Price</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {(marketResult?.records || marketResult?.prices || []).map((item: any, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-4 px-6 font-bold text-slate-900 dark:text-white">
-                          <div>{item.commodity}</div>
-                          {item.variety && <span className="text-[10px] text-slate-400 font-normal">{item.variety}</span>}
-                        </td>
-                        <td className="py-4 px-6 font-medium text-slate-700 dark:text-slate-300">
-                          {item.market || 'Regional Mandi'}
-                        </td>
-                        <td className="py-4 px-6 text-slate-500">
-                          {item.district ? `${item.district}, ` : ''}{item.state}
-                        </td>
-                        <td className="py-4 px-6 text-slate-500 font-medium">
-                          {item.arrivalDate || 'Today'}
-                        </td>
-                        <td className="py-4 px-6 text-right font-medium text-slate-600 dark:text-slate-400">
-                          {formatCurrency(item.minPrice)} / Qtl
-                        </td>
-                        <td className="py-4 px-6 text-right font-medium text-slate-600 dark:text-slate-400">
-                          {formatCurrency(item.maxPrice)} / Qtl
-                        </td>
-                        <td className="py-4 px-6 text-right font-black text-emerald-600 dark:text-emerald-400">
-                          {formatCurrency(item.modalPrice)} / Qtl
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
-              <TrendingUp size={36} className="text-slate-400 mx-auto" />
-              <h3 className="text-base font-black text-slate-800 dark:text-white">
-                {marketResult?.status === 'UNAVAILABLE' ? 'Official Mandi Feed Service Status' : 'No active market prices for this query'}
-              </h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                {marketResult?.disclaimer || 'Agmarknet auction feeds update throughout trading hours. Try querying for major commodities like Paddy, Cotton, or Maize.'}
-              </p>
-              {marketResult?.missingConfigRequirement && (
-                <div className="text-[11px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/50 max-w-lg mx-auto">
-                  {marketResult.missingConfigRequirement}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        ) : (
+          <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <CloudSun size={36} className="text-slate-400 mx-auto" />
+            <h3 className="text-base font-black text-slate-800 dark:text-white">
+              {weatherError || 'No Location Selected'}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Use the location selector above to detect your GPS position, search for your town/village, or drop a map pin.
+            </p>
+            {selectedLocation && (
+              <button
+                onClick={() => fetchWeatherByLocation(selectedLocation.latitude, selectedLocation.longitude, selectedLocation.name)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-sm"
+              >
+                <RefreshCw size={13} />
+                <span>Retry Weather Forecast</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
