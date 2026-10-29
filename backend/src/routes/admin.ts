@@ -155,7 +155,7 @@ router.get('/users', async (req: AuthRequest, res: Response): Promise<void> => {
       })
     ]);
 
-    res.json({ data: users, total, page: pageNum, limit: limitNum });
+    res.json({ success: true, data: users, total, page: pageNum, limit: limitNum });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
@@ -272,7 +272,7 @@ router.get('/equipment', async (req: AuthRequest, res: Response): Promise<void> 
         take: limitNum
       })
     ]);
-    res.json({ data: equipment, total, page: pageNum, limit: limitNum });
+    res.json({ success: true, data: equipment, total, page: pageNum, limit: limitNum });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch equipment moderation list' });
   }
@@ -374,7 +374,7 @@ router.get('/audit-logs', async (req: AuthRequest, res: Response): Promise<void>
         take: limitNum
       })
     ]);
-    res.json({ data: logs, total, page: pageNum, limit: limitNum });
+    res.json({ success: true, data: logs, total, page: pageNum, limit: limitNum });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
@@ -431,7 +431,7 @@ router.get('/bookings', async (req: AuthRequest, res: Response): Promise<void> =
       payment: b.payments?.[0] || { amount: b.amountPaid ?? b.totalPrice, status: b.paymentStatus }
     }));
 
-    res.json({ data: formattedBookings, total, page: pageNum, limit: limitNum });
+    res.json({ success: true, data: formattedBookings, total, page: pageNum, limit: limitNum });
   } catch (error) {
     console.error('Booking fetch error', error);
     res.status(500).json({ error: 'Failed to fetch bookings' });
@@ -484,7 +484,7 @@ router.get('/payments', async (req: AuthRequest, res: Response): Promise<void> =
       equipmentTitle: p.booking?.equipment?.title || 'Equipment'
     }));
 
-    res.json({ data: formattedPayments, total, page: pageNum, limit: limitNum });
+    res.json({ success: true, data: formattedPayments, total, page: pageNum, limit: limitNum });
   } catch (error) {
     console.error('Admin Payments Error:', error);
     res.status(500).json({ error: 'Failed to fetch admin payments' });

@@ -1799,8 +1799,12 @@ router.get('/weather/reverse-geocode', async (req: AuthRequest, res: Response): 
 // GET /api/farms/weather/lookup?lat=...&lng=... OR ?location=...
 router.get('/weather/lookup', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const latParam = req.query.lat ? parseFloat(String(req.query.lat)) : NaN;
-    const lngParam = req.query.lng ? parseFloat(String(req.query.lng)) : NaN;
+    const latParam = req.query.lat
+      ? parseFloat(String(req.query.lat))
+      : (req.query.latitude ? parseFloat(String(req.query.latitude)) : NaN);
+    const lngParam = req.query.lng
+      ? parseFloat(String(req.query.lng))
+      : (req.query.longitude ? parseFloat(String(req.query.longitude)) : NaN);
     const locationQuery = req.query.location ? String(req.query.location).trim() : '';
     const nameParam = req.query.name ? String(req.query.name).trim() : undefined;
     const bypassCache = req.query.bypassCache === 'true';

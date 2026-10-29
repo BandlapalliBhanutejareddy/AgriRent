@@ -412,14 +412,12 @@ class OwnerHomeScreen extends ConsumerWidget {
     bool isDark,
     String lang,
   ) {
-    final totalRevenue = ownerState.totalRevenue;
     final totalListings = ownerState.totalEquipmentCount;
     final activeListings = ownerState.activeListingsCount;
     final inactiveListings = ownerState.inactiveListingsCount;
     final pendingBookings = ownerState.pendingBookingsCount;
     final activeRentals = ownerState.activeRentalsCount;
     final completedBookings = ownerState.completedBookingsCount;
-    final outstandingBalance = ownerState.totalOutstandingBalance;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -558,28 +556,6 @@ class OwnerHomeScreen extends ConsumerWidget {
                 ref.read(ownerBookingFilterProvider.notifier).state = 'COMPLETED';
                 onNavigateTab?.call(2);
               },
-            ),
-            // 7. Total Rental Revenue -> Owner Analytics
-            _buildMetricCard(
-              title: 'revenue_generated'.tr(lang),
-              value: AppFormatters.formatCurrency(totalRevenue),
-              subtitle: 'Rental revenue breakdown',
-              icon: Icons.currency_rupee_rounded,
-              accentColor: const Color(0xFF2E7D32),
-              isDark: isDark,
-              onTap: () => context.push('/owner-analytics'),
-            ),
-            // 8. Pending Payments -> Payments Received
-            _buildMetricCard(
-              title: 'pending_payments'.tr(lang).isEmpty || 'pending_payments'.tr(lang) == 'pending_payments'
-                  ? 'Pending Payments'
-                  : 'pending_payments'.tr(lang),
-              value: AppFormatters.formatCurrency(outstandingBalance),
-              subtitle: 'Uncollected balances',
-              icon: Icons.account_balance_wallet_rounded,
-              accentColor: const Color(0xFFE65100),
-              isDark: isDark,
-              onTap: () => context.push('/payments-received'),
             ),
           ],
         ),

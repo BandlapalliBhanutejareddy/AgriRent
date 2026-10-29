@@ -13,8 +13,24 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../shared/widgets/profile_header_painters.dart';
 
 // -----------------------------------------------------------------------------
-// ADMIN DATA PROVIDERS
+// ADMIN DATA HELPERS & PROVIDERS
 // -----------------------------------------------------------------------------
+List<dynamic> extractListFromResponse(dynamic d) {
+  if (d == null) return [];
+  if (d is List) return d;
+  if (d is Map) {
+    if (d['data'] is List) return d['data'] as List<dynamic>;
+    if (d['data'] is Map && d['data']['data'] is List) return d['data']['data'] as List<dynamic>;
+    if (d['users'] is List) return d['users'] as List<dynamic>;
+    if (d['equipment'] is List) return d['equipment'] as List<dynamic>;
+    if (d['bookings'] is List) return d['bookings'] as List<dynamic>;
+    if (d['results'] is List) return d['results'] as List<dynamic>;
+    if (d['items'] is List) return d['items'] as List<dynamic>;
+    if (d['logs'] is List) return d['logs'] as List<dynamic>;
+  }
+  return [];
+}
+
 final adminStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final response = await ApiClient().dio.get('/admin/stats');
   final dynamic d = response.data;
@@ -26,34 +42,22 @@ final adminStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref
 
 final adminUsersProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final response = await ApiClient().dio.get('/admin/users');
-  final dynamic d = response.data;
-  if (d is List) return d;
-  if (d is Map && d['data'] is List) return d['data'];
-  return [];
+  return extractListFromResponse(response.data);
 });
 
 final adminEquipmentProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final response = await ApiClient().dio.get('/admin/equipment');
-  final dynamic d = response.data;
-  if (d is List) return d;
-  if (d is Map && d['data'] is List) return d['data'];
-  return [];
+  return extractListFromResponse(response.data);
 });
 
 final adminBookingsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final response = await ApiClient().dio.get('/admin/bookings');
-  final dynamic d = response.data;
-  if (d is List) return d;
-  if (d is Map && d['data'] is List) return d['data'];
-  return [];
+  return extractListFromResponse(response.data);
 });
 
 final adminAuditLogsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final response = await ApiClient().dio.get('/admin/audit-logs');
-  final dynamic d = response.data;
-  if (d is List) return d;
-  if (d is Map && d['data'] is List) return d['data'];
-  return [];
+  return extractListFromResponse(response.data);
 });
 
 final adminAlertsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
@@ -67,18 +71,45 @@ final adminAlertsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((re
 
 final adminHealthProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final response = await ApiClient().dio.get('/admin/system-health');
-  final dynamic d = response.data;
-  if (d is List) return d;
-  if (d is Map && d['data'] is List) return d['data'];
-  return [];
+  return extractListFromResponse(response.data);
 });
 
 final adminDataQualityProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final response = await ApiClient().dio.get('/admin/data-quality');
-  final dynamic d = response.data;
-  if (d is List) return d;
-  if (d is Map && d['data'] is List) return d['data'];
-  return [];
+  return extractListFromResponse(response.data);
+});
+
+final adminEquipmentAnalyticsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, period) async {
+  try {
+    final response = await ApiClient().dio.get('/admin/equipment-analytics', queryParameters: {'period': period});
+    final dynamic d = response.data;
+    if (d is Map<String, dynamic>) {
+      return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
+    }
+  } catch (_) {}
+  return {};
+});
+
+final adminOwnerEarningsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, period) async {
+  try {
+    final response = await ApiClient().dio.get('/admin/owner-earnings', queryParameters: {'period': period});
+    final dynamic d = response.data;
+    if (d is Map<String, dynamic>) {
+      return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
+    }
+  } catch (_) {}
+  return {};
+});
+
+final adminCropAnalyticsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  try {
+    final response = await ApiClient().dio.get('/admin/crop-analytics');
+    final dynamic d = response.data;
+    if (d is Map<String, dynamic>) {
+      return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
+    }
+  } catch (_) {}
+  return {};
 });
 
 // -----------------------------------------------------------------------------
@@ -94,6 +125,87 @@ class AdminDashboardScreen extends ConsumerStatefulWidget {
 class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   int _currentIndex = 0;
   bool _isUploadingPhoto = false;
+
+  // Users Management State
+  String _userSearch = '';
+  String _userRole = 'All';
+  String _userStatus = 'All';
+  int _userPage = 1;
+  final int _userLimit = 15;
+  int _userTotal = 0;
+  bool _isUsersLoading = false;
+  String? _usersError;
+  List<dynamic> _usersList = [];
+  final TextEditingController _userSearchCtrl = TextEditingController();
+
+  // Analytics Period State (7d, 30d, 90d, all)
+  String _analyticsPeriod = '30d';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  @override
+  void dispose() {
+    _userSearchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchUsers() async {
+    setState(() {
+      _isUsersLoading = true;
+      _usersError = null;
+    });
+    try {
+      final queryParams = <String, dynamic>{
+        'page': _userPage,
+        'limit': _userLimit,
+      };
+      if (_userSearch.trim().isNotEmpty) {
+        queryParams['search'] = _userSearch.trim();
+      }
+      if (_userRole != 'All') {
+        queryParams['role'] = _userRole;
+      }
+      if (_userStatus != 'All') {
+        queryParams['status'] = _userStatus;
+      }
+
+      final res = await ApiClient().dio.get('/admin/users', queryParameters: queryParams);
+      final dynamic d = res.data;
+      List<dynamic> list = [];
+      int total = 0;
+
+      if (d is Map) {
+        if (d['data'] is List) {
+          list = d['data'] as List<dynamic>;
+          total = (d['total'] as num?)?.toInt() ?? list.length;
+        } else if (d['data'] is Map) {
+          final inner = d['data'] as Map;
+          if (inner['data'] is List) {
+            list = inner['data'] as List<dynamic>;
+          }
+          total = (inner['total'] as num?)?.toInt() ?? list.length;
+        }
+      } else if (d is List) {
+        list = d;
+        total = list.length;
+      }
+
+      setState(() {
+        _usersList = list;
+        _userTotal = total;
+        _isUsersLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _usersError = e.toString().replaceFirst('Exception: ', '');
+        _isUsersLoading = false;
+      });
+    }
+  }
 
   String _getLanguageName(String? code) {
     switch ((code ?? 'en').toLowerCase()) {
@@ -358,35 +470,39 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   children: [
                     Expanded(
                       child: _buildJumpButton(
-                        title: 'Operations',
-                        icon: Icons.monitor_heart_rounded,
-                        color: const Color(0xFF1976D2),
+                        title: 'Fleet Moderation',
+                        icon: Icons.agriculture_rounded,
+                        color: const Color(0xFF16A34A),
                         isDark: isDark,
-                        onTap: () => setState(() => _currentIndex = 1),
+                        onTap: () => _showEquipmentManagementModal(isDark, lang),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildJumpButton(
-                        title: 'Alerts',
-                        icon: Icons.notification_important_rounded,
-                        color: const Color(0xFFD32F2F),
+                        title: 'All Bookings',
+                        icon: Icons.receipt_long_rounded,
+                        color: const Color(0xFF2563EB),
                         isDark: isDark,
-                        onTap: () => setState(() => _currentIndex = 2),
+                        onTap: () => _showBookingsManagementModal(isDark, lang),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildJumpButton(
-                        title: 'Health',
-                        icon: Icons.health_and_safety_rounded,
-                        color: const Color(0xFF2E7D32),
+                        title: 'Audit Logs',
+                        icon: Icons.history_rounded,
+                        color: const Color(0xFF7C3AED),
                         isDark: isDark,
-                        onTap: () => setState(() => _currentIndex = 3),
+                        onTap: () => _showAuditLogsModal(isDark, lang),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
+
+                // Platform Analytics & Trends (Parity with Web Admin)
+                _buildAnalyticsSection(isDark, lang),
               ],
             ),
           ),
@@ -588,6 +704,702 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     );
   }
 
+  Widget _buildAnalyticsSection(bool isDark, String lang) {
+    final eqAnalytics = ref.watch(adminEquipmentAnalyticsProvider(_analyticsPeriod));
+    final ownerEarnings = ref.watch(adminOwnerEarningsProvider(_analyticsPeriod));
+    final cropAnalytics = ref.watch(adminCropAnalyticsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Analytics & Trends',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : AppTheme.textDarkNavy,
+              ),
+            ),
+            // Period selector
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  ...['7d', '30d', '90d', 'all'].map((p) {
+                    final isSel = _analyticsPeriod == p;
+                    return GestureDetector(
+                      onTap: () => setState(() => _analyticsPeriod = p),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isSel ? const Color(0xFF2563EB) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          p.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: isSel ? Colors.white : (isDark ? Colors.white60 : Colors.grey.shade600),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // 1. Equipment Trends Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkCard : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.bar_chart_rounded, color: Color(0xFF2563EB), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Equipment Utilization & Categories',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              eqAnalytics.when(
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+                  ),
+                ),
+                error: (e, _) => Text('Analytics offline: $e', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                data: (data) {
+                  final categories = (data['categories'] as List<dynamic>?) ??
+                      (data['popularCategories'] as List<dynamic>?) ??
+                      [];
+                  if (categories.isEmpty) {
+                    return const Text('No category utilization recorded for this period.', style: TextStyle(fontSize: 12, color: Colors.grey));
+                  }
+                  return Column(
+                    children: categories.take(4).map((c) {
+                      final name = c['category']?.toString() ?? c['name']?.toString() ?? 'Category';
+                      final count = c['count'] ?? c['bookingCount'] ?? 1;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: (count is num ? count.toDouble() : 1.0) / 10.0,
+                                  minHeight: 6,
+                                  backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              '$count rentals',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 2. Owner Performance & Agricultural Demands
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Owner Earnings preview
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.monetization_on_rounded, size: 16, color: Color(0xFF16A34A)),
+                        SizedBox(width: 6),
+                        Text('Owner Payouts', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ownerEarnings.when(
+                      loading: () => const Text('Loading...', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      error: (e, _) => const Text('--', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      data: (data) {
+                        final total = data['totalEarnings'] ?? data['totalPayout'] ?? '₹0';
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$total',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${data['activeOwners'] ?? 0} active earners',
+                              style: TextStyle(fontSize: 10.5, color: isDark ? Colors.white54 : Colors.grey.shade600),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // Crop Demand preview
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.eco_rounded, size: 16, color: Color(0xFFEAB308)),
+                        SizedBox(width: 6),
+                        Text('Crop Demands', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    cropAnalytics.when(
+                      loading: () => const Text('Loading...', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      error: (e, _) => const Text('--', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      data: (data) {
+                        final topCrops = (data['topCrops'] as List<dynamic>?) ?? ['Paddy', 'Tomato'];
+                        final cropNames = topCrops.take(2).map((c) => c is Map ? c['name'] ?? '' : c.toString()).where((s) => s.isNotEmpty).join(', ');
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cropNames.isNotEmpty ? cropNames : 'Paddy, Tomato',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFEAB308)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'High regional rental need',
+                              style: TextStyle(fontSize: 10.5, color: isDark ? Colors.white54 : Colors.grey.shade600),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showEquipmentManagementModal(bool isDark, String lang) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, _) {
+          final eqState = ref.watch(adminEquipmentProvider);
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.agriculture_rounded, color: Color(0xFF16A34A), size: 24),
+                            SizedBox(width: 8),
+                            Text('Equipment Fleet Moderation', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          onPressed: () => ref.invalidate(adminEquipmentProvider),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: eqState.when(
+                      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A))),
+                      error: (e, _) => Center(child: Text('Error loading equipment: $e')),
+                      data: (equipmentList) {
+                        if (equipmentList.isEmpty) {
+                          return const Center(child: Text('No machinery registered in fleet.'));
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(14),
+                          itemCount: equipmentList.length,
+                          itemBuilder: (context, idx) {
+                            final eq = equipmentList[idx] as Map<String, dynamic>;
+                            final id = eq['id']?.toString() ?? '';
+                            final title = eq['title']?.toString() ?? 'Equipment';
+                            final cat = eq['category']?.toString() ?? 'Machinery';
+                            final rate = eq['pricePerDay'] ?? 0;
+                            final ownerName = eq['owner']?['name']?.toString() ?? 'Fleet Owner';
+                            final isAvail = eq['available'] == true;
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: const Color(0xFF16A34A).withValues(alpha: 0.15),
+                                    child: const Icon(Icons.agriculture_rounded, color: Color(0xFF16A34A)),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                                        Text('$cat • ₹$rate/day • By $ownerName', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final action = isAvail ? 'PAUSE' : 'APPROVE';
+                                      try {
+                                        await ApiClient().dio.put('/admin/equipment/$id/moderation', data: {'action': action});
+                                        ref.invalidate(adminEquipmentProvider);
+                                        ref.invalidate(adminStatsProvider);
+                                      } catch (_) {}
+                                    },
+                                    child: Text(
+                                      isAvail ? 'PAUSE' : 'ACTIVATE',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: isAvail ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showBookingsManagementModal(bool isDark, String lang) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, _) {
+          final bookingsState = ref.watch(adminBookingsProvider);
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB), size: 24),
+                            SizedBox(width: 8),
+                            Text('Platform Rental Bookings', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          onPressed: () => ref.invalidate(adminBookingsProvider),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: bookingsState.when(
+                      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
+                      error: (e, _) => Center(child: Text('Error loading bookings: $e')),
+                      data: (bookingsList) {
+                        if (bookingsList.isEmpty) {
+                          return const Center(child: Text('No rental bookings recorded yet.'));
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(14),
+                          itemCount: bookingsList.length,
+                          itemBuilder: (context, idx) {
+                            final b = bookingsList[idx] as Map<String, dynamic>;
+                            final id = b['id']?.toString().substring(0, 8) ?? '';
+                            final eqTitle = b['equipment']?['title']?.toString() ?? 'Equipment';
+                            final farmerName = b['farmer']?['name']?.toString() ?? 'Farmer';
+                            final amount = b['totalAmount'] ?? 0;
+                            final status = b['status']?.toString() ?? 'CONFIRMED';
+
+                            Color statusColor = const Color(0xFF2563EB);
+                            if (status == 'COMPLETED') statusColor = const Color(0xFF16A34A);
+                            if (status == 'PENDING') statusColor = const Color(0xFFEAB308);
+                            if (status == 'CANCELLED') statusColor = const Color(0xFFDC2626);
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: statusColor.withValues(alpha: 0.15),
+                                    child: Icon(Icons.receipt_rounded, color: statusColor),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Booking #$id • $eqTitle', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                                        Text('Rented by $farmerName • Total: ₹$amount', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      status,
+                                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: statusColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showAuditLogsModal(bool isDark, String lang) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, _) {
+          final logsState = ref.watch(adminAuditLogsProvider);
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.history_rounded, color: Color(0xFF7C3AED), size: 24),
+                            SizedBox(width: 8),
+                            Text('Platform Audit Trail', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          onPressed: () => ref.invalidate(adminAuditLogsProvider),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: logsState.when(
+                      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))),
+                      error: (e, _) => Center(child: Text('Error loading audit logs: $e')),
+                      data: (logs) {
+                        if (logs.isEmpty) {
+                          return const Center(child: Text('No system audit logs found.'));
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(14),
+                          itemCount: logs.length,
+                          itemBuilder: (context, idx) {
+                            final log = logs[idx] as Map<String, dynamic>;
+                            final action = log['action']?.toString() ?? 'SYSTEM_EVENT';
+                            final resource = log['resource']?.toString() ?? '';
+                            final time = log['createdAt'] != null
+                                ? DateFormat('dd MMM, h:mm a').format(DateTime.parse(log['createdAt']))
+                                : '';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.security_rounded, size: 18, color: Color(0xFF7C3AED)),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(action.replaceAll('_', ' '), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                        if (resource.isNotEmpty)
+                                          Text('Resource: $resource', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(time, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showBroadcastAlertDialog(bool isDark) {
+    final titleCtrl = TextEditingController();
+    final msgCtrl = TextEditingController();
+    String target = 'ALL';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          title: const Text('Send Broadcast Alert', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Target Audience:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('All Users', style: TextStyle(fontSize: 11)),
+                    selected: target == 'ALL',
+                    onSelected: (_) => setDlgState(() => target = 'ALL'),
+                  ),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: const Text('Farmers', style: TextStyle(fontSize: 11)),
+                    selected: target == 'FARMER',
+                    onSelected: (_) => setDlgState(() => target = 'FARMER'),
+                  ),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: const Text('Owners', style: TextStyle(fontSize: 11)),
+                    selected: target == 'OWNER',
+                    onSelected: (_) => setDlgState(() => target = 'OWNER'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Alert Headline',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: msgCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Message Body',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleCtrl.text.trim().isEmpty || msgCtrl.text.trim().isEmpty) return;
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(ctx);
+                try {
+                  await ApiClient().dio.post('/admin/alerts/send', data: {
+                    'title': titleCtrl.text.trim(),
+                    'message': msgCtrl.text.trim(),
+                    'targetRole': target,
+                  });
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Broadcast alert dispatched successfully')),
+                  );
+                  ref.invalidate(adminAlertsProvider);
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Failed to send alert: $e')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              child: const Text('Dispatch Alert'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildJumpButton({
     required String title,
     required IconData icon,
@@ -754,13 +1566,29 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'open_complaints'.tr(lang),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'open_complaints'.tr(lang),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _showBroadcastAlertDialog(isDark),
+                      icon: const Icon(Icons.campaign_rounded, size: 16),
+                      label: const Text('Broadcast Alert', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 if (complaints.isEmpty)
@@ -905,7 +1733,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   void _resolveComplaint(String id) async {
     try {
-      await ApiClient().dio.put('${ApiConstants.baseUrl}/admin/complaints/$id/status', data: {
+      await ApiClient().dio.put('/admin/complaints/$id/status', data: {
         'status': 'RESOLVED',
         'adminNotes': 'Resolved via Admin Mobile Console'
       });
@@ -1098,120 +1926,906 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // TAB 4: USERS MANAGEMENT
+  // TAB 1: USERS DIRECTORY & ACCOUNT MANAGEMENT
   // ---------------------------------------------------------------------------
   Widget _buildUsersTab(bool isDark, String lang) {
-    return ref.watch(adminUsersProvider).when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-      ),
-      error: (err, _) => _buildErrorState('unable_to_load_messages'.tr(lang), isDark, lang, () {
-        ref.invalidate(adminUsersProvider);
-      }),
-      data: (users) {
-        return RefreshIndicator(
-          color: AppTheme.primaryGreen,
-          onRefresh: () async => ref.invalidate(adminUsersProvider),
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: users.length,
-            itemBuilder: (context, index) {
-              final u = users[index];
-              final isSuspended = u['isSuspended'] == true;
-              final isVerified = u['isVerified'] == true;
-              final role = u['role']?.toString() ?? 'USER';
+    final totalPages = (_userTotal / _userLimit).ceil();
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkCard : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSuspended
-                        ? Colors.red.withValues(alpha: 0.3)
-                        : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+    return RefreshIndicator(
+      color: const Color(0xFF2563EB),
+      onRefresh: () async => _fetchUsers(),
+      child: Column(
+        children: [
+          // 1. Search Bar & Filter Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            color: isDark ? AppTheme.darkCard : Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _userSearchCtrl,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search by name, email, or phone...',
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white38 : Colors.grey.shade500,
+                    ),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF2563EB)),
+                    suffixIcon: _userSearch.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () {
+                              _userSearchCtrl.clear();
+                              setState(() {
+                                _userSearch = '';
+                                _userPage = 1;
+                              });
+                              _fetchUsers();
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onSubmitted: (val) {
+                    setState(() {
+                      _userSearch = val.trim();
+                      _userPage = 1;
+                    });
+                    _fetchUsers();
+                  },
+                ),
+                const SizedBox(height: 10),
+
+                // Role Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Role: ',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.grey),
+                      ),
+                      ...['All', 'FARMER', 'OWNER', 'ADMIN'].map((role) {
+                        final isSel = _userRole == role;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(
+                              role == 'All' ? 'All Roles' : (role == 'FARMER' ? 'Farmers' : (role == 'OWNER' ? 'Owners' : 'Admins')),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                color: isSel ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                              ),
+                            ),
+                            selected: isSel,
+                            selectedColor: const Color(0xFF2563EB),
+                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            side: BorderSide.none,
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                            onSelected: (_) {
+                              setState(() {
+                                _userRole = role;
+                                _userPage = 1;
+                              });
+                              _fetchUsers();
+                            },
+                          ),
+                        );
+                      }),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Status: ',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.grey),
+                      ),
+                      ...['All', 'Active', 'Suspended'].map((status) {
+                        final isSel = _userStatus == status;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(
+                              status == 'All' ? 'All Status' : status,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                color: isSel ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                              ),
+                            ),
+                            selected: isSel,
+                            selectedColor: status == 'Suspended' ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            side: BorderSide.none,
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                            onSelected: (_) {
+                              setState(() {
+                                _userStatus = status;
+                                _userPage = 1;
+                              });
+                              _fetchUsers();
+                            },
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
-                child: Row(
+                const SizedBox(height: 6),
+
+                // Record Counter
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    CircleAvatar(
-                      backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.12),
-                      child: Text(
-                        (u['name']?.toString() ?? 'U').substring(0, 1).toUpperCase(),
-                        style: const TextStyle(fontWeight: FontWeight.w800, color: AppTheme.primaryGreen),
+                    Text(
+                      'Showing ${_usersList.length} accounts${_userTotal > 0 ? ' of $_userTotal total' : ''}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white54 : Colors.grey.shade600,
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            u['name']?.toString() ?? 'User',
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : AppTheme.textDarkNavy,
-                            ),
-                          ),
-                          Text(
-                            '${u['email'] ?? ''} • $role',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: isDark ? Colors.white60 : AppTheme.textMutedGray,
-                            ),
-                          ),
-                        ],
+                    if (_isUsersLoading)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
                       ),
-                    ),
-                    // Action Buttons
-                    Row(
-                      children: [
-                        if (role == 'OWNER' && !isVerified)
-                          IconButton(
-                            icon: const Icon(Icons.verified_outlined, color: Colors.blue, size: 20),
-                            tooltip: 'Verify Owner',
-                            onPressed: () => _verifyOwner(u['id'].toString(), true),
-                          ),
-                        IconButton(
-                          icon: Icon(
-                            isSuspended ? Icons.lock_open_rounded : Icons.block_rounded,
-                            color: isSuspended ? Colors.green : Colors.red,
-                            size: 20,
-                          ),
-                          tooltip: isSuspended ? 'Reactivate' : 'Suspend',
-                          onPressed: () => _toggleSuspend(u['id'].toString(), !isSuspended),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
-              );
-            },
+              ],
+            ),
           ),
-        );
-      },
+          const Divider(height: 1),
+
+          // 2. Main List View or States
+          Expanded(
+            child: _isUsersLoading && _usersList.isEmpty
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+                  )
+                : _usersError != null
+                    ? _buildErrorState(_usersError!, isDark, lang, () => _fetchUsers())
+                    : _usersList.isEmpty
+                        ? _buildUsersEmptyState(isDark, lang)
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(14),
+                            itemCount: _usersList.length,
+                            itemBuilder: (context, index) {
+                              final u = _usersList[index] as Map<String, dynamic>;
+                              return _buildUserCard(u, isDark, lang);
+                            },
+                          ),
+          ),
+
+          // 3. Pagination Controls
+          if (totalPages > 1)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkCard : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _userPage > 1
+                        ? () {
+                            setState(() => _userPage--);
+                            _fetchUsers();
+                          }
+                        : null,
+                    icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                    label: const Text('Previous', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  Text(
+                    'Page $_userPage of $totalPages',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white70 : const Color(0xFF334155),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _userPage < totalPages
+                        ? () {
+                            setState(() => _userPage++);
+                            _fetchUsers();
+                          }
+                        : null,
+                    icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                    label: const Text('Next', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  void _verifyOwner(String id, bool verify) async {
-    try {
-      await ApiClient().dio.put('${ApiConstants.baseUrl}/admin/users/$id/verify', data: {'isVerified': verify});
-      ref.invalidate(adminUsersProvider);
-      ref.invalidate(adminStatsProvider);
-    } catch (_) {}
+  Widget _buildUsersEmptyState(bool isDark, String lang) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person_search_rounded,
+                size: 48,
+                color: Color(0xFF2563EB),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No matching users found',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : AppTheme.textDarkNavy,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _userSearch.isNotEmpty
+                  ? 'No users matched search "$_userSearch" with the selected role and status filters.'
+                  : 'There are no user accounts in the system matching the active filters.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: isDark ? Colors.white60 : AppTheme.textMutedGray,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton.icon(
+              onPressed: () {
+                _userSearchCtrl.clear();
+                setState(() {
+                  _userSearch = '';
+                  _userRole = 'All';
+                  _userStatus = 'All';
+                  _userPage = 1;
+                });
+                _fetchUsers();
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Reset All Filters', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  void _toggleSuspend(String id, bool suspend) async {
-    try {
-      await ApiClient().dio.put('${ApiConstants.baseUrl}/admin/users/$id/suspend', data: {
-        'isSuspended': suspend,
-        'reason': suspend ? 'Admin action' : 'Reinstated'
-      });
-      ref.invalidate(adminUsersProvider);
-      ref.invalidate(adminStatsProvider);
-    } catch (_) {}
+  Widget _buildUserCard(Map<String, dynamic> u, bool isDark, String lang) {
+    final id = u['id']?.toString() ?? '';
+    final name = u['name']?.toString() ?? 'User';
+    final email = u['email']?.toString() ?? '';
+    final phone = u['phone']?.toString() ?? '';
+    final role = u['role']?.toString() ?? 'USER';
+    final isSuspended = u['isSuspended'] == true;
+    final isVerified = u['isVerified'] == true;
+    final counts = u['_count'] as Map<String, dynamic>? ?? {};
+    final bookingsCount = counts['bookings'] ?? 0;
+    final equipmentsCount = counts['equipments'] ?? 0;
+
+    Color roleColor = const Color(0xFF16A34A);
+    if (role == 'OWNER' || role == 'EQUIPMENT_OWNER') roleColor = const Color(0xFF2563EB);
+    if (role == 'ADMIN') roleColor = const Color(0xFF7C3AED);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSuspended
+              ? const Color(0xFFDC2626).withValues(alpha: 0.4)
+              : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: roleColor.withValues(alpha: 0.15),
+                    child: Text(
+                      name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: roleColor,
+                      ),
+                    ),
+                  ),
+                  if (isVerified)
+                    const Positioned(
+                      bottom: -2,
+                      right: -2,
+                      child: Icon(Icons.verified_rounded, size: 16, color: Color(0xFF2563EB)),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+
+              // Name and Credentials
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Role Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: roleColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            role,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: roleColor,
+                            ),
+                          ),
+                        ),
+                        if (isSuspended) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'SUSPENDED',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      email,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (phone.isNotEmpty)
+                      Text(
+                        phone,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.white38 : Colors.grey.shade500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Action Buttons
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // View Deep Profile Details Modal
+                  IconButton(
+                    icon: const Icon(Icons.visibility_outlined, size: 20, color: Color(0xFF2563EB)),
+                    tooltip: 'View Profile Details',
+                    onPressed: () => _showUserDetailModal(id, isDark, lang),
+                  ),
+
+                  // Verify Owner (if owner)
+                  if (role == 'OWNER' || role == 'EQUIPMENT_OWNER')
+                    IconButton(
+                      icon: Icon(
+                        isVerified ? Icons.verified_rounded : Icons.verified_outlined,
+                        size: 20,
+                        color: isVerified ? const Color(0xFF16A34A) : Colors.grey,
+                      ),
+                      tooltip: isVerified ? 'Verified Owner' : 'Verify Owner',
+                      onPressed: () => _confirmVerifyOwner(id, name, !isVerified),
+                    ),
+
+                  // Suspend / Reactivate
+                  if (role != 'ADMIN')
+                    IconButton(
+                      icon: Icon(
+                        isSuspended ? Icons.lock_open_rounded : Icons.block_rounded,
+                        size: 20,
+                        color: isSuspended ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                      ),
+                      tooltip: isSuspended ? 'Reactivate Account' : 'Suspend Account',
+                      onPressed: () => _confirmToggleSuspend(id, name, !isSuspended),
+                    ),
+                ],
+              ),
+            ],
+          ),
+
+          // Counts row
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Bookings: $bookingsCount',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Equipments: $equipmentsCount',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUserDetailModal(String userId, bool isDark, String lang) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => FutureBuilder<Response>(
+        future: ApiClient().dio.get('/admin/users/$userId'),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Container(
+              height: 300,
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkCard : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
+            );
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return Container(
+              height: 250,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkCard : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Center(
+                child: Text('Failed to load user profile: ${snapshot.error}'),
+              ),
+            );
+          }
+
+          final dynamic raw = snapshot.data?.data;
+          final Map<String, dynamic> u = (raw is Map && raw['data'] is Map)
+              ? raw['data'] as Map<String, dynamic>
+              : (raw is Map ? raw as Map<String, dynamic> : {});
+
+          final name = u['name']?.toString() ?? 'User Profile';
+          final email = u['email']?.toString() ?? '';
+          final phone = u['phone']?.toString() ?? 'No phone provided';
+          final role = u['role']?.toString() ?? 'USER';
+          final isVerified = u['isVerified'] == true;
+          final isSuspended = u['isSuspended'] == true;
+          final equipments = (u['equipments'] as List<dynamic>?) ?? [];
+          final bookings = (u['bookings'] as List<dynamic>?) ?? [];
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.82,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                          child: Text(
+                            name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF2563EB)),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                ),
+                              ),
+                              Text(
+                                '$email • $phone',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        Chip(
+                          label: Text(role, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                          backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                          side: BorderSide.none,
+                        ),
+                        Chip(
+                          label: Text(isVerified ? 'Verified Account' : 'Unverified',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  color: isVerified ? const Color(0xFF16A34A) : Colors.grey)),
+                          backgroundColor: (isVerified ? Colors.green : Colors.grey).withValues(alpha: 0.12),
+                          side: BorderSide.none,
+                        ),
+                        if (isSuspended)
+                          const Chip(
+                            label: Text('Suspended', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Colors.red)),
+                            backgroundColor: Color(0x22DC2626),
+                            side: BorderSide.none,
+                          ),
+                      ],
+                    ),
+                    const Divider(height: 28),
+
+                    // Equipment section
+                    if (equipments.isNotEmpty) ...[
+                      Text(
+                        'Fleet Machinery (${equipments.length})',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...equipments.map((eq) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.agriculture_rounded, color: Color(0xFF16A34A), size: 24),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      eq['title']?.toString() ?? 'Equipment',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${eq['category']} • ₹${eq['pricePerDay']}/day',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: (eq['available'] == true ? Colors.green : Colors.orange).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  eq['available'] == true ? 'AVAILABLE' : 'RENTED',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: eq['available'] == true ? Colors.green : Colors.orange,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Bookings section
+                    if (bookings.isNotEmpty) ...[
+                      Text(
+                        'Recent Bookings (${bookings.length})',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...bookings.take(5).map((b) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Booking #${b['id']?.toString().substring(0, 8) ?? ''}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Total: ₹${b['totalAmount'] ?? 0}',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  b['status']?.toString() ?? 'STATUS',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _confirmVerifyOwner(String id, String name, bool verify) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(verify ? 'Verify Equipment Owner' : 'Revoke Verification'),
+        content: Text(
+          verify
+              ? 'Are you sure you want to verify "$name" as an approved fleet operator on AgroRent?'
+              : 'Are you sure you want to revoke verified status for "$name"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiClient().dio.put('/admin/users/$id/verify', data: {'isVerified': verify});
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Owner verification updated for $name')),
+                  );
+                }
+                _fetchUsers();
+                ref.invalidate(adminStatsProvider);
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed: ${e.toString()}')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: verify ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            child: Text(verify ? 'Verify' : 'Revoke'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmToggleSuspend(String id, String name, bool suspend) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(suspend ? 'Suspend User Account' : 'Reactivate User Account'),
+        content: Text(
+          suspend
+              ? 'Are you sure you want to suspend "$name"? They will immediately lose access to book machinery or manage listings.'
+              : 'Are you sure you want to reinstate and reactivate "$name"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiClient().dio.put('/admin/users/$id/suspend', data: {
+                  'isSuspended': suspend,
+                  'reason': suspend ? 'Suspended by admin' : 'Reinstated by admin',
+                });
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(suspend ? 'User $name has been suspended' : 'User $name reactivated')),
+                  );
+                }
+                _fetchUsers();
+                ref.invalidate(adminStatsProvider);
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed: ${e.toString()}')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: suspend ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+              foregroundColor: Colors.white,
+            ),
+            child: Text(suspend ? 'Suspend' : 'Reactivate'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildErrorState(String msg, bool isDark, String lang, VoidCallback onRetry) {

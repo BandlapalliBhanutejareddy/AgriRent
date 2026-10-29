@@ -395,12 +395,20 @@ export class WeatherService {
 
     const trimmed = locationQuery.trim();
 
-    // Check if query is in "lat, lng" format
-    const coordMatch = trimmed.match(/^([-+]?[0-9]*\.?[0-9]+)\s*,\s*([-+]?[0-9]*\.?[0-9]+)$/);
+    // Check if query is in coordinate format (supports formats with °, direction letters, or "Coordinates:")
+    const sanitized = trimmed
+      .replace(/Coordinates:\s*/i, '')
+      .replace(/°/g, '')
+      .replace(/[NSEWnsew]/g, '')
+      .trim();
+
+    const coordMatch = sanitized.match(/([-+]?[0-9]+\.?[0-9]*)\s*,\s*([-+]?[0-9]+\.?[0-9]*)/);
     if (coordMatch) {
       const lat = parseFloat(coordMatch[1]);
       const lng = parseFloat(coordMatch[2]);
-      return this.getWeatherByCoordinates({ latitude: lat, longitude: lng, farmId });
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return this.getWeatherByCoordinates({ latitude: lat, longitude: lng, farmId });
+      }
     }
 
     // Geocode query to real coordinates

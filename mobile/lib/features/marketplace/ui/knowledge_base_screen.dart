@@ -515,46 +515,81 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header Row: Icon + Badge + Arrow
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       color: brandAccent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.biotech_rounded, color: brandAccent, size: 20),
+                    child: const Icon(Icons.biotech_rounded, color: brandAccent, size: 18),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'technique'.tr(lang).toUpperCase(),
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: brandAccent, letterSpacing: 0.8),
-                        ),
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: isDark ? Colors.white : AppTheme.textDark,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(width: 8),
+                  Text(
+                    'technique'.tr(lang).toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: brandAccent,
+                      letterSpacing: 0.8,
                     ),
                   ),
-                  if (relatedCrop.isNotEmpty)
-                    Chip(
-                      padding: EdgeInsets.zero,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      label: Text(relatedCrop, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      backgroundColor: brandPrimary.withValues(alpha: isDark ? 0.3 : 0.08),
-                    ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: isDark ? Colors.white38 : Colors.grey.shade400,
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
+
+              // Title: Full horizontal width available
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white : AppTheme.textDark,
+                  height: 1.25,
+                ),
+              ),
+
+              // Tags: Wrap onto subsequent lines cleanly
+              if (relatedCrop.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 5,
+                  children: relatedCrop.split(',').map((item) {
+                    final tag = item.trim();
+                    if (tag.isEmpty) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: brandPrimary.withValues(alpha: isDark ? 0.35 : 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white70 : const Color(0xFF334155),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+              const SizedBox(height: 10),
+
+              // Description
               Text(
                 description,
                 style: TextStyle(
