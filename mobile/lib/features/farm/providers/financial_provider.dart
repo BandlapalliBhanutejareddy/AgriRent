@@ -42,7 +42,7 @@ class FinancialNotifier extends StateNotifier<FinancialState> {
   Future<void> fetchFinancialAnalysis(String farmId, String lang) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiClient().dio.get('/farms/$farmId/financials?lang=$lang');
+      final response = await ApiClient().dio.get('farms/$farmId/financials?lang=$lang');
       if (response.statusCode == 200) {
         final analysis = FarmFinancialAnalysis.fromJson(response.data);
         final newAnalyses = Map<String, FarmFinancialAnalysis>.from(state.analyses);

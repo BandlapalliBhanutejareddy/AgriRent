@@ -55,7 +55,7 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
         return;
       }
 
-      final res = await ApiClient().dio.get('/farms/$fId/crops/$cId/tasks/completed');
+      final res = await ApiClient().dio.get('farms/$fId/crops/$cId/tasks/completed');
       final dynamic body = res.data;
       final List<dynamic> list = (body is Map && body['data'] is Map && body['data']['tasks'] is List)
           ? body['data']['tasks']
@@ -74,7 +74,7 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
         final cId = widget.cropId ?? (farm?.crops.isNotEmpty == true ? farm!.crops.first.id : '');
 
         if (fId != null && fId.isNotEmpty) {
-          final res = await ApiClient().dio.get('/farms/$fId/crops/$cId/operations');
+          final res = await ApiClient().dio.get('farms/$fId/crops/$cId/operations');
           final dynamic raw = res.data;
           final List<dynamic> ops = raw is List
               ? raw

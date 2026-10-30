@@ -59,7 +59,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         'newPassword': newPass,
       };
       
-      final response = await ApiClient().dio.post('/auth/change-password', data: data);
+      final response = await ApiClient().dio.post('auth/change-password', data: data);
       
       if (response.data['success'] == true) {
         if (mounted) {

@@ -117,7 +117,7 @@ export const EQUIPMENT_CATALOG_ITEMS: EquipmentCatalogItem[] = [
     categoryId: 'TRACTORS_AND_POWER_UNITS',
     defaultPricePerDay: 2200,
     description: 'Heavy duty tractor designed for rotavators, heavy tillage, and commercial trailers.',
-    defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80'
+    defaultImageUrl: '/equipment/tractor.jpg'
   },
   {
     id: 'tractor_75_plus',
@@ -183,7 +183,7 @@ export const EQUIPMENT_CATALOG_ITEMS: EquipmentCatalogItem[] = [
     categoryId: 'LAND_PREPARATION',
     defaultPricePerDay: 1800,
     description: 'Precision laser-guided land leveler for 30% water conservation and uniform seed germination.',
-    defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80'
+    defaultImageUrl: '/equipment/cultivator.jpg'
   },
   {
     id: 'harrow',
@@ -243,7 +243,7 @@ export const EQUIPMENT_CATALOG_ITEMS: EquipmentCatalogItem[] = [
     categoryId: 'CROP_CARE_AND_INTERCULTURE',
     defaultPricePerDay: 1300,
     description: 'PTO-driven hydraulic folding boom sprayer spanning 12 meters with anti-drift nozzles.',
-    defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80'
+    defaultImageUrl: '/equipment/sprayer.jpg'
   },
   {
     id: 'power_sprayer',
@@ -305,7 +305,7 @@ export const EQUIPMENT_CATALOG_ITEMS: EquipmentCatalogItem[] = [
     categoryId: 'THRESHING_AND_POST_HARVEST',
     defaultPricePerDay: 1600,
     description: 'Tractor-driven thresher suitable for wheat, soybean, maize, mustard, and gram.',
-    defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80'
+    defaultImageUrl: '/equipment/thresher.jpg'
   },
   {
     id: 'baler',
@@ -323,7 +323,7 @@ export const EQUIPMENT_CATALOG_ITEMS: EquipmentCatalogItem[] = [
     categoryId: 'MATERIAL_HANDLING_AND_TRANSPORT',
     defaultPricePerDay: 700,
     description: 'Heavy duty hydraulic tipping trailer for farm transport and harvesting haulage.',
-    defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80'
+    defaultImageUrl: '/equipment/rotavator.jpg'
   }
 ];
 

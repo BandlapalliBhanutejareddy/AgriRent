@@ -32,7 +32,7 @@ List<dynamic> extractListFromResponse(dynamic d) {
 }
 
 final adminStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/stats');
+  final response = await ApiClient().dio.get('admin/stats');
   final dynamic d = response.data;
   if (d is Map<String, dynamic>) {
     return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
@@ -41,27 +41,27 @@ final adminStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref
 });
 
 final adminUsersProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/users');
+  final response = await ApiClient().dio.get('admin/users');
   return extractListFromResponse(response.data);
 });
 
 final adminEquipmentProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/equipment');
+  final response = await ApiClient().dio.get('admin/equipment');
   return extractListFromResponse(response.data);
 });
 
 final adminBookingsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/bookings');
+  final response = await ApiClient().dio.get('admin/bookings');
   return extractListFromResponse(response.data);
 });
 
 final adminAuditLogsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/audit-logs');
+  final response = await ApiClient().dio.get('admin/audit-logs');
   return extractListFromResponse(response.data);
 });
 
 final adminAlertsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/feedback-complaints');
+  final response = await ApiClient().dio.get('admin/feedback-complaints');
   final dynamic d = response.data;
   if (d is Map<String, dynamic>) {
     return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
@@ -70,18 +70,18 @@ final adminAlertsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((re
 });
 
 final adminHealthProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/system-health');
+  final response = await ApiClient().dio.get('admin/system-health');
   return extractListFromResponse(response.data);
 });
 
 final adminDataQualityProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
-  final response = await ApiClient().dio.get('/admin/data-quality');
+  final response = await ApiClient().dio.get('admin/data-quality');
   return extractListFromResponse(response.data);
 });
 
 final adminEquipmentAnalyticsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, period) async {
   try {
-    final response = await ApiClient().dio.get('/admin/equipment-analytics', queryParameters: {'period': period});
+    final response = await ApiClient().dio.get('admin/equipment-analytics', queryParameters: {'period': period});
     final dynamic d = response.data;
     if (d is Map<String, dynamic>) {
       return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
@@ -92,7 +92,7 @@ final adminEquipmentAnalyticsProvider = FutureProvider.autoDispose.family<Map<St
 
 final adminOwnerEarningsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, period) async {
   try {
-    final response = await ApiClient().dio.get('/admin/owner-earnings', queryParameters: {'period': period});
+    final response = await ApiClient().dio.get('admin/owner-earnings', queryParameters: {'period': period});
     final dynamic d = response.data;
     if (d is Map<String, dynamic>) {
       return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
@@ -103,7 +103,7 @@ final adminOwnerEarningsProvider = FutureProvider.autoDispose.family<Map<String,
 
 final adminCropAnalyticsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   try {
-    final response = await ApiClient().dio.get('/admin/crop-analytics');
+    final response = await ApiClient().dio.get('admin/crop-analytics');
     final dynamic d = response.data;
     if (d is Map<String, dynamic>) {
       return d['data'] is Map<String, dynamic> ? d['data'] as Map<String, dynamic> : d;
@@ -185,7 +185,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           queryParams['status'] = _userStatus;
         }
 
-        final res = await ApiClient().dio.get('/admin/users', queryParameters: queryParams);
+        final res = await ApiClient().dio.get('admin/users', queryParameters: queryParams);
         final dynamic d = res.data;
 
         if (d is Map) {
@@ -1080,7 +1080,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                     onPressed: () async {
                                       final action = isAvail ? 'PAUSE' : 'APPROVE';
                                       try {
-                                        await ApiClient().dio.put('/admin/equipment/$id/moderation', data: {'action': action});
+                                        await ApiClient().dio.put('admin/equipment/$id/moderation', data: {'action': action});
                                         ref.invalidate(adminEquipmentProvider);
                                         ref.invalidate(adminStatsProvider);
                                       } catch (_) {}
@@ -1490,7 +1490,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       setDlgState(() => isSending = true);
 
                       try {
-                        final res = await ApiClient().dio.post('/admin/alerts/broadcast', data: {
+                        final res = await ApiClient().dio.post('admin/alerts/broadcast', data: {
                           'title': title,
                           'message': message,
                           'targetRole': target,
@@ -1916,7 +1916,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   void _resolveComplaint(String id) async {
     try {
-      await ApiClient().dio.put('/admin/complaints/$id/status', data: {
+      await ApiClient().dio.put('admin/complaints/$id/status', data: {
         'status': 'RESOLVED',
         'adminNotes': 'Resolved via Admin Mobile Console'
       });
@@ -2238,14 +2238,14 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     );
 
     try {
-      String endpoint = '/admin/system-health/test-api';
+      String endpoint = 'admin/system-health/test-api';
       final s = serviceName.toLowerCase();
       if (s.contains('database') || s.contains('postgres')) {
-        endpoint = '/admin/system-health/test-db';
+        endpoint = 'admin/system-health/test-db';
       } else if (s.contains('ai') || s.contains('ollama')) {
-        endpoint = '/admin/system-health/test-ai';
+        endpoint = 'admin/system-health/test-ai';
       } else if (s.contains('notification') || s.contains('dispatch')) {
-        endpoint = '/admin/system-health/test-notifications';
+        endpoint = 'admin/system-health/test-notifications';
       }
 
       final res = await ApiClient().dio.post(endpoint);
@@ -2440,7 +2440,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       SnackBar(content: Text('Executing $action...'), duration: const Duration(seconds: 2)),
     );
     try {
-      final res = await ApiClient().dio.post('/admin/system-health/recover', data: { 'action': action });
+      final res = await ApiClient().dio.post('admin/system-health/recover', data: { 'action': action });
       final msg = res.data?['message']?.toString() ?? 'Recovery operation completed.';
       if (mounted) {
         showDialog(
@@ -2477,7 +2477,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   Future<void> _showRecentErrorsDialog(bool isDark) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final res = await ApiClient().dio.get('/admin/system-health/recent-errors');
+      final res = await ApiClient().dio.get('admin/system-health/recent-errors');
       final dynamic d = res.data;
       final List<dynamic> logs = (d is Map && d['recentLogs'] is List) ? d['recentLogs'] as List : [];
 
@@ -3097,7 +3097,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => FutureBuilder<Response>(
-        future: ApiClient().dio.get('/admin/users/$userId'),
+        future: ApiClient().dio.get('admin/users/$userId'),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Container(
@@ -3386,7 +3386,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                await ApiClient().dio.put('/admin/users/$id/verify', data: {'isVerified': verify});
+                await ApiClient().dio.put('admin/users/$id/verify', data: {'isVerified': verify});
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Owner verification updated for $name')),
@@ -3432,7 +3432,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                await ApiClient().dio.put('/admin/users/$id/suspend', data: {
+                await ApiClient().dio.put('admin/users/$id/suspend', data: {
                   'isSuspended': suspend,
                   'reason': suspend ? 'Suspended by admin' : 'Reinstated by admin',
                 });

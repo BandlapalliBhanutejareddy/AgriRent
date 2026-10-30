@@ -56,8 +56,7 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   Future<void> fetchSchedule() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiClient().dio.get(
-        '/farms/$farmId/schedule?lang=$lang',
+      final response = await ApiClient().dio.get('farms/$farmId/schedule?lang=$lang',
         options: Options(
           sendTimeout: const Duration(seconds: 12),
           receiveTimeout: const Duration(seconds: 12),

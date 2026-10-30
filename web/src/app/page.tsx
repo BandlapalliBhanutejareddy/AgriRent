@@ -142,8 +142,9 @@ export default function LandingPage() {
             >
               <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border border-white/20">
                 <img 
-                  src="https://images.unsplash.com/photo-1592860956272-9eb5d8c366ff?auto=format&fit=crop&q=80&w=1200" 
+                  src="/equipment/tractor.jpg" 
                   alt="Modern tractor working in field" 
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/equipment/default.jpg'; }}
                   className="w-full object-cover h-[600px]"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent"></div>
@@ -224,13 +225,18 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
-              { name: 'Tractors', count: '124 Listed', img: 'https://images.unsplash.com/photo-1592860956272-9eb5d8c366ff?auto=format&fit=crop&q=80&w=400' },
-              { name: 'Harvesters', count: '45 Listed', img: 'https://images.unsplash.com/photo-1625244724120-1fd1d34d00f6?auto=format&fit=crop&q=80&w=400' },
-              { name: 'Implements', count: '89 Listed', img: 'https://images.unsplash.com/photo-1589922253303-3b03867dfb61?auto=format&fit=crop&q=80&w=400' },
-              { name: 'Cultivators', count: '67 Listed', img: 'https://images.unsplash.com/photo-1590089851695-1f9e80c8df63?auto=format&fit=crop&q=80&w=400' }
+              { name: 'Tractors', count: '124 Listed', img: '/equipment/tractor.jpg' },
+              { name: 'Harvesters', count: '45 Listed', img: '/equipment/harvester.jpg' },
+              { name: 'Implements', count: '89 Listed', img: '/equipment/rotavator.jpg' },
+              { name: 'Cultivators', count: '67 Listed', img: '/equipment/cultivator.jpg' }
             ].map((cat, i) => (
               <Link href="/register" key={i} className="group relative h-64 rounded-3xl overflow-hidden cursor-pointer">
-                <img src={cat.img} alt={cat.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                <img 
+                  src={cat.img} 
+                  alt={cat.name} 
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/equipment/default.jpg'; }}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-transparent"></div>
                 <div className="absolute bottom-6 left-6">
                   <h3 className="text-white text-xl font-bold">{cat.name}</h3>

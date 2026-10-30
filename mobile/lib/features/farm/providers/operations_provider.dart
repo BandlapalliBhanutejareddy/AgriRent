@@ -112,7 +112,7 @@ class OperationsNotifier extends StateNotifier<OperationsState> {
   Future<void> fetchOperations() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiClient().dio.get('/farms/$farmId/crops/$cropId/operations');
+      final response = await ApiClient().dio.get('farms/$farmId/crops/$cropId/operations');
       if (response.statusCode == 200) {
         final rawData = response.data;
         final List<dynamic> dataList = rawData is List
@@ -145,8 +145,7 @@ class OperationsNotifier extends StateNotifier<OperationsState> {
     );
 
     try {
-      final response = await ApiClient().dio.post(
-        '/farms/$farmId/crops/$cropId/operations/$operationId/tasks/$taskId/complete',
+      final response = await ApiClient().dio.post('farms/$farmId/crops/$cropId/operations/$operationId/tasks/$taskId/complete',
         data: {},
       );
 

@@ -66,7 +66,7 @@ export default function WeatherPage() {
       const payload = res.data?.data || res.data;
       if (payload && (payload.location || payload.current)) {
         setWeatherData(payload);
-        setSelectedLocation({ latitude: lat, longitude: lng, name: payload.location?.name || name || '' });
+        setSelectedLocation({ latitude: lat, longitude: lng, name: payload.location?.name || name || `${lat.toFixed(4)}°, ${lng.toFixed(4)}°` });
       } else {
         setWeatherError(res.data?.error || 'Failed to retrieve weather for selected coordinates.');
       }

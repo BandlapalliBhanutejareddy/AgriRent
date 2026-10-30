@@ -42,7 +42,7 @@ class _CropAdvisorScreenState extends ConsumerState<CropAdvisorScreen> {
     });
 
     try {
-      final response = await ApiClient().dio.post('/ai/smart-plan', data: {
+      final response = await ApiClient().dio.post('ai/smart-plan', data: {
         'crop': _crop,
         'soilType': _soilType,
         'acreage': double.tryParse(_acreage) ?? 5.0,

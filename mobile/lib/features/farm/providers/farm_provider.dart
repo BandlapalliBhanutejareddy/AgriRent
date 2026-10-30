@@ -82,7 +82,7 @@ class FarmNotifier extends StateNotifier<FarmState> {
   Future<void> fetchFarms() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiClient().dio.get('/farms');
+      final response = await ApiClient().dio.get('farms');
       if (response.statusCode == 200) {
         final dynamic raw = response.data;
         final List<dynamic> list = raw is List
@@ -190,7 +190,7 @@ class FarmNotifier extends StateNotifier<FarmState> {
       payload['totalBudget'] = totalBudget;
     }
 
-    final response = await ApiClient().dio.post('/farms', data: payload);
+    final response = await ApiClient().dio.post('farms', data: payload);
     if (response.statusCode != 200 && response.statusCode != 201) {
       final msg = response.data is Map ? response.data['error'] : 'Failed to create farm';
       throw Exception(msg ?? 'Failed to create farm');
@@ -274,7 +274,7 @@ class FarmNotifier extends StateNotifier<FarmState> {
       payload['totalBudget'] = totalBudget;
     }
 
-    final response = await ApiClient().dio.put('/farms/$farmId', data: payload);
+    final response = await ApiClient().dio.put('farms/$farmId', data: payload);
     if (response.statusCode != 200) {
       final msg = response.data is Map ? response.data['error'] : 'Failed to update farm';
       throw Exception(msg ?? 'Failed to update farm');

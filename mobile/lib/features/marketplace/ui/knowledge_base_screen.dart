@@ -7,8 +7,8 @@ import '../../../core/localization/app_localizations.dart';
 
 final guidesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final client = ApiClient();
-  final guidesRes = await client.dio.get('/guides');
-  final techniquesRes = await client.dio.get('/guides/techniques');
+  final guidesRes = await client.dio.get('guides');
+  final techniquesRes = await client.dio.get('guides/techniques');
 
   final rawGuides = (guidesRes.data is Map && guidesRes.data['data'] != null)
       ? guidesRes.data['data']
@@ -748,8 +748,7 @@ class _GuideDetailSheetState extends State<_GuideDetailSheet> {
     });
 
     try {
-      final response = await ApiClient().dio.post(
-        '/ai/advisor',
+      final response = await ApiClient().dio.post('ai/advisor',
         data: {
           'crop': widget.title,
           'question': query,

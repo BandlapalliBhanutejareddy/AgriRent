@@ -141,7 +141,7 @@ class AgriculturalCatalog {
       categoryId: 'TRACTORS_AND_POWER_UNITS',
       defaultPricePerDay: 2200,
       description: 'Heavy duty tractor designed for rotavators, heavy tillage, and commercial trailers.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1592878904946-b3cd8ae243d0?w=800&auto=format&fit=crop&q=80',
       icon: Icons.agriculture_rounded,
     ),
     EquipmentCatalogItem(
@@ -224,7 +224,7 @@ class AgriculturalCatalog {
       categoryId: 'LAND_PREPARATION',
       defaultPricePerDay: 1800,
       description: 'Precision laser-guided land leveler for 30% water conservation and uniform seed germination.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&auto=format&fit=crop&q=80',
       icon: Icons.terrain_rounded,
     ),
     EquipmentCatalogItem(
@@ -363,7 +363,7 @@ class AgriculturalCatalog {
       categoryId: 'CROP_CARE_AND_INTERCULTURE',
       defaultPricePerDay: 1300,
       description: 'PTO-driven hydraulic folding boom sprayer spanning 12 meters with anti-drift nozzles.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?w=800&auto=format&fit=crop&q=80',
       icon: Icons.sanitizer_rounded,
     ),
 
@@ -428,7 +428,7 @@ class AgriculturalCatalog {
       categoryId: 'IRRIGATION_EQUIPMENT',
       defaultPricePerDay: 350,
       description: 'Portable quick-latch HDPE flexible pipes for field water conveyance without transmission losses.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb1861564?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?w=800&auto=format&fit=crop&q=80',
       icon: Icons.water_drop_rounded,
     ),
 
@@ -643,7 +643,7 @@ class AgriculturalCatalog {
       categoryId: 'SOIL_TESTING_AND_TOOLS',
       defaultPricePerDay: 150,
       description: 'Digital spear tip probe measuring soil and irrigation water acidity/alkalinity instantly.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80',
       icon: Icons.science_rounded,
     ),
     EquipmentCatalogItem(
@@ -652,7 +652,7 @@ class AgriculturalCatalog {
       categoryId: 'SOIL_TESTING_AND_TOOLS',
       defaultPricePerDay: 180,
       description: 'TDR probe giving immediate volumetric water content percentage in root zones.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0?w=800&auto=format&fit=crop&q=80',
       icon: Icons.science_rounded,
     ),
     EquipmentCatalogItem(
@@ -679,7 +679,7 @@ class AgriculturalCatalog {
       categoryId: 'SOIL_TESTING_AND_TOOLS',
       defaultPricePerDay: 50,
       description: '50-meter heavy-duty fiberglass field surveyor tape with ground stake.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1508873696983-2df5293cb395?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80',
       icon: Icons.science_rounded,
     ),
     EquipmentCatalogItem(
@@ -1022,7 +1022,7 @@ class AgriculturalCatalog {
       categoryId: 'SAFETY_AND_ACCESSORIES',
       defaultPricePerDay: 40,
       description: 'High visibility fluorescent safety vest with retroreflective stripes for road haulage.',
-      defaultImageUrl: 'https://images.unsplash.com/photo-1578873375972-00b865d1d64e?w=800&auto=format&fit=crop&q=80',
+      defaultImageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&auto=format&fit=crop&q=80',
       icon: Icons.health_and_safety_rounded,
     ),
     EquipmentCatalogItem(

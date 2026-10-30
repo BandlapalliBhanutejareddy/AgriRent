@@ -178,6 +178,7 @@ app.use('/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/farms', farmRoutes);
+app.use('/farms', farmRoutes);
 app.use('/api/dev', devRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/community', communityRoutes);

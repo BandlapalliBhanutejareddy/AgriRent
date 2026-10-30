@@ -44,8 +44,8 @@ router.get('/weather/geocode', optionalAuth, async (req: AuthRequest, res: Respo
 // GET /api/farms/weather/reverse-geocode?lat=...&lng=...
 router.get('/weather/reverse-geocode', optionalAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const lat = parseFloat(String(req.query.lat));
-    const lng = parseFloat(String(req.query.lng));
+    const lat = parseFloat(String(req.query.lat || req.query.latitude));
+    const lng = parseFloat(String(req.query.lng || req.query.longitude || req.query.lon));
     if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
       res.status(400).json({ success: false, error: 'Invalid coordinates' });
       return;
@@ -54,7 +54,10 @@ router.get('/weather/reverse-geocode', optionalAuth, async (req: AuthRequest, re
     res.json({ success: true, data: { locationName }, locationName });
   } catch (err: any) {
     console.error('Reverse geocoding error:', err);
-    res.status(500).json({ success: false, error: 'Reverse geocoding failed', details: err.message });
+    const lat = parseFloat(String(req.query.lat || req.query.latitude));
+    const lng = parseFloat(String(req.query.lng || req.query.longitude || req.query.lon));
+    const fallbackName = (!isNaN(lat) && !isNaN(lng)) ? `${lat.toFixed(4)}°, ${lng.toFixed(4)}°` : 'Selected Coordinates';
+    res.json({ success: true, data: { locationName: fallbackName }, locationName: fallbackName });
   }
 });
 
@@ -66,7 +69,7 @@ router.get('/weather/lookup', optionalAuth, async (req: AuthRequest, res: Respon
       : (req.query.latitude ? parseFloat(String(req.query.latitude)) : NaN);
     const lngParam = req.query.lng
       ? parseFloat(String(req.query.lng))
-      : (req.query.longitude ? parseFloat(String(req.query.longitude)) : NaN);
+      : (req.query.longitude ? parseFloat(String(req.query.longitude)) : (req.query.lon ? parseFloat(String(req.query.lon)) : NaN));
     const locationQuery = req.query.location ? String(req.query.location).trim() : '';
     const nameParam = req.query.name ? String(req.query.name).trim() : undefined;
     const bypassCache = req.query.bypassCache === 'true';
