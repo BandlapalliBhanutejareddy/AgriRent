@@ -41,8 +41,44 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
         }
       });
 
+      // Auto-provision user profile in PostgreSQL for valid Supabase identities
+      if (!user && supabaseUser.email) {
+        const rawRole = String(supabaseUser.user_metadata?.role || '').toUpperCase();
+        const safeRole: 'FARMER' | 'OWNER' = (rawRole === 'OWNER' || rawRole === 'EQUIPMENT_OWNER') ? 'OWNER' : 'FARMER';
+        const name = supabaseUser.user_metadata?.full_name ||
+                     supabaseUser.user_metadata?.name ||
+                     supabaseUser.email.split('@')[0] ||
+                     'AgroRent User';
+        const profileImage = supabaseUser.user_metadata?.avatar_url ||
+                             supabaseUser.user_metadata?.picture ||
+                             null;
+
+        try {
+          user = await prisma.user.create({
+            data: {
+              name,
+              email: String(supabaseUser.email).toLowerCase(),
+              password: 'SUPABASE_AUTH_MANAGED',
+              role: safeRole,
+              authId: supabaseUser.id,
+              isVerified: true,
+              profileImage
+            }
+          });
+        } catch (createErr) {
+          user = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { authId: supabaseUser.id },
+                { email: supabaseUser.email }
+              ]
+            }
+          });
+        }
+      }
+
       if (user) {
-        if (!user.authId && supabaseUser.id) {
+        if (!user.authId || user.authId.startsWith('local_')) {
           user = await prisma.user.update({
             where: { id: user.id },
             data: { authId: supabaseUser.id }
@@ -117,6 +153,42 @@ export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFu
           ]
         }
       });
+
+      // Auto-provision user profile in PostgreSQL for valid Supabase identities
+      if (!user && supabaseUser.email) {
+        const rawRole = String(supabaseUser.user_metadata?.role || '').toUpperCase();
+        const safeRole: 'FARMER' | 'OWNER' = (rawRole === 'OWNER' || rawRole === 'EQUIPMENT_OWNER') ? 'OWNER' : 'FARMER';
+        const name = supabaseUser.user_metadata?.full_name ||
+                     supabaseUser.user_metadata?.name ||
+                     supabaseUser.email.split('@')[0] ||
+                     'AgroRent User';
+        const profileImage = supabaseUser.user_metadata?.avatar_url ||
+                             supabaseUser.user_metadata?.picture ||
+                             null;
+
+        try {
+          user = await prisma.user.create({
+            data: {
+              name,
+              email: String(supabaseUser.email).toLowerCase(),
+              password: 'SUPABASE_AUTH_MANAGED',
+              role: safeRole,
+              authId: supabaseUser.id,
+              isVerified: true,
+              profileImage
+            }
+          });
+        } catch (_) {
+          user = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { authId: supabaseUser.id },
+                { email: supabaseUser.email }
+              ]
+            }
+          });
+        }
+      }
 
       if (user && !user.isSuspended) {
         req.user = { id: user.id, email: user.email, authId: user.authId || user.id };

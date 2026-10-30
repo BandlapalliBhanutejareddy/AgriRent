@@ -147,14 +147,18 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 // 1b. Continue with Google (Secure OAuth Identity Token Verification)
 router.post('/google', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { idToken, accessToken, role } = req.body;
+    let { idToken, accessToken, role } = req.body || {};
+    if (!accessToken && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      accessToken = req.headers.authorization.split(' ')[1];
+    }
 
     if (!idToken && !accessToken) {
       res.status(400).json({ success: false, error: 'Google ID token or access token is required.' });
       return;
     }
 
-    const targetRole = role === 'OWNER' ? 'OWNER' : 'FARMER'; // Default FARMER, never allow self-registering as ADMIN
+    const cleanReqRole = String(role || '').toUpperCase();
+    const targetRole = (cleanReqRole === 'OWNER' || cleanReqRole === 'EQUIPMENT_OWNER') ? 'OWNER' : 'FARMER'; // Default FARMER, never allow self-registering as ADMIN
 
     let googleData: any = null;
 
@@ -238,8 +242,8 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
         return;
       }
 
-      // Link googleSub if missing
-      if (!user.authId) {
+      // Link googleSub if missing or local placeholder
+      if (!user.authId || user.authId.startsWith('local_')) {
         user = await prisma.user.update({
           where: { id: user.id },
           data: { authId: googleSub }
@@ -301,6 +305,15 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
         authId: user.authId
       },
       token: issuedToken,
+      session: {
+        access_token: issuedToken,
+        user: {
+          id: user.authId || user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        }
+      },
       isNewUser
     });
 

@@ -181,7 +181,7 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 });
 
 async function provisionAdmin() {
-  const adminEmail = 'bandlapalliteja369@gmail.com';
+  const adminEmail = process.env.ADMIN_INITIAL_EMAIL || 'admin@agrorent.ai';
   const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123';
   try {
     const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });

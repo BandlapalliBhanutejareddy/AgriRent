@@ -141,13 +141,12 @@ class AuthRepository {
         throw Exception(res.data?['error'] ?? 'Google authentication failed');
       }
 
-      // 1. If an existing authenticated session is already valid, sync directly
-      final existingSession = _supabaseAuth.currentSession;
-      if (existingSession != null && !existingSession.isExpired) {
-        return await _syncGoogleSession(existingSession, role);
-      }
+      // Clear any prior stale session before starting fresh Google account selection
+      try {
+        await _supabaseAuth.signOut();
+      } catch (_) {}
 
-      // 2. Set up listener to await OAuth deep link return without blocking or failing early
+      // Set up listener to await OAuth deep link return without blocking or failing early
       final completer = Completer<models.User>();
       StreamSubscription<supabase.AuthState>? authSubscription;
       StreamSubscription<Uri>? appLinkSub;
@@ -216,10 +215,13 @@ class AuthRepository {
               }
             } catch (_) {}
 
+            final sbUser = _supabaseAuth.currentSession?.user;
             final fallbackUser = models.User(
-              id: 'google_user_${DateTime.now().millisecondsSinceEpoch}',
-              name: 'Google User',
-              email: 'bandlapalliteja369@gmail.com',
+              id: sbUser?.id ?? 'google_user_${DateTime.now().millisecondsSinceEpoch}',
+              name: sbUser?.userMetadata?['name']?.toString() ??
+                    sbUser?.userMetadata?['full_name']?.toString() ??
+                    (sbUser?.email?.split('@')[0] ?? 'Google User'),
+              email: sbUser?.email ?? 'google_user@agrorent.ai',
               role: role.toUpperCase(),
               preferredLanguage: 'en',
               isVerified: true,
@@ -249,6 +251,10 @@ class AuthRepository {
       final isOAuthTriggered = await _supabaseAuth.signInWithOAuth(
         supabase.OAuthProvider.google,
         redirectTo: 'io.supabase.agrorentai://login-callback',
+        queryParams: {
+          'prompt': 'select_account',
+          'access_type': 'offline',
+        },
       );
       if (!isOAuthTriggered) {
         await appLinkSub.cancel();
