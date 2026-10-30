@@ -45,6 +45,13 @@ export default function AdminActionCenterPage() {
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Broadcast Alert Modal State
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastTarget, setBroadcastTarget] = useState<'ALL' | 'FARMER' | 'OWNER'>('ALL');
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+
   useEffect(() => {
     loadAllData();
   }, []);
@@ -141,6 +148,31 @@ export default function AdminActionCenterPage() {
     }
   }
 
+  async function handleSendBroadcast(e: React.FormEvent) {
+    e.preventDefault();
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
+      showToast('Please enter both headline title and message body', 'error');
+      return;
+    }
+    try {
+      setSendingBroadcast(true);
+      const res = await api.post('/admin/alerts/broadcast', {
+        title: broadcastTitle.trim(),
+        message: broadcastMessage.trim(),
+        targetRole: broadcastTarget,
+        type: 'ADMIN_BROADCAST'
+      });
+      showToast(res.data?.message || 'Broadcast alert dispatched successfully', 'success');
+      setShowBroadcastModal(false);
+      setBroadcastTitle('');
+      setBroadcastMessage('');
+    } catch (err: any) {
+      showToast(err.response?.data?.error || err.message || 'Failed to dispatch alert', 'error');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  }
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* Banner */}
@@ -153,18 +185,27 @@ export default function AdminActionCenterPage() {
             Alerts & Interactive Action Center
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">
-            Conduct owner identity approvals, moderate equipment fleet listings, and resolve farmer disputes in real time.
+            Conduct owner identity approvals, moderate equipment fleet listings, broadcast alerts, and resolve farmer disputes in real time.
           </p>
         </div>
 
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="px-5 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all border border-white/15 flex items-center gap-2 active:scale-95 shrink-0"
-        >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          <span>Refresh Data</span>
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => setShowBroadcastModal(true)}
+            className="px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-purple-600/30 flex items-center gap-2 active:scale-95"
+          >
+            <Bell size={14} />
+            <span>Send Broadcast Alert</span>
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-5 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all border border-white/15 flex items-center gap-2 active:scale-95"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Action Cards (Clickable) */}
@@ -532,6 +573,116 @@ export default function AdminActionCenterPage() {
           </div>
         )}
       </div>
+
+      {/* Broadcast Alert Modal */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[28px] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 rounded-2xl">
+                  <Bell size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                    Send Broadcast Alert
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Dispatch an urgent broadcast notice to platform users.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBroadcastModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSendBroadcast} className="mt-6 space-y-5">
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                  Target Audience
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'ALL', label: 'All Users' },
+                    { id: 'FARMER', label: 'Farmers' },
+                    { id: 'OWNER', label: 'Owners' }
+                  ].map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setBroadcastTarget(item.id as any)}
+                      className={`py-2 px-3 rounded-xl text-xs font-black transition-all ${
+                        broadcastTarget === item.id
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Headline Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Critical Weather Advisory or Subsidy Announcement"
+                  value={broadcastTitle}
+                  onChange={e => setBroadcastTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Message Body
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Detailed instructions or operational alert for selected recipients..."
+                  value={broadcastMessage}
+                  onChange={e => setBroadcastMessage(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowBroadcastModal(false)}
+                  disabled={sendingBroadcast}
+                  className="px-5 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingBroadcast}
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+                >
+                  {sendingBroadcast ? (
+                    <>
+                      <RefreshCw size={12} className="animate-spin" />
+                      <span>Dispatching...</span>
+                    </>
+                  ) : (
+                    <span>Dispatch Alert</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

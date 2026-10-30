@@ -92,6 +92,20 @@ router.get('/weather/lookup', optionalAuth, async (req: AuthRequest, res: Respon
         res.status(502).json(weatherData);
         return;
       }
+      if (req.user?.id) {
+        try {
+          const userFarm = await prisma.farm.findFirst({
+            where: { ownerId: req.user.id },
+            include: { crops: { where: { status: 'ACTIVE' } } },
+            orderBy: { createdAt: 'desc' }
+          });
+          if (userFarm) {
+            await WeatherAlertService.evaluate(req.user.id, userFarm.id, userFarm.name, weatherData);
+          }
+        } catch (evalErr) {
+          console.warn('WeatherAlertService evaluation error in coordinates lookup:', evalErr);
+        }
+      }
       res.json(weatherData);
       return;
     }
@@ -102,6 +116,20 @@ router.get('/weather/lookup', optionalAuth, async (req: AuthRequest, res: Respon
       if (!weatherData.success && weatherData.code === 'GEOCODING_FAILED') {
         res.status(400).json(weatherData);
         return;
+      }
+      if (req.user?.id && weatherData.success) {
+        try {
+          const userFarm = await prisma.farm.findFirst({
+            where: { ownerId: req.user.id },
+            include: { crops: { where: { status: 'ACTIVE' } } },
+            orderBy: { createdAt: 'desc' }
+          });
+          if (userFarm) {
+            await WeatherAlertService.evaluate(req.user.id, userFarm.id, userFarm.name, weatherData);
+          }
+        } catch (evalErr) {
+          console.warn('WeatherAlertService evaluation error in search lookup:', evalErr);
+        }
       }
       res.json(weatherData);
       return;
