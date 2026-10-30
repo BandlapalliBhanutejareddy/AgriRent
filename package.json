@@ -6,6 +6,8 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
+    "build": "cd backend && npm install && npx prisma generate && npm run build",
+    "start": "cd backend && npm start",
     "dev:web": "cd web && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
