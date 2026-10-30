@@ -1,7 +1,14 @@
 import axios from 'axios';
 import { useStore } from '../store/useStore';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const isBrowser = typeof window !== 'undefined';
+const isProdHost = isBrowser && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+// In production web, ensure we communicate with the live Render backend rather than unreachable localhost
+let API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://agrirent-5qpx.onrender.com/api';
+if (isProdHost && (API_URL.includes('localhost') || API_URL.includes('127.0.0.1'))) {
+  API_URL = 'https://agrirent-5qpx.onrender.com/api';
+}
 
 export const api = axios.create({
   baseURL: API_URL,

@@ -93,7 +93,9 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const isClient = typeof window !== 'undefined';
+      const isDev = isClient && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const origin = isDev ? window.location.origin : 'https://agri-rent-two.vercel.app';
       const { data, error: sbError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

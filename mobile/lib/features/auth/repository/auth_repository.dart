@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../../../core/api/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -149,8 +150,10 @@ class AuthRepository {
       // 2. Set up listener to await OAuth deep link return without blocking or failing early
       final completer = Completer<models.User>();
       StreamSubscription<supabase.AuthState>? authSubscription;
+      StreamSubscription<Uri>? appLinkSub;
       Timer? timeoutTimer;
 
+      // Supabase internal auth listener
       authSubscription = _supabaseAuth.onAuthStateChange.listen((data) async {
         final session = data.session;
         if (data.event == supabase.AuthChangeEvent.signedIn && session != null) {
@@ -167,11 +170,55 @@ class AuthRepository {
         }
       });
 
+      // Direct AppLinks deep link listener (supports direct token, code, or web bridge returns)
+      final appLinks = AppLinks();
+      appLinkSub = appLinks.uriLinkStream.listen((uri) async {
+        try {
+          // 1. Check for token in fragment (#access_token=...) or query parameters (?access_token=...)
+          String? token;
+          if (uri.fragment.isNotEmpty) {
+            final fragmentParams = Uri.splitQueryString(uri.fragment);
+            token = fragmentParams['access_token'] ?? fragmentParams['token'];
+          }
+          token ??= uri.queryParameters['access_token'] ?? uri.queryParameters['token'];
+
+          if (token != null && token.isNotEmpty) {
+            final res = await _apiClient.dio.post(ApiConstants.googleAuth, data: {
+              'accessToken': token,
+              'role': role,
+            });
+            if (res.data != null && res.data['success'] == true) {
+              final appToken = res.data['token']?.toString() ?? token;
+              await SecureStorage.saveAccessToken(appToken);
+              final userData = res.data['user'];
+              await SecureStorage.saveUser(jsonEncode(userData));
+              if (!completer.isCompleted) {
+                completer.complete(models.User.fromJson(userData));
+              }
+              return;
+            }
+          }
+
+          // 2. Check for PKCE code in query parameters
+          final code = uri.queryParameters['code'];
+          if (code != null && code.isNotEmpty) {
+            final response = await _supabaseAuth.exchangeCodeForSession(code);
+            final user = await _syncGoogleSession(response.session, role);
+            if (!completer.isCompleted) {
+              completer.complete(user);
+            }
+          }
+        } catch (linkErr) {
+          // If already completed or not an auth link, continue gracefully
+        }
+      });
+
       final isOAuthTriggered = await _supabaseAuth.signInWithOAuth(
         supabase.OAuthProvider.google,
         redirectTo: 'io.supabase.agrorentai://login-callback',
       );
       if (!isOAuthTriggered) {
+        await appLinkSub.cancel();
         await authSubscription.cancel();
         throw Exception('Could not launch Google authentication window.');
       }
@@ -186,6 +233,7 @@ class AuthRepository {
         return await completer.future;
       } finally {
         timeoutTimer.cancel();
+        await appLinkSub.cancel();
         await authSubscription.cancel();
       }
     } catch (e) {
