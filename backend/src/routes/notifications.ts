@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { requireAuth, requireRole, AuthRequest } from '../middlewares/authMiddleware';
 import { prisma } from '../lib/prisma';
 import { emitToUser } from '../lib/socket';
+import { handleBroadcastAlert } from './admin';
 
 const router = Router();
 
@@ -185,83 +186,8 @@ router.post('/:id/reply', requireAuth, async (req: AuthRequest, res: Response): 
   }
 });
 
-// Admin Broadcast Route Alias
-router.post('/broadcast', requireAuth, requireRole('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    req.body.targetRole = req.body.targetRole || req.body.target || 'ALL';
-    const { targetRole, title, message, relatedId, type = 'ADMIN_BROADCAST' } = req.body;
-    if (!title || !String(title).trim() || !message || !String(message).trim()) {
-      res.status(400).json({ success: false, error: 'Headline title and message body are required.' });
-      return;
-    }
-    const cleanTitle = String(title).trim();
-    const cleanMsg = String(message).trim();
-    const roleFilter = (targetRole || 'ALL').toUpperCase().trim();
-    let whereClause: any = { isSuspended: false };
-
-    if (roleFilter === 'FARMER') {
-      whereClause.role = { in: ['FARMER', 'BOTH'] };
-    } else if (roleFilter === 'OWNER') {
-      whereClause.role = { in: ['OWNER', 'BOTH'] };
-    } else if (roleFilter === 'ADMIN') {
-      whereClause.role = 'ADMIN';
-    }
-
-    const matchingUsers = await prisma.user.findMany({
-      where: whereClause,
-      select: { id: true, name: true, email: true }
-    });
-
-    if (matchingUsers.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: `No active users found for audience filter "${roleFilter}".`
-      });
-      return;
-    }
-
-    await prisma.notification.createMany({
-      data: matchingUsers.map(u => ({
-        userId: u.id,
-        title: cleanTitle,
-        message: cleanMsg,
-        relatedId: relatedId ? String(relatedId) : null,
-        type: String(type)
-      }))
-    });
-
-    for (const u of matchingUsers) {
-      emitToUser(u.id, 'notification', {
-        title: cleanTitle,
-        message: cleanMsg,
-        type: String(type),
-        createdAt: new Date()
-      });
-    }
-
-    await prisma.auditLog.create({
-      data: {
-        actorId: req.prismaUser.id,
-        actorRole: 'ADMIN',
-        action: 'DISPATCH_BROADCAST_ALERT',
-        resource: 'Notification',
-        metadata: JSON.stringify({
-          audience: roleFilter,
-          recipientCount: matchingUsers.length,
-          title: cleanTitle
-        })
-      }
-    });
-
-    res.json({
-      success: true,
-      message: `Broadcast alert dispatched to ${matchingUsers.length} ${roleFilter === 'ALL' ? 'users' : roleFilter.toLowerCase() + 's'} successfully.`,
-      deliveredCount: matchingUsers.length
-    });
-  } catch (error: any) {
-    console.error('Broadcast notification error:', error);
-    res.status(500).json({ success: false, error: 'Failed to dispatch broadcast alert.' });
-  }
-});
+// Admin Broadcast Route Aliases
+router.post('/broadcast', requireAuth, requireRole('ADMIN'), handleBroadcastAlert);
+router.post('/alerts/broadcast', requireAuth, requireRole('ADMIN'), handleBroadcastAlert);
 
 export default router;

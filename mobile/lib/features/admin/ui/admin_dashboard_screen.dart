@@ -1342,13 +1342,14 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     final titleCtrl = TextEditingController();
     final msgCtrl = TextEditingController();
     String target = 'ALL';
+    String category = 'GENERAL';
     bool isSending = false;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) => AlertDialog(
+        builder: (dlgCtx, setDlgState) => AlertDialog(
           backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
@@ -1370,60 +1371,76 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Target Audience:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    ChoiceChip(
-                      label: const Text('All Users', style: TextStyle(fontSize: 11)),
-                      selected: target == 'ALL',
-                      onSelected: isSending ? null : (_) => setDlgState(() => target = 'ALL'),
-                    ),
-                    const SizedBox(width: 6),
-                    ChoiceChip(
-                      label: const Text('Farmers', style: TextStyle(fontSize: 11)),
-                      selected: target == 'FARMER',
-                      onSelected: isSending ? null : (_) => setDlgState(() => target = 'FARMER'),
-                    ),
-                    const SizedBox(width: 6),
-                    ChoiceChip(
-                      label: const Text('Owners', style: TextStyle(fontSize: 11)),
-                      selected: target == 'OWNER',
-                      onSelected: isSending ? null : (_) => setDlgState(() => target = 'OWNER'),
-                    ),
-                  ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Target Audience:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All Users', style: TextStyle(fontSize: 11)),
+                        selected: target == 'ALL',
+                        onSelected: isSending ? null : (_) => setDlgState(() => target = 'ALL'),
+                      ),
+                      const SizedBox(width: 6),
+                      ChoiceChip(
+                        label: const Text('Farmers', style: TextStyle(fontSize: 11)),
+                        selected: target == 'FARMER',
+                        onSelected: isSending ? null : (_) => setDlgState(() => target = 'FARMER'),
+                      ),
+                      const SizedBox(width: 6),
+                      ChoiceChip(
+                        label: const Text('Owners', style: TextStyle(fontSize: 11)),
+                        selected: target == 'OWNER',
+                        onSelected: isSending ? null : (_) => setDlgState(() => target = 'OWNER'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: titleCtrl,
-                enabled: !isSending,
-                decoration: const InputDecoration(
-                  labelText: 'Alert Headline',
-                  hintText: 'e.g. Critical Weather Advisory or Subsidy Update',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                const SizedBox(height: 12),
+                const Text('Alert Category:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: ['GENERAL', 'WEATHER', 'EQUIPMENT', 'SUBSIDY', 'MAINTENANCE', 'SYSTEM'].map((cat) {
+                    return ChoiceChip(
+                      label: Text(cat, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
+                      selected: category == cat,
+                      onSelected: isSending ? null : (_) => setDlgState(() => category = cat),
+                    );
+                  }).toList(),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: msgCtrl,
-                enabled: !isSending,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Message Body',
-                  hintText: 'Details for intended farmers / owners...',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: titleCtrl,
+                  enabled: !isSending,
+                  decoration: const InputDecoration(
+                    labelText: 'Alert Headline',
+                    hintText: 'e.g. Critical Weather Advisory or Subsidy Update',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: msgCtrl,
+                  enabled: !isSending,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Message Body',
+                    hintText: 'Details for intended farmers / owners...',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -1438,40 +1455,113 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       final message = msgCtrl.text.trim();
                       if (title.isEmpty || message.isEmpty) return;
 
+                      // Confirmation Review Dialog
+                      final confirm = await showDialog<bool>(
+                        context: dlgCtx,
+                        builder: (confirmCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          title: const Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: Color(0xFF2563EB)),
+                              SizedBox(width: 8),
+                              Text('Confirm Broadcast', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          content: Text(
+                            'Are you sure you want to broadcast this $category alert to all $target recipients?\n\nIn-app notifications and real-time live events will be immediately delivered.',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(confirmCtx, false),
+                              child: const Text('Edit'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                              onPressed: () => Navigator.pop(confirmCtx, true),
+                              child: const Text('Confirm & Send'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm != true) return;
+
                       setDlgState(() => isSending = true);
-                      final messenger = ScaffoldMessenger.of(context);
 
                       try {
                         final res = await ApiClient().dio.post('/admin/alerts/broadcast', data: {
                           'title': title,
                           'message': message,
                           'targetRole': target,
+                          'category': category,
                           'type': 'ADMIN_BROADCAST',
                         });
 
-                        final successMsg = res.data?['message']?.toString() ?? 'Broadcast alert dispatched successfully.';
+                        final resData = res.data is Map ? res.data as Map : {};
+                        final successMsg = resData['message']?.toString() ?? 'Broadcast alert dispatched successfully.';
+                        final count = resData['deliveredCount'] ?? resData['recipientCount'] ?? 0;
+                        final pushStatus = resData['pushStatus'] is Map ? resData['pushStatus'] as Map : {};
+                        final pushMode = pushStatus['mode']?.toString() ?? 'In-app real-time (FCM offline)';
 
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                         }
 
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text(successMsg),
-                            backgroundColor: const Color(0xFF16A34A),
-                            behavior: SnackBarBehavior.floating,
+                        if (!mounted) return;
+                        showDialog(
+                          context: context,
+                          builder: (resCtx) => AlertDialog(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            title: const Row(
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: Colors.green),
+                                SizedBox(width: 8),
+                                Text('Alert Dispatched', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(successMsg, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 10),
+                                Text('• Target Audience: $target', style: const TextStyle(fontSize: 12)),
+                                Text('• Category: $category', style: const TextStyle(fontSize: 12)),
+                                Text('• Recipients Reached: $count', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                Text('• Delivery Mode: $pushMode', style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+                              ],
+                            ),
+                            actions: [
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
+                                onPressed: () => Navigator.pop(resCtx),
+                                child: const Text('Done'),
+                              ),
+                            ],
                           ),
                         );
                         ref.invalidate(adminAlertsProvider);
                       } catch (e) {
                         setDlgState(() => isSending = false);
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to dispatch alert: $e'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        if (!mounted) return;
+                        showDialog(
+                          context: context,
+                          builder: (errCtx) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.error_outline_rounded, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Broadcast Failed', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              content: Text('Failed to dispatch alert: ${e.toString().replaceFirst('Exception: ', '')}'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(errCtx), child: const Text('OK')),
+                              ],
+                            ),
+                          );
                       }
                     },
               style: ElevatedButton.styleFrom(
@@ -1850,25 +1940,60 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'system_health'.tr(lang),
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : AppTheme.textDarkNavy,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'system_health'.tr(lang),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : AppTheme.textDarkNavy,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    ref.invalidate(adminHealthProvider);
+                    ref.invalidate(adminDataQualityProvider);
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Refresh', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             ref.watch(adminHealthProvider).when(
               loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen)),
-              error: (err, _) => Text('Error: $err'),
+              error: (err, _) => Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Text('Error loading health: $err', style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
               data: (healthServices) {
                 return Column(
                   children: healthServices.map((svc) {
                     final serviceName = svc['service']?.toString() ?? 'Service';
                     final status = svc['status']?.toString() ?? 'ONLINE';
                     final latency = svc['responseTime'] != null ? '${svc['responseTime']}ms' : 'Active';
+                    final recoveryAction = svc['recoveryAction']?.toString();
                     final isOnline = status == 'ONLINE';
+                    final isDegraded = status == 'DEGRADED';
+
+                    final Color statusColor = isOnline
+                        ? Colors.green
+                        : isDegraded
+                            ? Colors.amber.shade800
+                            : Colors.red;
+
+                    final IconData statusIcon = isOnline
+                        ? Icons.check_circle_rounded
+                        : isDegraded
+                            ? Icons.warning_rounded
+                            : Icons.cancel_rounded;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -1881,20 +2006,17 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                         ),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.12),
+                                  color: statusColor.withValues(alpha: 0.12),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(
-                                  isOnline ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                  color: isOnline ? Colors.green : Colors.red,
-                                  size: 18,
-                                ),
+                                child: Icon(statusIcon, color: statusColor, size: 18),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -1910,7 +2032,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                       ),
                                     ),
                                     Text(
-                                      'Latency / Status: $latency',
+                                      'Latency: $latency',
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         color: isDark ? Colors.white54 : AppTheme.textMutedGray,
@@ -1922,7 +2044,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: (isOnline ? Colors.green : Colors.red).withValues(alpha: 0.12),
+                                  color: statusColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -1930,12 +2052,46 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
-                                    color: isOnline ? Colors.green : Colors.red,
+                                    color: statusColor,
                                   ),
                                 ),
                               ),
                             ],
                           ),
+                          if (recoveryAction != null && recoveryAction.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: (isOnline ? Colors.blue : Colors.amber).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: (isOnline ? Colors.blue : Colors.amber).withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline_rounded,
+                                    size: 15,
+                                    color: isOnline ? Colors.blue.shade700 : Colors.amber.shade900,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      recoveryAction,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        height: 1.35,
+                                        color: isDark ? Colors.white70 : Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 10),
                           SizedBox(
                             width: double.infinity,
@@ -1955,6 +2111,37 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   }).toList(),
                 );
               },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Action Controls: Recovery Tools & Diagnostics Log
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRecoveryControlsDialog(isDark),
+                    icon: const Icon(Icons.build_rounded, size: 16, color: Color(0xFF2563EB)),
+                    label: const Text('Recovery Controls', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRecentErrorsDialog(isDark),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 16, color: Colors.purple),
+                    label: const Text('Diagnostic Logs', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 24),
@@ -2052,29 +2239,98 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
     try {
       String endpoint = '/admin/system-health/test-api';
-      if (serviceName.toLowerCase().contains('database')) {
+      final s = serviceName.toLowerCase();
+      if (s.contains('database') || s.contains('postgres')) {
         endpoint = '/admin/system-health/test-db';
-      } else if (serviceName.toLowerCase().contains('ai')) {
+      } else if (s.contains('ai') || s.contains('ollama')) {
         endpoint = '/admin/system-health/test-ai';
+      } else if (s.contains('notification') || s.contains('dispatch')) {
+        endpoint = '/admin/system-health/test-notifications';
       }
 
       final res = await ApiClient().dio.post(endpoint);
       final dynamic d = res.data;
       final msg = (d is Map && d['message'] != null) ? d['message'].toString() : '$serviceName responded successfully.';
+      final status = (d is Map && d['status'] != null) ? d['status'].toString() : 'ONLINE';
+      final latency = (d is Map && d['responseTime'] != null) ? '${d['responseTime']}ms' : 'N/A';
+      final recoveryAction = (d is Map && d['recoveryAction'] != null) ? d['recoveryAction'].toString() : null;
+
+      final isOnline = status == 'ONLINE';
+      final isDegraded = status == 'DEGRADED';
 
       if (mounted) {
         messenger.hideCurrentSnackBar();
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.green),
+                Icon(
+                  isOnline
+                      ? Icons.check_circle_rounded
+                      : isDegraded
+                          ? Icons.warning_rounded
+                          : Icons.cancel_rounded,
+                  color: isOnline
+                      ? Colors.green
+                      : isDegraded
+                          ? Colors.amber.shade800
+                          : Colors.red,
+                ),
                 const SizedBox(width: 8),
-                Flexible(child: Text('$serviceName Diagnostic')),
+                Flexible(child: Text('$serviceName Diagnostic', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
               ],
             ),
-            content: Text(msg),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('Status: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (isOnline ? Colors.green : Colors.amber.shade800).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: isOnline ? Colors.green : Colors.amber.shade800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('Latency: $latency', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(msg, style: const TextStyle(fontSize: 13)),
+                if (recoveryAction != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.25)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Recommended Action:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                        const SizedBox(height: 4),
+                        Text(recoveryAction, style: const TextStyle(fontSize: 11, height: 1.35)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
             actions: [
               TextButton(
                 onPressed: () {
@@ -2097,6 +2353,194 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           ),
         );
       }
+    }
+  }
+
+  void _showRecoveryControlsDialog(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.build_circle_rounded, color: Color(0xFF2563EB)),
+            SizedBox(width: 8),
+            Text('Recovery Controls', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select a non-destructive recovery action to run across the cluster:',
+              style: TextStyle(fontSize: 12.5),
+            ),
+            const SizedBox(height: 14),
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.sync_rounded, color: Colors.green),
+              title: const Text('Reconnect DB Pool', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Re-establishes PostgreSQL connection pool cleanly', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _executeRecoveryAction('RECONNECT_DB');
+              },
+            ),
+            const Divider(),
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.cleaning_services_rounded, color: Colors.orange),
+              title: const Text('Flush Transient Cache', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Evicts stale weather and temporary cache keys', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _executeRecoveryAction('CLEAR_TRANSIENT_CACHE');
+              },
+            ),
+            const Divider(),
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.playlist_play_rounded, color: Colors.purple),
+              title: const Text('Test All Diagnostic Probes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Runs health check suite and logs audit telemetry', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _executeRecoveryAction('TEST_ALL');
+              },
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Note: Host container reboots and external GPU provisioning require hosting platform dashboard access (Render Cloud / GCP).',
+                style: TextStyle(fontSize: 10.5, color: Colors.black54),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executeRecoveryAction(String action) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(content: Text('Executing $action...'), duration: const Duration(seconds: 2)),
+    );
+    try {
+      final res = await ApiClient().dio.post('/admin/system-health/recover', data: { 'action': action });
+      final msg = res.data?['message']?.toString() ?? 'Recovery operation completed.';
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Recovery Success', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(msg),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ref.invalidate(adminHealthProvider);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(backgroundColor: Colors.red, content: Text('Recovery failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _showRecentErrorsDialog(bool isDark) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final res = await ApiClient().dio.get('/admin/system-health/recent-errors');
+      final dynamic d = res.data;
+      final List<dynamic> logs = (d is Map && d['recentLogs'] is List) ? d['recentLogs'] as List : [];
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.receipt_long_rounded, color: Colors.purple),
+              SizedBox(width: 8),
+              Text('Diagnostic Logs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: logs.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: Text('No diagnostic issues or system errors recorded.', style: TextStyle(fontSize: 13))),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: logs.length,
+                    itemBuilder: (context, idx) {
+                      final item = logs[idx] as Map;
+                      final action = item['action']?.toString() ?? 'EVENT';
+                      final resource = item['resource']?.toString() ?? 'System';
+                      final time = item['createdAt']?.toString() ?? '';
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(action, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text(resource, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(time, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(backgroundColor: Colors.red, content: Text('Failed to load logs: $e')));
     }
   }
 

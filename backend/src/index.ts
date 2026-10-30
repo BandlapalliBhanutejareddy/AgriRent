@@ -111,16 +111,28 @@ app.use(sanitize);
 app.use(responseMiddleware);
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'AgroRent API is running!' });
+  res.json({ success: true, status: 'ok', message: 'AgroRent API is running!' });
+});
+app.get('/health', (req, res) => {
+  res.json({ success: true, status: 'ok', message: 'AgroRent API is running!' });
 });
 
 app.get('/api/ready', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ready', database: 'connected' });
+    res.json({ success: true, status: 'ready', database: 'connected' });
   } catch (error) {
     console.error('Ready check error:', error);
-    res.status(503).json({ status: 'unready', database: 'disconnected' });
+    res.status(503).json({ success: false, status: 'unready', database: 'disconnected' });
+  }
+});
+app.get('/ready', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ success: true, status: 'ready', database: 'connected' });
+  } catch (error) {
+    console.error('Ready check error:', error);
+    res.status(503).json({ success: false, status: 'unready', database: 'disconnected' });
   }
 });
 
@@ -152,6 +164,7 @@ import marketRoutes from './routes/market';
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/notifications', notificationRoutes);
 app.use('/api/saved', savedRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/guides', guideRoutes);
@@ -161,6 +174,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/farms', farmRoutes);

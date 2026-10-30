@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 
-type TabType = 'VERIFICATIONS' | 'MODERATION' | 'COMPLAINTS';
+type TabType = 'VERIFICATIONS' | 'MODERATION' | 'COMPLAINTS' | 'BROADCASTS';
 
 export default function AdminActionCenterPage() {
   const { showToast } = useToast();
@@ -41,6 +41,7 @@ export default function AdminActionCenterPage() {
   const [owners, setOwners] = useState<any[]>([]);
   const [equipment, setEquipment] = useState<any[]>([]);
   const [complaints, setComplaints] = useState<any[]>([]);
+  const [broadcastHistory, setBroadcastHistory] = useState<any[]>([]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +49,7 @@ export default function AdminActionCenterPage() {
   // Broadcast Alert Modal State
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastTarget, setBroadcastTarget] = useState<'ALL' | 'FARMER' | 'OWNER'>('ALL');
+  const [broadcastCategory, setBroadcastCategory] = useState<'GENERAL' | 'WEATHER' | 'EQUIPMENT' | 'SUBSIDY' | 'MAINTENANCE' | 'SYSTEM'>('GENERAL');
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
@@ -59,11 +61,12 @@ export default function AdminActionCenterPage() {
   async function loadAllData() {
     try {
       setLoading(true);
-      const [statsRes, usersRes, equipRes, complaintsRes] = await Promise.all([
+      const [statsRes, usersRes, equipRes, complaintsRes, historyRes] = await Promise.all([
         api.get('/admin/stats').catch(() => ({ data: {} })),
         api.get('/admin/users', { params: { role: 'OWNER', limit: 50 } }).catch(() => ({ data: { data: [] } })),
         api.get('/admin/equipment', { params: { limit: 50 } }).catch(() => ({ data: { data: [] } })),
-        api.get('/admin/feedback-complaints').catch(() => ({ data: { complaints: [] } }))
+        api.get('/admin/feedback-complaints').catch(() => ({ data: { complaints: [] } })),
+        api.get('/admin/alerts/history').catch(() => ({ data: { logs: [] } }))
       ]);
 
       const s = statsRes.data || {};
@@ -81,6 +84,9 @@ export default function AdminActionCenterPage() {
 
       const complaintList = complaintsRes.data?.complaints || [];
       setComplaints(complaintList);
+
+      const logsList = historyRes.data?.logs || [];
+      setBroadcastHistory(logsList);
     } catch (err) {
       console.error('Failed to load admin action center data', err);
       showToast('Failed to load alerts & action center data', 'error');
@@ -160,12 +166,14 @@ export default function AdminActionCenterPage() {
         title: broadcastTitle.trim(),
         message: broadcastMessage.trim(),
         targetRole: broadcastTarget,
+        category: broadcastCategory,
         type: 'ADMIN_BROADCAST'
       });
       showToast(res.data?.message || 'Broadcast alert dispatched successfully', 'success');
       setShowBroadcastModal(false);
       setBroadcastTitle('');
       setBroadcastMessage('');
+      api.get('/admin/alerts/history').then(r => setBroadcastHistory(r.data?.logs || [])).catch(() => {});
     } catch (err: any) {
       showToast(err.response?.data?.error || err.message || 'Failed to dispatch alert', 'error');
     } finally {
@@ -322,6 +330,17 @@ export default function AdminActionCenterPage() {
               }`}
             >
               Complaints Center ({complaints.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('BROADCASTS')}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
+                activeTab === 'BROADCASTS'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              Broadcast History ({broadcastHistory.length})
             </button>
           </div>
 
@@ -572,6 +591,67 @@ export default function AdminActionCenterPage() {
             )}
           </div>
         )}
+
+        {/* 4. BROADCASTS HISTORY TAB */}
+        {activeTab === 'BROADCASTS' && (
+          <div className="overflow-x-auto">
+            {broadcastHistory.length === 0 ? (
+              <div className="p-12 text-center">
+                <Bell className="mx-auto text-slate-300 dark:text-slate-600 mb-3" size={36} />
+                <p className="text-slate-500 font-bold text-sm">No broadcast alerts recorded yet.</p>
+                <p className="text-slate-400 text-xs mt-1">Dispatched enterprise alerts will appear here with delivery details.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="py-3 px-6">Timestamp</th>
+                    <th className="py-3 px-6">Target Audience</th>
+                    <th className="py-3 px-6">Category</th>
+                    <th className="py-3 px-6">Headline Title</th>
+                    <th className="py-3 px-6">Recipients Reached</th>
+                    <th className="py-3 px-6">Status / Mode</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
+                  {broadcastHistory.map((item, idx) => {
+                    const meta = item.metadata ? (typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata) : {};
+                    const audience = meta.audience || 'ALL';
+                    const category = meta.category || 'GENERAL';
+                    const title = meta.title || 'Broadcast Alert';
+                    const count = meta.recipientCount ?? meta.deliveredCount ?? 0;
+                    return (
+                      <tr key={item.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-4 px-6 text-slate-500 text-[11px] whitespace-nowrap">
+                          {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Recent'}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                            {audience}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            {category}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-bold text-slate-900 dark:text-white">
+                          {title}
+                        </td>
+                        <td className="py-4 px-6 font-mono font-bold text-emerald-600">
+                          {count} users
+                        </td>
+                        <td className="py-4 px-6 text-[11px] text-slate-500">
+                          In-app & WebSocket Live
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Broadcast Alert Modal */}
@@ -622,6 +702,28 @@ export default function AdminActionCenterPage() {
                       }`}
                     >
                       {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                  Alert Category
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  {(['GENERAL', 'WEATHER', 'EQUIPMENT', 'SUBSIDY', 'MAINTENANCE', 'SYSTEM'] as const).map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setBroadcastCategory(cat)}
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                        broadcastCategory === cat
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat}
                     </button>
                   ))}
                 </div>
