@@ -59,4 +59,17 @@ test('6. Environment configuration must target production Supabase and Render en
   assert(envFile.includes('https://agrirent-5qpx.onrender.com/api/'), 'Base URL must match production Render URL');
 });
 
-console.log('\nAll 6 regression verification tests PASSED with zero defects!\n');
+test('7. Supabase client configuration across web and backend must NEVER fall back to placeholder.supabase.co', () => {
+  const webSb = fs.readFileSync(path.resolve(__dirname, '../../web/src/lib/supabase.ts'), 'utf8');
+  const backendSb = fs.readFileSync(path.resolve(__dirname, '../../backend/src/lib/supabase.ts'), 'utf8');
+  const backendStorage = fs.readFileSync(path.resolve(__dirname, '../../backend/src/lib/storage.ts'), 'utf8');
+  const backendUpload = fs.readFileSync(path.resolve(__dirname, '../../backend/src/routes/upload.ts'), 'utf8');
+
+  assert(!webSb.includes("'https://placeholder.supabase.co'"), 'Web Supabase client must not have placeholder fallback');
+  assert(webSb.includes('https://ezylxyrtnodxthdgynvn.supabase.co'), 'Web Supabase client must default to actual production URL');
+  assert(!backendSb.includes("'https://placeholder.supabase.co'"), 'Backend Supabase client must not have placeholder fallback');
+  assert(!backendStorage.includes("'https://placeholder.supabase.co'"), 'Backend storage must not have placeholder fallback');
+  assert(!backendUpload.includes("'https://placeholder.supabase.co'"), 'Backend upload must not have placeholder fallback');
+});
+
+console.log('\nAll 7 regression verification tests PASSED with zero defects!\n');
