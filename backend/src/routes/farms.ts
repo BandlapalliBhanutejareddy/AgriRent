@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { requireAuth, AuthRequest } from '../middlewares/authMiddleware';
+import { requireAuth, optionalAuth, AuthRequest } from '../middlewares/authMiddleware';
 import { farmDigitalTwinService } from '../services/farm/FarmDigitalTwinService';
 import { cropLifecycleService } from '../services/farm/CropLifecycleService';
 import { nextBestActionService } from '../services/farm/NextBestActionService';
@@ -20,7 +20,141 @@ import { WeatherAlertService } from '../services/weather/WeatherAlertService';
 
 const router = Router();
 
-// Protect all farm routes with authentication
+// ============================================================================
+// PUBLIC / SEMI-PUBLIC WEATHER & GEOLOCATION UTILITY ROUTES (optionalAuth)
+// Accessible without requiring login so map clicks, GPS, and manual place searches succeed instantly.
+// ============================================================================
+
+// GET /api/farms/weather/geocode?query=...
+router.get('/weather/geocode', optionalAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const query = (req.query.query as string) || (req.query.q as string) || '';
+    if (!query.trim() || query.trim().length < 2) {
+      res.json({ success: true, data: { results: [] }, results: [] });
+      return;
+    }
+    const results = await WeatherService.geocode(query.trim(), 5);
+    res.json({ success: true, data: { results }, results });
+  } catch (err: any) {
+    console.error('Geocoding route error:', err);
+    res.status(500).json({ success: false, error: 'Geocoding failed', details: err.message });
+  }
+});
+
+// GET /api/farms/weather/reverse-geocode?lat=...&lng=...
+router.get('/weather/reverse-geocode', optionalAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const lat = parseFloat(String(req.query.lat));
+    const lng = parseFloat(String(req.query.lng));
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      res.status(400).json({ success: false, error: 'Invalid coordinates' });
+      return;
+    }
+    const locationName = await WeatherService.reverseGeocode(lat, lng);
+    res.json({ success: true, data: { locationName }, locationName });
+  } catch (err: any) {
+    console.error('Reverse geocoding error:', err);
+    res.status(500).json({ success: false, error: 'Reverse geocoding failed', details: err.message });
+  }
+});
+
+// GET /api/farms/weather/lookup?lat=...&lng=... OR ?location=...
+router.get('/weather/lookup', optionalAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const latParam = req.query.lat
+      ? parseFloat(String(req.query.lat))
+      : (req.query.latitude ? parseFloat(String(req.query.latitude)) : NaN);
+    const lngParam = req.query.lng
+      ? parseFloat(String(req.query.lng))
+      : (req.query.longitude ? parseFloat(String(req.query.longitude)) : NaN);
+    const locationQuery = req.query.location ? String(req.query.location).trim() : '';
+    const nameParam = req.query.name ? String(req.query.name).trim() : undefined;
+    const bypassCache = req.query.bypassCache === 'true';
+
+    // 1. Direct coordinate lookup (GPS or map click)
+    if (!isNaN(latParam) && !isNaN(lngParam)) {
+      if (latParam < -90 || latParam > 90 || lngParam < -180 || lngParam > 180) {
+        res.status(400).json({
+          success: false,
+          error: 'Latitude must be between -90 and 90, Longitude between -180 and 180.',
+          code: 'INVALID_COORDINATES'
+        });
+        return;
+      }
+      const weatherData = await WeatherService.getWeatherByCoordinates({
+        latitude: latParam,
+        longitude: lngParam,
+        locationName: nameParam,
+        farmId: 'current-lookup',
+        bypassCache
+      });
+      if (!weatherData.success) {
+        res.status(502).json(weatherData);
+        return;
+      }
+      res.json(weatherData);
+      return;
+    }
+
+    // 2. Explicit text search lookup
+    if (locationQuery) {
+      const weatherData = await WeatherService.getFarmWeather('current-lookup', locationQuery);
+      if (!weatherData.success && weatherData.code === 'GEOCODING_FAILED') {
+        res.status(400).json(weatherData);
+        return;
+      }
+      res.json(weatherData);
+      return;
+    }
+
+    // 3. Fallback to authenticated user's saved farm (if token present)
+    if (req.user?.id) {
+      const farm = await prisma.farm.findFirst({
+        where: { ownerId: req.user.id },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (farm) {
+        if (farm.latitude != null && farm.longitude != null) {
+          const weatherData = await WeatherService.getWeatherByCoordinates({
+            latitude: farm.latitude,
+            longitude: farm.longitude,
+            locationName: farm.location,
+            farmId: farm.id,
+            bypassCache
+          });
+          if (!weatherData.success) {
+            res.status(502).json(weatherData);
+            return;
+          }
+          res.json(weatherData);
+          return;
+        } else if (farm.location) {
+          const weatherData = await WeatherService.getFarmWeather(farm.id, farm.location);
+          if (!weatherData.success) {
+            const status = weatherData.code === 'WEATHER_LOCATION_UNAVAILABLE' || weatherData.code === 'GEOCODING_FAILED' ? 400 : 502;
+            res.status(status).json(weatherData);
+            return;
+          }
+          res.json(weatherData);
+          return;
+        }
+      }
+    }
+
+    // 4. Honest error when no location is available - never silently substitute
+    res.status(400).json({
+      success: false,
+      error: 'Please select a location using GPS, search for a place, or select a point on the map.',
+      code: 'WEATHER_LOCATION_UNAVAILABLE'
+    });
+  } catch (err: any) {
+    console.error('Weather lookup error:', err);
+    res.status(500).json({ success: false, error: 'Internal server error.', details: err.message });
+  }
+});
+
+// Protect remaining private farm management routes with authentication
 router.use(requireAuth);
 
 /**
@@ -1763,132 +1897,7 @@ router.get('/:farmId/spending-report', async (req, res) => {
 
 
 
-// GET /api/farms/weather/geocode?query=...
-router.get('/weather/geocode', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const query = (req.query.query as string) || (req.query.q as string) || '';
-    if (!query.trim() || query.trim().length < 2) {
-      res.json({ success: true, data: { results: [] }, results: [] });
-      return;
-    }
-    const results = await WeatherService.geocode(query.trim(), 5);
-    res.json({ success: true, data: { results }, results });
-  } catch (err: any) {
-    console.error('Geocoding route error:', err);
-    res.status(500).json({ success: false, error: 'Geocoding failed', details: err.message });
-  }
-});
 
-// GET /api/farms/weather/reverse-geocode?lat=...&lng=...
-router.get('/weather/reverse-geocode', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const lat = parseFloat(String(req.query.lat));
-    const lng = parseFloat(String(req.query.lng));
-    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      res.status(400).json({ success: false, error: 'Invalid coordinates' });
-      return;
-    }
-    const locationName = await WeatherService.reverseGeocode(lat, lng);
-    res.json({ success: true, data: { locationName }, locationName });
-  } catch (err: any) {
-    console.error('Reverse geocoding error:', err);
-    res.status(500).json({ success: false, error: 'Reverse geocoding failed', details: err.message });
-  }
-});
-
-// GET /api/farms/weather/lookup?lat=...&lng=... OR ?location=...
-router.get('/weather/lookup', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const latParam = req.query.lat
-      ? parseFloat(String(req.query.lat))
-      : (req.query.latitude ? parseFloat(String(req.query.latitude)) : NaN);
-    const lngParam = req.query.lng
-      ? parseFloat(String(req.query.lng))
-      : (req.query.longitude ? parseFloat(String(req.query.longitude)) : NaN);
-    const locationQuery = req.query.location ? String(req.query.location).trim() : '';
-    const nameParam = req.query.name ? String(req.query.name).trim() : undefined;
-    const bypassCache = req.query.bypassCache === 'true';
-
-    // 1. Direct coordinate lookup (GPS or map click)
-    if (!isNaN(latParam) && !isNaN(lngParam)) {
-      if (latParam < -90 || latParam > 90 || lngParam < -180 || lngParam > 180) {
-        res.status(400).json({
-          success: false,
-          error: 'Latitude must be between -90 and 90, Longitude between -180 and 180.',
-          code: 'INVALID_COORDINATES'
-        });
-        return;
-      }
-      const weatherData = await WeatherService.getWeatherByCoordinates({
-        latitude: latParam,
-        longitude: lngParam,
-        locationName: nameParam,
-        farmId: 'current-lookup',
-        bypassCache
-      });
-      if (!weatherData.success) {
-        res.status(502).json(weatherData);
-        return;
-      }
-      res.json(weatherData);
-      return;
-    }
-
-    // 2. Explicit text search lookup
-    if (locationQuery) {
-      const weatherData = await WeatherService.getFarmWeather('current-lookup', locationQuery);
-      if (!weatherData.success && weatherData.code === 'GEOCODING_FAILED') {
-        res.status(400).json(weatherData);
-        return;
-      }
-      res.json(weatherData);
-      return;
-    }
-
-    // 3. Fallback to authenticated user's saved farm (WITHOUT fake hardcoded Guntur)
-    const farm = await prisma.farm.findFirst({
-      where: { ownerId: req.user!.id },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    if (farm) {
-      if (farm.latitude != null && farm.longitude != null) {
-        const weatherData = await WeatherService.getWeatherByCoordinates({
-          latitude: farm.latitude,
-          longitude: farm.longitude,
-          locationName: farm.location,
-          farmId: farm.id,
-          bypassCache
-        });
-        if (!weatherData.success) {
-          res.status(502).json(weatherData);
-          return;
-        }
-        res.json(weatherData);
-        return;
-      } else if (farm.location) {
-        const weatherData = await WeatherService.getFarmWeather(farm.id, farm.location);
-        if (!weatherData.success) {
-          const status = weatherData.code === 'WEATHER_LOCATION_UNAVAILABLE' || weatherData.code === 'GEOCODING_FAILED' ? 400 : 502;
-          res.status(status).json(weatherData);
-          return;
-        }
-        res.json(weatherData);
-        return;
-      }
-    }
-
-    // 4. Honest error when no location is available - never silently substitute
-    res.status(400).json({
-      success: false,
-      error: 'Please select a location using GPS, search for a place, or select a point on the map.',
-      code: 'WEATHER_LOCATION_UNAVAILABLE'
-    });
-  } catch (err: any) {
-    console.error('Weather lookup error:', err);
-    res.status(500).json({ success: false, error: 'Internal server error.', details: err.message });
-  }
-});
 
 // GET /api/farms/:farmId/weather
 router.get('/:farmId/weather', async (req: AuthRequest, res: Response): Promise<void> => {

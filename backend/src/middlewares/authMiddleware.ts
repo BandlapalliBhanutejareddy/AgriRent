@@ -88,6 +88,63 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
   }
 };
 
+export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // 1. Try Supabase Access Token
+    let supabaseUser: any = null;
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (!error && data?.user) {
+        supabaseUser = data.user;
+      }
+    } catch {
+      // Supabase is offline or placeholder in CI
+    }
+
+    if (supabaseUser) {
+      let user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { authId: supabaseUser.id },
+            { email: supabaseUser.email }
+          ]
+        }
+      });
+
+      if (user && !user.isSuspended) {
+        req.user = { id: user.id, email: user.email, authId: user.authId || user.id };
+        req.prismaUser = user;
+        return next();
+      }
+    }
+
+    // 2. Try Fallback Token
+    const fallback = verifyFallbackToken(token);
+    if (fallback) {
+      const user = await prisma.user.findUnique({
+        where: { id: fallback.sub }
+      });
+
+      if (user && !user.isSuspended) {
+        req.user = { id: user.id, email: user.email, authId: user.authId || user.id };
+        req.prismaUser = user;
+        return next();
+      }
+    }
+
+    next();
+  } catch {
+    next();
+  }
+};
+
 export const requireRole = (role: 'FARMER' | 'OWNER' | 'ADMIN') => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.prismaUser) {
