@@ -8,7 +8,20 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4.19-38B2AC.svg)](https://tailwindcss.com/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.60.0-green.svg)](https://playwright.dev/)
 
-An enterprise-grade, multi-role agricultural machinery rental marketplace and AI-powered agronomic digital twin platform designed for modern Indian agriculture. AgroRent AI connects smallholder farmers with equipment owners, provides ICAR/KVK-grounded agronomic advisory, and orchestrates end-to-end rental lifecycles.
+An enterprise-grade, multi-role agricultural machinery rental marketplace and AI-powered agronomic digital twin platform designed for modern Indian agriculture. AgroRent AI bridges the mechanization divide by connecting smallholder farmers with equipment fleet owners, providing ICAR/KVK-grounded agronomic advisory, and orchestrating end-to-end rental lifecycles.
+
+---
+
+## 🌾 The AgroRent Story: Empowering Every Farmer
+
+In India and developing agrarian economies, over **85% of cultivators are smallholder farmers** managing less than two hectares of land. While modern agricultural mechanization (such as precision laser levelers, high-capacity combine harvesters, and boom sprayers) can increase crop yields by 15–20% and reduce harvest losses, the prohibitive capital cost of purchasing this equipment makes ownership impossible for most growers.
+
+At the same time, regional equipment owners and progressive farming cooperatives experience high seasonal equipment downtime, where expensive tractors and implements sit idle between local harvest windows.
+
+**AgroRent AI solves both sides of this equation:**
+1. **For the Smallholder Farmer (like Ramesh in Telangana):** When unexpected monsoon rains approach, Ramesh doesn't need ₹12,00,000 to buy a tractor and moisture-resistant threshing equipment. He opens AgroRent AI, views real-time localized weather alerts, searches verified machinery nearby within his budget (`₹/day`), and books equipment with instant in-app delivery tracking.
+2. **For the Equipment Owner (like Suresh in Andhra Pradesh):** Suresh logs his fleet on AgroRent, sets custom pricing and operating radiuses, reviews incoming farmer bookings, coordinates dispatch, and tracks automated net payout ledgers with security and zero guesswork.
+3. **For the Platform Administrator:** A centralized command center monitors platform integrity, dispatches priority broadcasts (weather advisories, government subsidies), moderates fleet listings, tracks recipient engagement ("Who Watched?"), and resolves farmer disputes in real time.
 
 ---
 
@@ -33,13 +46,23 @@ An enterprise-grade, multi-role agricultural machinery rental marketplace and AI
 > cd mobile && flutter build apk --release
 > ```
 
-### 🔑 Verified Demonstration Portals & Accounts
+### 👥 User Roles & Access Architecture
 
-| Portal | Email | Role | Features & Access |
-|---|---|---|---|
-| **Administrator** | `bandlapalliteja369@gmail.com` | `ADMIN` | Operational Center, Targeted Broadcasts, Recipient Read Receipts ("Who Watched?"), Fleet Moderation, Data Quality, System Health |
-| **Farmer** | `farmer11@gmail.com` | `FARMER` | Machinery Marketplace, Satellite Weather & Agronomic Advisory, Digital Twin Crop Stages, Booking Flow, Real-time In-app Notifications |
-| **Fleet Owner** | `owner11@gmail.com` | `OWNER` | Fleet Inventory Management, Rental Lifecycle Tracking (Confirm/Dispatch/Return), Maintenance Logs, Payouts Ledger |
+AgroRent AI provides distinct role-based experiences tailored to the modern agrarian ecosystem:
+
+| Portal | Role | Scope & Capabilities |
+|---|---|---|
+| **🌾 Farmer Portal** | `FARMER` | Machinery Marketplace, Satellite Weather & Agronomic Advisory, Digital Twin Crop Stages, Booking Flow, Real-time In-app Notifications |
+| **🚜 Fleet Owner Portal** | `OWNER` | Fleet Inventory Management, Rental Lifecycle Tracking (Confirm/Dispatch/Return), Maintenance Logs, Payouts Ledger |
+| **🛡️ Administrator Portal** | `ADMIN` | Operational Center, Targeted Broadcasts, Recipient Read Receipts ("Who Watched?"), Fleet Moderation, Data Quality, System Health |
+
+> [!SECURITY]
+> **Authentication & Authorized Access Guidelines**:
+> - Never commit or publicly share production passwords, API keys, or private tokens.
+> - Access the live web application at [https://agri-rent-two.vercel.app/login](https://agri-rent-two.vercel.app/login) and authenticate via your authorized role credentials or Google OAuth.
+> - New users can register directly through the public onboarding flow, selecting their appropriate primary role (Farmer or Equipment Owner).
+> - Administrative privileges are strictly protected and assigned through internal administrative onboarding.
+> - If any test credentials were previously exposed in local development or logs, rotate them immediately in your identity provider and database.
 
 ---
 

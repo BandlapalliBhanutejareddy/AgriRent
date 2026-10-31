@@ -53,6 +53,7 @@ export default function AdminActionCenterPage() {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastTarget, setBroadcastTarget] = useState<'ALL' | 'FARMER' | 'OWNER'>('ALL');
   const [broadcastCategory, setBroadcastCategory] = useState<'GENERAL' | 'WEATHER' | 'EQUIPMENT' | 'SUBSIDY' | 'MAINTENANCE' | 'SYSTEM'>('GENERAL');
+  const [broadcastPriority, setBroadcastPriority] = useState<'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
@@ -197,6 +198,7 @@ export default function AdminActionCenterPage() {
           message: broadcastMessage.trim(),
           targetRole: broadcastTarget,
           category: broadcastCategory,
+          priority: broadcastPriority,
           type: 'ADMIN_BROADCAST'
         });
       } catch (sendErr) {
@@ -205,6 +207,7 @@ export default function AdminActionCenterPage() {
           message: broadcastMessage.trim(),
           targetRole: broadcastTarget,
           category: broadcastCategory,
+          priority: broadcastPriority,
           type: 'ADMIN_BROADCAST'
         });
       }
@@ -212,6 +215,7 @@ export default function AdminActionCenterPage() {
       setShowBroadcastModal(false);
       setBroadcastTitle('');
       setBroadcastMessage('');
+      setBroadcastPriority('NORMAL');
       api.get('/admin/alerts/history').then(r => setBroadcastHistory(r.data?.logs || [])).catch(() => { });
     } catch (err: any) {
       showToast(err.response?.data?.error || err.message || 'Failed to dispatch alert', 'error');
@@ -668,6 +672,7 @@ export default function AdminActionCenterPage() {
                     const meta = item.metadata ? (typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata) : {};
                     const audience = item.audience || meta.audience || 'ALL';
                     const category = item.category || meta.category || 'GENERAL';
+                    const priority = item.priority || meta.priority || 'NORMAL';
                     const title = item.title || meta.title || 'Broadcast Alert';
                     const message = item.message || meta.message || '';
                     const count = item.recipientCount ?? meta.recipientCount ?? item.deliveredCount ?? meta.deliveredCount ?? 0;
@@ -685,9 +690,20 @@ export default function AdminActionCenterPage() {
                           </span>
                         </td>
                         <td className="py-4 px-6">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                            {category}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                              {category}
+                            </span>
+                            {priority && priority !== 'NORMAL' && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                                priority === 'URGENT'
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                              }`}>
+                                {priority}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-4 px-6">
                           <div className="font-bold text-slate-900 dark:text-white">{title}</div>
@@ -798,6 +814,31 @@ export default function AdminActionCenterPage() {
                         }`}
                     >
                       {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                  Priority Level
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['NORMAL', 'HIGH', 'URGENT'] as const).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setBroadcastPriority(p)}
+                      className={`py-2 px-3 rounded-xl text-xs font-black transition-all ${broadcastPriority === p
+                        ? p === 'URGENT'
+                          ? 'bg-red-600 text-white shadow-sm'
+                          : p === 'HIGH'
+                          ? 'bg-amber-600 text-white shadow-sm'
+                          : 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                        }`}
+                    >
+                      {p}
                     </button>
                   ))}
                 </div>

@@ -241,6 +241,15 @@ export default function NotificationsPage() {
                         <h4 className={`font-bold text-sm sm:text-base leading-tight ${notif.read ? 'text-slate-600 dark:text-slate-400' : 'text-slate-850 dark:text-white'}`}>
                           {notif.title}
                         </h4>
+                        {notif.priority && notif.priority !== 'NORMAL' && (
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                            notif.priority === 'URGENT'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-800'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                          }`}>
+                            Priority: {notif.priority}
+                          </span>
+                        )}
                         <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
                           <Clock size={10} /> {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString() : 'Just now'}
                         </span>
