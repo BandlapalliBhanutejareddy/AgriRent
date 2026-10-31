@@ -18,8 +18,8 @@ class ApiClient {
   ApiClient._internal() {
     _dio = Dio(BaseOptions(
       baseUrl: ApiConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 60),
-      receiveTimeout: const Duration(seconds: 60),
+      connectTimeout: const Duration(seconds: 90),
+      receiveTimeout: const Duration(seconds: 90),
       sendTimeout: const Duration(seconds: 60),
       headers: {
         'Content-Type': 'application/json',
@@ -62,60 +62,75 @@ class ApiClient {
           print('Message: ${e.message}');
         }
 
-        // Automatic dev failover between candidate hosts (127.0.0.1, LAN IP 10.110.136.66, 10.0.2.2)
         final retryCount = (e.requestOptions.extra['retried_count'] as int?) ?? 0;
-        final path = e.requestOptions.path;
-        final isDevRoute = path.contains('admin/') || path.contains('system-health') || path.contains('notifications');
+        final isProduction = kReleaseMode || Environment.flavor == 'production';
 
-        if (retryCount < 2 && (e.response?.statusCode == 404 && isDevRoute)) {
-          final candidates = ['http://127.0.0.1:4000/api/', 'http://10.110.136.66:4000/api/'];
-          for (final candidate in candidates) {
+        if (isProduction) {
+          // In production: Retry against cloud baseUrl if server is cold-starting
+          if (retryCount < 2 &&
+              (e.type == DioExceptionType.connectionTimeout ||
+               e.type == DioExceptionType.receiveTimeout ||
+               e.type == DioExceptionType.connectionError)) {
+            final newOptions = e.requestOptions;
+            newOptions.extra['retried_count'] = retryCount + 1;
+            newOptions.baseUrl = ApiConstants.baseUrl;
             try {
-              final rawDio = Dio(BaseOptions(
-                connectTimeout: const Duration(seconds: 4),
-                receiveTimeout: const Duration(seconds: 8),
-                headers: e.requestOptions.headers,
-              ));
-              final ep = path.startsWith('/') ? path.substring(1) : path;
-              final response = await rawDio.request(
-                '$candidate$ep',
-                data: e.requestOptions.data,
-                queryParameters: e.requestOptions.queryParameters,
-                options: Options(method: e.requestOptions.method),
-              );
-              if (response.statusCode == 200 || response.statusCode == 201) {
-                return handler.resolve(response);
+              // Allow cold container spin-up time before retry
+              await Future.delayed(const Duration(seconds: 2));
+              final response = await _dio.fetch(newOptions);
+              return handler.resolve(response);
+            } catch (retryErr) {
+              if (kDebugMode) {
+                print('[ApiClient] Cloud container wake retry failed: $retryErr');
               }
+            }
+          }
+        } else {
+          // Dev-only failover: only when strictly in development mode
+          final path = e.requestOptions.path;
+          final isDevRoute = path.contains('admin/') || path.contains('system-health') || path.contains('notifications');
+
+          if (retryCount < 2 && (e.response?.statusCode == 404 && isDevRoute)) {
+            final candidates = ['http://127.0.0.1:4000/api/', 'http://10.110.136.66:4000/api/'];
+            for (final candidate in candidates) {
+              try {
+                final rawDio = Dio(BaseOptions(
+                  connectTimeout: const Duration(seconds: 4),
+                  receiveTimeout: const Duration(seconds: 8),
+                  headers: e.requestOptions.headers,
+                ));
+                final ep = path.startsWith('/') ? path.substring(1) : path;
+                final response = await rawDio.request(
+                  '$candidate$ep',
+                  data: e.requestOptions.data,
+                  queryParameters: e.requestOptions.queryParameters,
+                  options: Options(method: e.requestOptions.method),
+                );
+                if (response.statusCode == 200 || response.statusCode == 201) {
+                  return handler.resolve(response);
+                }
+              } catch (_) {}
+            }
+          }
+
+          if (retryCount < 3 &&
+              (e.type == DioExceptionType.connectionError ||
+               e.type == DioExceptionType.connectionTimeout ||
+               e.type == DioExceptionType.unknown)) {
+            Environment.switchDevHost();
+            final newOptions = e.requestOptions;
+            newOptions.extra['retried_count'] = retryCount + 1;
+            newOptions.baseUrl = ApiConstants.baseUrl;
+            try {
+              final response = await _dio.fetch(newOptions);
+              return handler.resolve(response);
             } catch (_) {}
           }
         }
 
-        if (retryCount < 3 &&
-            (e.type == DioExceptionType.connectionError ||
-             e.type == DioExceptionType.connectionTimeout ||
-             e.type == DioExceptionType.unknown)) {
-          Environment.switchDevHost();
-          if (kDebugMode) {
-            print('[ApiClient] Network error encountered. Switching dev host to ${Environment.activeDevHost} and retrying (attempt ${retryCount + 1})...');
-          }
-          final newOptions = e.requestOptions;
-          newOptions.extra['retried_count'] = retryCount + 1;
-          newOptions.baseUrl = ApiConstants.baseUrl;
-          try {
-            final response = await _dio.fetch(newOptions);
-            return handler.resolve(response);
-          } catch (retryErr) {
-            if (kDebugMode) {
-              print('[ApiClient] Failover retry ($retryCount) failed: $retryErr');
-            }
-          }
-        }
-
         if (e.response?.statusCode == 401) {
-           await Supabase.instance.client.auth.signOut();
-           await SecureStorage.clearAll();
-        } else if (e.response?.statusCode == 403) {
-           // Handle 403 Forbidden (RBAC failure)
+          await Supabase.instance.client.auth.signOut();
+          await SecureStorage.clearAll();
         }
 
         return handler.next(e);

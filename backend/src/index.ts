@@ -231,29 +231,52 @@ async function provisionAdmin() {
   }
 }
 
-provisionAdmin().then(() => {
-  const activeServer = server.listen(port as number, () => {
-    console.log(`Backend server running on port ${port}`);
+// Instant Server Port Binding (0.0.0.0 for Cloud Containers & Render)
+const activeServer = server.listen(Number(port), '0.0.0.0', () => {
+  console.log(`[AgroRent Server] Production backend listening on 0.0.0.0:${port} [PID: ${process.pid}]`);
+
+  // Asynchronous background admin provisioning - does not delay port availability
+  provisionAdmin().catch((err: any) => {
+    console.warn('[Startup] Warning during background admin provisioning:', err?.message || err);
   });
+});
 
-  // Graceful Shutdown
-  const shutdown = async (signal: string) => {
-    console.log(`\n${signal} signal received: closing HTTP server`);
-    activeServer.close(async () => {
-      console.log('HTTP server closed');
-      try {
-        await prisma.$disconnect();
-        console.log('Prisma connection disconnected');
-        process.exit(0);
-      } catch (err) {
-        console.error('Error during disconnection', err);
-        process.exit(1);
-      }
-    });
-  };
+// Reliable Graceful Shutdown & Connection Pool Flush
+let isShuttingDown = false;
+const shutdown = async (signal: string) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n[Server] ${signal} signal received: initiating graceful shutdown...`);
 
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  // Force exit safety timeout if sockets or pools hang
+  const forceTimer = setTimeout(() => {
+    console.error('[Server] Graceful shutdown exceeded 10s timeout. Forcing process exit.');
+    process.exit(1);
+  }, 10000);
+  forceTimer.unref();
+
+  activeServer.close(async () => {
+    console.log('[Server] HTTP server closed. Disconnecting database pools...');
+    try {
+      await prisma.$disconnect();
+      console.log('[Server] Prisma database connection pool disconnected cleanly.');
+      process.exit(0);
+    } catch (err: any) {
+      console.error('[Server] Error disconnecting Prisma during shutdown:', err?.message || err);
+      process.exit(1);
+    }
+  });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+process.on('uncaughtException', (err: any) => {
+  console.error('[Fatal Error] Uncaught Exception:', err?.stack || err);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.error('[Fatal Error] Unhandled Promise Rejection:', reason);
 });
 
 // Force keep-alive (Development only)
