@@ -62,8 +62,34 @@ class ApiClient {
           print('Message: ${e.message}');
         }
 
-        // Automatic dev failover between candidate hosts (127.0.0.1, LAN IP 10.109.99.66, 10.0.2.2)
+        // Automatic dev failover between candidate hosts (127.0.0.1, LAN IP 10.110.136.66, 10.0.2.2)
         final retryCount = (e.requestOptions.extra['retried_count'] as int?) ?? 0;
+        final path = e.requestOptions.path;
+        final isDevRoute = path.contains('admin/') || path.contains('system-health') || path.contains('notifications');
+
+        if (retryCount < 2 && (e.response?.statusCode == 404 && isDevRoute)) {
+          final candidates = ['http://127.0.0.1:4000/api/', 'http://10.110.136.66:4000/api/'];
+          for (final candidate in candidates) {
+            try {
+              final rawDio = Dio(BaseOptions(
+                connectTimeout: const Duration(seconds: 4),
+                receiveTimeout: const Duration(seconds: 8),
+                headers: e.requestOptions.headers,
+              ));
+              final ep = path.startsWith('/') ? path.substring(1) : path;
+              final response = await rawDio.request(
+                '$candidate$ep',
+                data: e.requestOptions.data,
+                queryParameters: e.requestOptions.queryParameters,
+                options: Options(method: e.requestOptions.method),
+              );
+              if (response.statusCode == 200 || response.statusCode == 201) {
+                return handler.resolve(response);
+              }
+            } catch (_) {}
+          }
+        }
+
         if (retryCount < 3 &&
             (e.type == DioExceptionType.connectionError ||
              e.type == DioExceptionType.connectionTimeout ||

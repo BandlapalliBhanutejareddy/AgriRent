@@ -18,7 +18,10 @@ import {
   MessageSquare,
   Clock,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Eye,
+  Users,
+  CheckCheck
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 
@@ -53,6 +56,31 @@ export default function AdminActionCenterPage() {
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+
+  // Recipients Read Receipt Drill-down Modal State
+  const [selectedBroadcast, setSelectedBroadcast] = useState<any | null>(null);
+  const [recipientsData, setRecipientsData] = useState<any | null>(null);
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
+  const [recipientsTab, setRecipientsTab] = useState<'ALL' | 'WATCHED' | 'UNWATCHED'>('ALL');
+  const [recipientSearch, setRecipientSearch] = useState('');
+
+  async function handleOpenRecipientsModal(item: any) {
+    setSelectedBroadcast(item);
+    setRecipientsData(null);
+    setRecipientsTab('ALL');
+    setRecipientSearch('');
+    try {
+      setLoadingRecipients(true);
+      const broadcastKey = item.broadcastId || item.id;
+      const res = await api.get(`/admin/alerts/${broadcastKey}/recipients`);
+      setRecipientsData(res.data);
+    } catch (err: any) {
+      console.error('Failed to load recipient details', err);
+      showToast('Could not load recipient read receipt list', 'error');
+    } finally {
+      setLoadingRecipients(false);
+    }
+  }
 
   useEffect(() => {
     loadAllData();
@@ -164,6 +192,14 @@ export default function AdminActionCenterPage() {
       setSendingBroadcast(true);
       let res;
       try {
+        res = await api.post('/admin/alerts/send', {
+          title: broadcastTitle.trim(),
+          message: broadcastMessage.trim(),
+          targetRole: broadcastTarget,
+          category: broadcastCategory,
+          type: 'ADMIN_BROADCAST'
+        });
+      } catch (sendErr) {
         res = await api.post('/admin/alerts/broadcast', {
           title: broadcastTitle.trim(),
           message: broadcastMessage.trim(),
@@ -171,35 +207,37 @@ export default function AdminActionCenterPage() {
           category: broadcastCategory,
           type: 'ADMIN_BROADCAST'
         });
-      } catch (_) {
-        try {
-          res = await api.post('/admin/alerts/send', {
-            title: broadcastTitle.trim(),
-            message: broadcastMessage.trim(),
-            targetRole: broadcastTarget,
-            category: broadcastCategory,
-            type: 'ADMIN_BROADCAST'
-          });
-        } catch (fallbackErr: any) {
-          res = {
-            data: {
-              success: true,
-              message: `Broadcast alert dispatched to ${broadcastTarget} recipients successfully.`
-            }
-          };
-        }
       }
       showToast(res.data?.message || 'Broadcast alert dispatched successfully', 'success');
       setShowBroadcastModal(false);
       setBroadcastTitle('');
       setBroadcastMessage('');
-      api.get('/admin/alerts/history').then(r => setBroadcastHistory(r.data?.logs || [])).catch(() => {});
+      api.get('/admin/alerts/history').then(r => setBroadcastHistory(r.data?.logs || [])).catch(() => { });
     } catch (err: any) {
       showToast(err.response?.data?.error || err.message || 'Failed to dispatch alert', 'error');
     } finally {
       setSendingBroadcast(false);
     }
   }
+
+  const allRecipients = recipientsData?.recipients || [
+    ...(recipientsData?.watchedUsers || []),
+    ...(recipientsData?.unwatchedUsers || [])
+  ];
+
+  const filteredRecipients = allRecipients.filter((r: any) => {
+    if (recipientsTab === 'WATCHED' && !(r.read || r.watched)) return false;
+    if (recipientsTab === 'UNWATCHED' && (r.read || r.watched)) return false;
+    if (recipientSearch.trim()) {
+      const q = recipientSearch.toLowerCase().trim();
+      const matchName = (r.name || '').toLowerCase().includes(q);
+      const matchEmail = (r.email || '').toLowerCase().includes(q);
+      const matchRole = (r.role || '').toLowerCase().includes(q);
+      const matchPhone = (r.phone || '').toLowerCase().includes(q);
+      return matchName || matchEmail || matchRole || matchPhone;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -240,11 +278,10 @@ export default function AdminActionCenterPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div
           onClick={() => setActiveTab('VERIFICATIONS')}
-          className={`p-6 rounded-3xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${
-            activeTab === 'VERIFICATIONS'
-              ? 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-500 ring-2 ring-blue-500/20'
-              : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
-          }`}
+          className={`p-6 rounded-3xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${activeTab === 'VERIFICATIONS'
+            ? 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-500 ring-2 ring-blue-500/20'
+            : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
@@ -265,11 +302,10 @@ export default function AdminActionCenterPage() {
 
         <div
           onClick={() => setActiveTab('MODERATION')}
-          className={`p-6 rounded-3xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${
-            activeTab === 'MODERATION'
-              ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-500 ring-2 ring-amber-500/20'
-              : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
-          }`}
+          className={`p-6 rounded-3xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${activeTab === 'MODERATION'
+            ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-500 ring-2 ring-amber-500/20'
+            : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
@@ -290,11 +326,10 @@ export default function AdminActionCenterPage() {
 
         <div
           onClick={() => setActiveTab('COMPLAINTS')}
-          className={`p-6 rounded-3xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${
-            activeTab === 'COMPLAINTS'
-              ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-500 ring-2 ring-rose-500/20'
-              : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
-          }`}
+          className={`p-6 rounded-3xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${activeTab === 'COMPLAINTS'
+            ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-500 ring-2 ring-rose-500/20'
+            : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
@@ -321,44 +356,40 @@ export default function AdminActionCenterPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('VERIFICATIONS')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
-                activeTab === 'VERIFICATIONS'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'VERIFICATIONS'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                }`}
             >
               Owner Verifications ({owners.filter(o => !o.isVerified).length})
             </button>
 
             <button
               onClick={() => setActiveTab('MODERATION')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
-                activeTab === 'MODERATION'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'MODERATION'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                }`}
             >
               Equipment Moderation ({equipment.length})
             </button>
 
             <button
               onClick={() => setActiveTab('COMPLAINTS')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
-                activeTab === 'COMPLAINTS'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'COMPLAINTS'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                }`}
             >
               Complaints Center ({complaints.length})
             </button>
 
             <button
               onClick={() => setActiveTab('BROADCASTS')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
-                activeTab === 'BROADCASTS'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'BROADCASTS'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                }`}
             >
               Broadcast History ({broadcastHistory.length})
             </button>
@@ -563,11 +594,10 @@ export default function AdminActionCenterPage() {
                             )}
                           </td>
                           <td className="py-4 px-4">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                              complaint.priority === 'HIGH' ? 'bg-red-50 text-red-600 border border-red-200' :
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${complaint.priority === 'HIGH' ? 'bg-red-50 text-red-600 border border-red-200' :
                               complaint.priority === 'MEDIUM' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-                              'bg-slate-100 text-slate-600'
-                            }`}>
+                                'bg-slate-100 text-slate-600'
+                              }`}>
                               {complaint.priority || 'MEDIUM'}
                             </span>
                           </td>
@@ -578,10 +608,9 @@ export default function AdminActionCenterPage() {
                             )}
                           </td>
                           <td className="py-4 px-4 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              isResolved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isResolved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                               'bg-rose-50 text-rose-700 border border-rose-200'
-                            }`}>
+                              }`}>
                               {complaint.status || 'OPEN'}
                             </span>
                           </td>
@@ -630,16 +659,21 @@ export default function AdminActionCenterPage() {
                     <th className="py-3 px-6">Category</th>
                     <th className="py-3 px-6">Headline Title</th>
                     <th className="py-3 px-6">Recipients Reached</th>
-                    <th className="py-3 px-6">Status / Mode</th>
+                    <th className="py-3 px-6">Watched Status</th>
+                    <th className="py-3 px-6 text-right">Recipient Tracking</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
                   {broadcastHistory.map((item, idx) => {
                     const meta = item.metadata ? (typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata) : {};
-                    const audience = meta.audience || 'ALL';
-                    const category = meta.category || 'GENERAL';
-                    const title = meta.title || 'Broadcast Alert';
-                    const count = meta.recipientCount ?? meta.deliveredCount ?? 0;
+                    const audience = item.audience || meta.audience || 'ALL';
+                    const category = item.category || meta.category || 'GENERAL';
+                    const title = item.title || meta.title || 'Broadcast Alert';
+                    const message = item.message || meta.message || '';
+                    const count = item.recipientCount ?? meta.recipientCount ?? item.deliveredCount ?? meta.deliveredCount ?? 0;
+                    const watched = item.acknowledgedCount ?? meta.acknowledgedCount ?? 0;
+                    const percentage = item.readPercentage ?? meta.readPercentage ?? (count > 0 ? Math.round((watched / count) * 100) : 0);
+
                     return (
                       <tr key={item.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
                         <td className="py-4 px-6 text-slate-500 text-[11px] whitespace-nowrap">
@@ -655,14 +689,36 @@ export default function AdminActionCenterPage() {
                             {category}
                           </span>
                         </td>
-                        <td className="py-4 px-6 font-bold text-slate-900 dark:text-white">
-                          {title}
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-slate-900 dark:text-white">{title}</div>
+                          {message && (
+                            <div className="text-[11px] text-slate-500 truncate max-w-xs mt-0.5">
+                              {message}
+                            </div>
+                          )}
                         </td>
-                        <td className="py-4 px-6 font-mono font-bold text-emerald-600">
-                          {count} users
+                        <td className="py-4 px-6 font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {count} {count === 1 ? 'user' : 'users'}
                         </td>
-                        <td className="py-4 px-6 text-[11px] text-slate-500">
-                          In-app & WebSocket Live
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              watched > 0
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            }`}>
+                              {watched} / {count} watched ({percentage}%)
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <button
+                            onClick={() => handleOpenRecipientsModal(item)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 rounded-xl text-xs font-bold transition-all shadow-sm border border-purple-200 dark:border-purple-800"
+                          >
+                            <Users size={13} />
+                            <span>Who Watched?</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -715,11 +771,10 @@ export default function AdminActionCenterPage() {
                       key={item.id}
                       type="button"
                       onClick={() => setBroadcastTarget(item.id as any)}
-                      className={`py-2 px-3 rounded-xl text-xs font-black transition-all ${
-                        broadcastTarget === item.id
-                          ? 'bg-purple-600 text-white shadow-sm'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                      }`}
+                      className={`py-2 px-3 rounded-xl text-xs font-black transition-all ${broadcastTarget === item.id
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
                     >
                       {item.label}
                     </button>
@@ -737,11 +792,10 @@ export default function AdminActionCenterPage() {
                       key={cat}
                       type="button"
                       onClick={() => setBroadcastCategory(cat)}
-                      className={`py-1.5 px-2 rounded-lg text-[10px] font-black uppercase transition-all ${
-                        broadcastCategory === cat
-                          ? 'bg-purple-600 text-white shadow-sm'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                      }`}
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-black uppercase transition-all ${broadcastCategory === cat
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                        }`}
                     >
                       {cat}
                     </button>
@@ -802,6 +856,180 @@ export default function AdminActionCenterPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Recipient Watched / Unwatched Tracking Modal */}
+      {selectedBroadcast && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[28px] max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                    {selectedBroadcast.audience || 'ALL'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                    {selectedBroadcast.category || 'GENERAL'}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    {selectedBroadcast.createdAt ? new Date(selectedBroadcast.createdAt).toLocaleString() : ''}
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1.5">
+                  {selectedBroadcast.title || 'Broadcast Alert'}
+                </h3>
+                {selectedBroadcast.message && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800 leading-relaxed">
+                    "{selectedBroadcast.message}"
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setSelectedBroadcast(null); setRecipientsData(null); }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Counters */}
+            <div className="grid grid-cols-3 gap-3 my-4 shrink-0">
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Dispatched</span>
+                <span className="text-lg font-black text-slate-900 dark:text-white font-mono">
+                  {recipientsData?.stats?.totalRecipients ?? selectedBroadcast.recipientCount ?? 0}
+                </span>
+              </div>
+              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 text-center">
+                <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block">Watched / Seen</span>
+                <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  {recipientsData?.stats?.acknowledgedCount ?? selectedBroadcast.acknowledgedCount ?? 0}
+                </span>
+              </div>
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 rounded-2xl border border-amber-100 dark:border-amber-800/50 text-center">
+                <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400 block">Not Watched (Pending)</span>
+                <span className="text-lg font-black text-amber-600 dark:text-amber-400 font-mono">
+                  {recipientsData?.stats?.unreadCount ?? (selectedBroadcast.recipientCount - (selectedBroadcast.acknowledgedCount || 0))}
+                </span>
+              </div>
+            </div>
+
+            {/* Filter Tabs & Search */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-3 shrink-0">
+              <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setRecipientsTab('ALL')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    recipientsTab === 'ALL'
+                      ? 'bg-white dark:bg-slate-900 shadow-sm text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  All ({recipientsData?.stats?.totalRecipients ?? 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecipientsTab('WATCHED')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    recipientsTab === 'WATCHED'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400'
+                  }`}
+                >
+                  Watched ({recipientsData?.stats?.acknowledgedCount ?? 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecipientsTab('UNWATCHED')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    recipientsTab === 'UNWATCHED'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+                  }`}
+                >
+                  Not Watched ({recipientsData?.stats?.unreadCount ?? 0})
+                </button>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                <input
+                  type="text"
+                  placeholder="Filter by name, email, role..."
+                  value={recipientSearch}
+                  onChange={(e) => setRecipientSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            {/* List Table */}
+            <div className="overflow-y-auto flex-1 border border-slate-100 dark:border-slate-800 rounded-2xl">
+              {loadingRecipients ? (
+                <div className="p-8 text-center text-slate-400">
+                  <RefreshCw className="animate-spin mx-auto mb-2 text-purple-600" size={24} />
+                  <p className="text-xs font-bold">Loading recipient delivery receipts...</p>
+                </div>
+              ) : filteredRecipients.length === 0 ? (
+                <div className="p-8 text-center text-slate-400">
+                  <p className="text-xs">No matching recipients found in this view.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 sticky top-0 border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase font-black text-slate-500">
+                    <tr>
+                      <th className="py-2.5 px-4">Recipient Name</th>
+                      <th className="py-2.5 px-4">Contact</th>
+                      <th className="py-2.5 px-4">Role</th>
+                      <th className="py-2.5 px-4">Delivery & Read Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredRecipients.map((rec: any, idx: number) => {
+                      const isWatched = rec.read === true || rec.watched === true;
+                      return (
+                        <tr key={rec.id || rec.notificationId || idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                          <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                            {rec.name}
+                          </td>
+                          <td className="py-3 px-4 text-slate-500 text-[11px]">
+                            <div>{rec.email}</div>
+                            {rec.phone && rec.phone !== 'N/A' && <div className="text-[10px] text-slate-400">{rec.phone}</div>}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {rec.role}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {isWatched ? (
+                              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                                <CheckCircle2 size={13} />
+                                <span>Watched</span>
+                                {rec.watchedAt && (
+                                  <span className="text-[10px] text-slate-400 font-normal">
+                                    ({new Date(rec.watchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-bold">
+                                <Clock size={13} />
+                                <span>Not Watched Yet</span>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}

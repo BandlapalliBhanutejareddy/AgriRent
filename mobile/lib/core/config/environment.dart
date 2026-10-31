@@ -5,7 +5,7 @@ class Environment {
   static const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'production');
 
   static const String _defaultDevHost = String.fromEnvironment('DEV_HOST', defaultValue: '127.0.0.1');
-  static const String _defaultFallbackDevHost = String.fromEnvironment('FALLBACK_DEV_HOST', defaultValue: '10.0.2.2');
+  static const String _defaultFallbackDevHost = String.fromEnvironment('FALLBACK_DEV_HOST', defaultValue: '10.110.136.66');
 
   static String activeDevHost = _defaultDevHost;
   static String fallbackDevHost = _defaultFallbackDevHost;

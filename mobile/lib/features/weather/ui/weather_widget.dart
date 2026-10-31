@@ -21,7 +21,7 @@ class WeatherWidget extends ConsumerWidget {
       return _buildLoadingState(lang, isDark);
     }
 
-    if (weatherState.error != null) {
+    if (weatherState.error != null && weatherState.weatherData == null) {
       return _buildErrorState(context, ref, lang, weatherState.error!, isDark);
     }
 

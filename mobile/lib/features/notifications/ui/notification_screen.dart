@@ -28,10 +28,80 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       ref.read(notificationsProvider.notifier).markAsRead(n.id);
     }
 
+    final type = (n.type ?? '').toUpperCase();
+
+    if (type.contains('BROADCAST') || type.contains('ADMIN')) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.campaign_rounded, color: Color(0xFF2563EB)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  n.title,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                n.message,
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  if (n.category != null && n.category!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Category: ${n.category}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
+                      ),
+                    ),
+                  if (n.priority != null && n.priority != 'NORMAL')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Priority: ${n.priority}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFD32F2F)),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              child: const Text('Acknowledge'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final relId = n.relatedId?.trim();
     if (relId == null || relId.isEmpty) return;
-
-    final type = (n.type ?? '').toUpperCase();
 
     if (type == 'CHAT_MESSAGE') {
       context.push('/chat?bookingId=$relId');
@@ -300,9 +370,11 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                             onPressed: () => _handleNotificationTap(n, lang),
                                             icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                                             label: Text(
-                                              (n.type ?? '').toUpperCase() == 'CHAT_MESSAGE'
-                                                  ? 'reply'.tr(lang)
-                                                  : 'open_chat'.tr(lang),
+                                              (n.type ?? '').toUpperCase().contains('BROADCAST') || (n.type ?? '').toUpperCase().contains('ADMIN')
+                                                  ? 'View Announcement'
+                                                  : ((n.type ?? '').toUpperCase() == 'CHAT_MESSAGE'
+                                                      ? 'reply'.tr(lang)
+                                                      : 'open_chat'.tr(lang)),
                                               style: const TextStyle(
                                                   fontWeight: FontWeight.bold, fontSize: 12),
                                             ),
@@ -333,6 +405,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   }
 
   IconData _getIconForType(String? type) {
+    final t = (type ?? '').toUpperCase();
+    if (t.contains('BROADCAST')) return Icons.campaign_rounded;
+    if (t.contains('ADMIN')) return Icons.admin_panel_settings_rounded;
     switch (type) {
       case 'SUCCESS':
         return Icons.check_circle_rounded;
@@ -356,6 +431,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   }
 
   Color _getIconColor(String? type) {
+    final t = (type ?? '').toUpperCase();
+    if (t.contains('BROADCAST')) return const Color(0xFF2563EB);
+    if (t.contains('ADMIN')) return const Color(0xFF7C3AED);
     switch (type) {
       case 'SUCCESS':
         return const Color(0xFF2E7D32);

@@ -21,16 +21,17 @@ test.describe('Admin E2E Flow', () => {
     await adminPage.goto('/login');
     // Select ADMIN portal
     await adminPage.locator('button:has-text("ADMIN")').click();
-    await adminPage.locator('input[type="email"]').fill('admin@agrorent.ai');
-    await adminPage.locator('input[type="password"]').fill('password123');
+    await adminPage.locator('input[type="email"]').fill('admin.live@agrorent.ai');
+    await adminPage.locator('input[type="password"]').fill('Password123!');
     await adminPage.getByTestId('login-button').click();
     await expect(adminPage).toHaveURL(/\/dashboard\/admin/, { timeout: 30000 });
+    await adminPage.goto('/dashboard/admin#USERS');
     console.log('Navigated to Admin Dashboard.');
     await adminPage.waitForTimeout(3000);
     await adminPage.screenshot({ path: '../../docs/evidence/security/1_admin_dashboard.png', fullPage: true });
 
     // Assuming we have an owner called "owner1@agrorent.com"
-    const ownerEmail = 'owner-test@agrorent.ai';
+    const ownerEmail = 'owner@demo.com';
     
     // Search for owner
     console.log('Searching for owner...');
@@ -78,7 +79,7 @@ test.describe('Admin E2E Flow', () => {
     console.log('Logging in as Farmer...');
     await farmerPage.goto('/login', { waitUntil: 'networkidle' });
     await farmerPage.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
-    await farmerPage.locator('input[type="password"]').fill('password123');
+    await farmerPage.locator('input[type="password"]').fill('Password123!');
     await farmerPage.getByTestId('login-button').click();
     await farmerPage.waitForURL(/\/dashboard/, { timeout: 30000 });
 

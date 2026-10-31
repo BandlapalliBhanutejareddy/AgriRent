@@ -203,6 +203,9 @@ model Notification {
   title     String
   message   String
   read      Boolean  @default(false)
+  readAt    DateTime?
+  viewedAt  DateTime?
+  priority  String?  @default("NORMAL")
   createdAt DateTime @default(now())
   relatedId String?
   type      String?

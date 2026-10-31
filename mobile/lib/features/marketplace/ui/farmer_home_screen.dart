@@ -64,7 +64,101 @@ class _FarmerHomeScreenState extends ConsumerState<FarmerHomeScreen> {
       });
       ref.read(marketplaceProvider.notifier).fetchInitial();
       ref.read(unreadNotificationsCountProvider.notifier).refresh();
+      _checkPendingAnnouncements();
     });
+  }
+
+  Future<void> _checkPendingAnnouncements() async {
+    try {
+      final repo = ref.read(notificationRepositoryProvider);
+      final pending = await repo.fetchPendingAnnouncements();
+      if (pending.isEmpty || !mounted) return;
+
+      for (final announcement in pending) {
+        if (!mounted) break;
+        repo.markAsViewed(announcement.id);
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dlgCtx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.campaign_rounded, color: Colors.blue, size: 24),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        announcement.title,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      if (announcement.priority != null && announcement.priority != 'NORMAL')
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            announcement.priority!,
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  announcement.message,
+                  style: const TextStyle(fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Sent: ${DateFormat('MMM d, y • h:mm a').format(announcement.createdAt.toLocal())}',
+                  style: const TextStyle(fontSize: 11, color: Colors.black45),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dlgCtx),
+                child: const Text('View Later'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryGreen,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () async {
+                  await ref.read(notificationsProvider.notifier).markAsRead(announcement.id);
+                  if (dlgCtx.mounted) {
+                    Navigator.pop(dlgCtx);
+                  }
+                },
+                child: const Text('Acknowledge & Mark Read'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchAnalytics() async {

@@ -1,17 +1,17 @@
 {
   "suite": "AgroRent AI Backend REST API Test Suite",
-  "timestamp": "2026-10-27T15:56:11.293Z",
+  "timestamp": "2026-10-31T04:17:20.374Z",
   "baseUrl": "http://localhost:4000",
   "totalTests": 16,
   "passed": 16,
   "failed": 0,
-  "durationMs": 35285,
+  "durationMs": 58982,
   "results": [
     {
       "Category": "Health & Readiness",
       "Name": "GET /api/health liveness probe",
       "Status": "PASS",
-      "DurationMs": 26,
+      "DurationMs": 22,
       "Details": "Liveness probe healthy (HTTP 200)",
       "Error": null
     },
@@ -19,7 +19,7 @@
       "Category": "Health & Readiness",
       "Name": "GET /api/ready database readiness check",
       "Status": "PASS",
-      "DurationMs": 934,
+      "DurationMs": 5278,
       "Details": "Database connection pool active & healthy",
       "Error": null
     },
@@ -27,7 +27,7 @@
       "Category": "Authentication API",
       "Name": "POST /api/auth/login invalid credentials rejection",
       "Status": "PASS",
-      "DurationMs": 1736,
+      "DurationMs": 3610,
       "Details": "Correctly rejected invalid login with HTTP 401",
       "Error": null
     },
@@ -35,7 +35,7 @@
       "Category": "Authentication API",
       "Name": "POST /api/auth/login valid farmer login",
       "Status": "PASS",
-      "DurationMs": 1103,
+      "DurationMs": 1637,
       "Details": "Authenticated successfully as farmer.live@agrorent.ai (JWT token issued)",
       "Error": null
     },
@@ -43,7 +43,7 @@
       "Category": "Authentication API",
       "Name": "POST /api/auth/login valid owner login",
       "Status": "PASS",
-      "DurationMs": 2248,
+      "DurationMs": 1825,
       "Details": "Authenticated successfully as owner.demo@agrorent.ai (JWT token issued)",
       "Error": null
     },
@@ -51,7 +51,7 @@
       "Category": "Marketplace API",
       "Name": "GET /api/equipment catalog listing",
       "Status": "PASS",
-      "DurationMs": 2050,
+      "DurationMs": 4590,
       "Details": "Returned 20 equipment machinery items",
       "Error": null
     },
@@ -59,15 +59,15 @@
       "Category": "Marketplace API",
       "Name": "GET /api/equipment/nearby geographic search",
       "Status": "PASS",
-      "DurationMs": 1149,
-      "Details": "Geographic proximity search active (0 items found)",
+      "DurationMs": 2294,
+      "Details": "Geographic proximity search active (1 items found)",
       "Error": null
     },
     {
       "Category": "Marketplace API",
       "Name": "GET /api/equipment/categories catalog taxonomy",
       "Status": "PASS",
-      "DurationMs": 3,
+      "DurationMs": 2,
       "Details": "Category taxonomy verified (8 categories available)",
       "Error": null
     },
@@ -75,7 +75,7 @@
       "Category": "Bookings API",
       "Name": "GET /api/bookings authenticated user rentals",
       "Status": "PASS",
-      "DurationMs": 5127,
+      "DurationMs": 7736,
       "Details": "Retrieved user rental booking list successfully (4 bookings)",
       "Error": null
     },
@@ -83,7 +83,7 @@
       "Category": "Farm Management API",
       "Name": "GET /api/farms farmer digital twin schedule",
       "Status": "PASS",
-      "DurationMs": 2611,
+      "DurationMs": 4222,
       "Details": "Retrieved digital twin farm records (1 farms registered)",
       "Error": null
     },
@@ -91,7 +91,7 @@
       "Category": "Wishlist API",
       "Name": "GET /api/saved/ids quick state query",
       "Status": "PASS",
-      "DurationMs": 1852,
+      "DurationMs": 2442,
       "Details": "Retrieved saved IDs list (0 bookmarks)",
       "Error": null
     },
@@ -99,7 +99,7 @@
       "Category": "Owner Fleet API",
       "Name": "GET /api/analytics/owner owner KPI analytics",
       "Status": "PASS",
-      "DurationMs": 3935,
+      "DurationMs": 6321,
       "Details": "Owner dashboard KPIs, revenue metrics, and booking counts returned",
       "Error": null
     },
@@ -107,7 +107,7 @@
       "Category": "Owner Fleet API",
       "Name": "GET /api/owner/bank-details payout configuration",
       "Status": "PASS",
-      "DurationMs": 1741,
+      "DurationMs": 3303,
       "Details": "Retrieved bank details with masked security: Configured",
       "Error": null
     },
@@ -115,7 +115,7 @@
       "Category": "Community API",
       "Name": "GET /api/community farmer community metadata",
       "Status": "PASS",
-      "DurationMs": 2527,
+      "DurationMs": 4175,
       "Details": "Community metadata verified: AgroRent Farmer Community",
       "Error": null
     },
@@ -123,7 +123,7 @@
       "Category": "Community API",
       "Name": "GET /api/community/messages persistent discussion feed",
       "Status": "PASS",
-      "DurationMs": 2062,
+      "DurationMs": 3164,
       "Details": "Retrieved community messages (0 messages loaded)",
       "Error": null
     },
@@ -131,7 +131,7 @@
       "Category": "AI Advisory API",
       "Name": "POST /api/ai/advisor agricultural agronomic advice",
       "Status": "PASS",
-      "DurationMs": 6181,
+      "DurationMs": 8361,
       "Details": "AI agronomic advice generated (Fallback active)",
       "Error": null
     }

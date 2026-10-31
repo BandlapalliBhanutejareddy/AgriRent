@@ -20,16 +20,56 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Mark notification as read
+// Get pending unacknowledged announcements for offline users logging in
+router.get('/pending-announcements', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const announcements = await prisma.notification.findMany({
+      where: {
+        userId: String(req.prismaUser.id),
+        read: false,
+        type: { in: ['ADMIN_BROADCAST', 'ADMIN_ALERT'] }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+    res.json({ success: true, announcements });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch pending announcements' });
+  }
+});
+
+// Mark notification as viewed (read receipt)
+router.put('/:id/viewed', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const notificationId = String(req.params.id);
+    await prisma.notification.updateMany({
+      where: {
+        id: notificationId,
+        userId: String(req.prismaUser.id),
+        viewedAt: null
+      },
+      data: { viewedAt: new Date() }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to record viewed status' });
+  }
+});
+
+// Mark notification as read (acknowledged)
 router.put('/:id/read', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const notificationId = String(req.params.id);
-    await prisma.notification.update({
+    await prisma.notification.updateMany({
       where: { 
         id: notificationId,
         userId: String(req.prismaUser.id) // Ensure ownership
       },
-      data: { read: true }
+      data: { 
+        read: true,
+        readAt: new Date(),
+        viewedAt: new Date()
+      }
     });
     res.json({ success: true });
   } catch (error) {
@@ -40,12 +80,17 @@ router.put('/:id/read', requireAuth, async (req: AuthRequest, res: Response) => 
 // Mark all as read
 router.put('/read-all', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    const now = new Date();
     await prisma.notification.updateMany({
       where: { 
         userId: String(req.prismaUser.id),
         read: false
       },
-      data: { read: true }
+      data: { 
+        read: true,
+        readAt: now,
+        viewedAt: now
+      }
     });
     res.json({ success: true });
   } catch (error) {

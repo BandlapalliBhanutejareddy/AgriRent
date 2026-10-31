@@ -16,13 +16,23 @@ class WeatherData {
   });
 
   factory WeatherData.fromJson(Map<String, dynamic> json) {
+    final locMap = json['location'] is Map ? Map<String, dynamic>.from(json['location'] as Map) : <String, dynamic>{};
+    final curMap = json['current'] is Map ? Map<String, dynamic>.from(json['current'] as Map) : <String, dynamic>{};
+    final forecastList = (json['forecast'] as List?)
+            ?.whereType<Map>()
+            .map((e) => DailyForecast.fromJson(Map<String, dynamic>.from(e)))
+            .toList() ??
+        [];
+
     return WeatherData(
-      farmId: json['farmId'] ?? '',
-      location: WeatherLocation.fromJson(json['location'] ?? {}),
-      current: CurrentWeather.fromJson(json['current'] ?? {}),
-      forecast: (json['forecast'] as List?)?.map((e) => DailyForecast.fromJson(e)).toList() ?? [],
-      source: json['source'] ?? '',
-      fetchedAt: json['fetchedAt'] != null ? DateTime.parse(json['fetchedAt']) : DateTime.now(),
+      farmId: json['farmId']?.toString() ?? '',
+      location: WeatherLocation.fromJson(locMap),
+      current: CurrentWeather.fromJson(curMap),
+      forecast: forecastList,
+      source: json['source']?.toString() ?? '',
+      fetchedAt: json['fetchedAt'] != null
+          ? (DateTime.tryParse(json['fetchedAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
     );
   }
 }
@@ -73,7 +83,7 @@ class CurrentWeather {
       humidity: (json['humidity'] as num?)?.toDouble(),
       precipitation: (json['precipitation'] as num?)?.toDouble(),
       rain: (json['rain'] as num?)?.toDouble(),
-      weatherCode: json['weatherCode'] as int?,
+      weatherCode: (json['weatherCode'] as num?)?.toInt(),
       windSpeed: (json['windSpeed'] as num?)?.toDouble(),
       windDirection: (json['windDirection'] as num?)?.toDouble(),
       observedAt: json['observedAt'] != null ? DateTime.tryParse(json['observedAt']) : null,
@@ -104,8 +114,8 @@ class DailyForecast {
       minTemperature: (json['minTemperature'] as num?)?.toDouble(),
       maxTemperature: (json['maxTemperature'] as num?)?.toDouble(),
       precipitation: (json['precipitation'] as num?)?.toDouble(),
-      precipitationProbability: json['precipitationProbability'] as int?,
-      weatherCode: json['weatherCode'] as int?,
+      precipitationProbability: (json['precipitationProbability'] as num?)?.toInt(),
+      weatherCode: (json['weatherCode'] as num?)?.toInt(),
     );
   }
 }

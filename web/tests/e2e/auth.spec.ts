@@ -4,8 +4,8 @@ test.describe('Authentication Flows', () => {
   
   test('should login successfully as farmer', async ({ page }) => {
     await page.goto('/login');
-    await page.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
-    await page.locator('input[type="password"]').fill('password123');
+    await page.locator('input[type="email"]').fill('farmer.live@agrorent.ai');
+    await page.locator('input[type="password"]').fill('Password123!');
     await page.getByTestId('login-button').click();
     await expect(page).toHaveURL(/\/dashboard\/farmer/);
     
@@ -19,8 +19,8 @@ test.describe('Authentication Flows', () => {
 
   test('should logout successfully', async ({ page }) => {
     await page.goto('/login');
-    await page.locator('input[type="email"]').fill('farmer-test@agrorent.ai');
-    await page.locator('input[type="password"]').fill('password123');
+    await page.locator('input[type="email"]').fill('farmer.live@agrorent.ai');
+    await page.locator('input[type="password"]').fill('Password123!');
     await page.getByTestId('login-button').click();
     await expect(page).toHaveURL(/\/dashboard\/farmer/);
     

@@ -71,7 +71,56 @@ export default function WeatherPage() {
         setWeatherError(res.data?.error || 'Failed to retrieve weather for selected coordinates.');
       }
     } catch (err: any) {
-      console.error('Failed to fetch weather:', err);
+      console.warn('Backend weather lookup failed, attempting direct Open-Meteo fallback:', err);
+      try {
+        const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,sunrise,sunset&timezone=auto&forecast_days=7`;
+        const omRes = await fetch(omUrl);
+        if (omRes.ok) {
+          const omData = await omRes.json();
+          const current = omData.current || {};
+          const daily = omData.daily || {};
+          const times: string[] = daily.time || [];
+          const maxTemps: number[] = daily.temperature_2m_max || [];
+          const minTemps: number[] = daily.temperature_2m_min || [];
+          const weatherCodes: number[] = daily.weather_code || [];
+          const precipProbs: number[] = daily.precipitation_probability_max || [];
+          const precipSums: number[] = daily.precipitation_sum || [];
+
+          const forecast = times.map((t: string, idx: number) => ({
+            date: t,
+            maxTemperature: maxTemps[idx],
+            minTemperature: minTemps[idx],
+            weatherCode: weatherCodes[idx],
+            precipitation: precipSums[idx],
+            precipitationProbability: precipProbs[idx],
+          }));
+
+          const locLabel = name || `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`;
+          const payload = {
+            farmId: 'current-lookup',
+            location: { latitude: lat, longitude: lng, name: locLabel },
+            current: {
+              temperature: current.temperature_2m,
+              apparentTemperature: current.apparent_temperature,
+              humidity: current.relative_humidity_2m,
+              precipitation: current.precipitation,
+              rain: current.rain,
+              weatherCode: current.weather_code,
+              windSpeed: current.wind_speed_10m,
+              windDirection: current.wind_direction_10m,
+              observedAt: new Date().toISOString()
+            },
+            forecast,
+            source: 'Open-Meteo Live Satellite',
+            fetchedAt: new Date().toISOString()
+          };
+          setWeatherData(payload);
+          setSelectedLocation({ latitude: lat, longitude: lng, name: locLabel });
+          return;
+        }
+      } catch (omErr) {
+        console.error('Direct Open-Meteo lookup failed:', omErr);
+      }
       setWeatherError(err.response?.data?.error || 'Unable to retrieve weather. Please check your network.');
     } finally {
       setWeatherLoading(false);
@@ -261,7 +310,7 @@ export default function WeatherPage() {
 
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-[10px] text-slate-400">
                   <span>Data Source: {weatherData?.source || 'Open-Meteo'}</span>
-                  <span>Retrieved: {new Date(weatherData?.fetchedAt || Date.now()).toLocaleString()}</span>
+                  <span>Retrieved: {weatherData?.fetchedAt ? new Date(weatherData.fetchedAt).toLocaleString() : 'Just now'}</span>
                 </div>
               </div>
             )}

@@ -111,7 +111,8 @@ async function main() {
   // 1. Health & Readiness
   await runTest('Health & Readiness', 'GET /api/health liveness probe', async () => {
     const res = await request('GET', '/api/health');
-    if (res.status !== 200 || res.data?.data?.status !== 'ok') {
+    const status = res.data?.status || res.data?.data?.status;
+    if (res.status !== 200 || status !== 'ok') {
       throw new Error(`Expected 200 with status ok, got ${res.status}`);
     }
     return 'Liveness probe healthy (HTTP 200)';
@@ -119,7 +120,8 @@ async function main() {
 
   await runTest('Health & Readiness', 'GET /api/ready database readiness check', async () => {
     const res = await request('GET', '/api/ready');
-    if (res.status !== 200 || res.data?.data?.database !== 'connected') {
+    const dbStatus = res.data?.database || res.data?.data?.database;
+    if (res.status !== 200 || dbStatus !== 'connected') {
       throw new Error(`Expected database connected, got ${res.status}`);
     }
     return 'Database connection pool active & healthy';

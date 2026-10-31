@@ -456,7 +456,12 @@ function MarketplaceContent() {
             return (
             <div key={item.id} className="rounded-[32px] border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-lg transition-all duration-350">
               <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 relative">
-                <img src={displayImage} alt={item.title} className="w-full h-full object-cover" />
+                <img 
+                  src={displayImage} 
+                  alt={item.title} 
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/equipment/default.jpg'; }}
+                  className="w-full h-full object-cover" 
+                />
                 <button
                   type="button"
                   onClick={(e) => toggleSaveEquipment(e, item.id)}
