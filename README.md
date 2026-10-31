@@ -12,6 +12,37 @@ An enterprise-grade, multi-role agricultural machinery rental marketplace and AI
 
 ---
 
+## 🌐 Live Production Deployments & Access
+
+| Component | Platform | Production Endpoint / Distribution | Status |
+|---|---|---|---|
+| **Web Application** | Vercel (Edge & Turbopack) | [https://agri-rent-two.vercel.app](https://agri-rent-two.vercel.app) | ![Production](https://img.shields.io/badge/Vercel-LIVE%20(HTTP%20200)-success) |
+| **Backend API** | Render Cloud Web Service | [https://agrirent-5qpx.onrender.com](https://agrirent-5qpx.onrender.com) | ![Production](https://img.shields.io/badge/Render-ACTIVE-success) |
+| **API Health Probe** | Render Liveness Endpoint | [https://agrirent-5qpx.onrender.com/api/health](https://agrirent-5qpx.onrender.com/api/health) | `{"status":"ok"}` |
+| **Database** | Supabase Managed PostgreSQL | Project `ezylxyrtnodxthdgynvn` (AWS Tokyo `ap-northeast-1`) | Connected / In-Sync |
+| **Android Application** | Local Release Artifact | `AgroRent_AI_Release.apk` (73.4 MB) | Built & Verified |
+
+> [!NOTE]
+> **Mobile App Distribution Notice**:
+> The verified Android production release package has been compiled locally (`mobile/build/app/outputs/flutter-apk/app-release.apk` / `AgroRent_AI_Release.apk`) and verified on Android 16 (OnePlus CPH2793). Because binary `.apk` files are gitignored to preserve repository integrity, no third-party public store link (such as Google Play Console or Firebase App Distribution) is currently attached to this repository. You can install the built release APK directly to any connected Android device using:
+> ```powershell
+> adb install -r AgroRent_AI_Release.apk
+> ```
+> Or rebuild the clean release APK from source at any time with:
+> ```powershell
+> cd mobile && flutter build apk --release
+> ```
+
+### 🔑 Verified Demonstration Portals & Accounts
+
+| Portal | Email | Role | Features & Access |
+|---|---|---|---|
+| **Administrator** | `bandlapalliteja369@gmail.com` | `ADMIN` | Operational Center, Targeted Broadcasts, Recipient Read Receipts ("Who Watched?"), Fleet Moderation, Data Quality, System Health |
+| **Farmer** | `farmer11@gmail.com` | `FARMER` | Machinery Marketplace, Satellite Weather & Agronomic Advisory, Digital Twin Crop Stages, Booking Flow, Real-time In-app Notifications |
+| **Fleet Owner** | `owner11@gmail.com` | `OWNER` | Fleet Inventory Management, Rental Lifecycle Tracking (Confirm/Dispatch/Return), Maintenance Logs, Payouts Ledger |
+
+---
+
 ## 🏛️ System Architecture
 
 AgroRent AI is engineered as a unified monorepo containing three core applications:
