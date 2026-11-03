@@ -25,7 +25,10 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://127.0.0.1:3001',
   'http://localhost:3000',
+  'http://127.0.0.1:3000',
   'http://192.168.1.148:3000',
+  'https://bandlapallibhanutejareddy.github.io',
+  'https://agri-rent-two.vercel.app',
   'https://your-vercel-domain.vercel.app',
   'https://www.agrorent.ai'
 ];
@@ -33,18 +36,28 @@ const allowedOrigins = [
 if (process.env.CORS_ORIGIN) {
   allowedOrigins.push(process.env.CORS_ORIGIN);
 }
-app.use(cors({
+
+const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1 && !origin.endsWith('.vercel.app')) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.github.io')
+    ) {
+      return callback(null, true);
     }
-    return callback(null, true);
+    const msg = `The CORS policy for this site does not allow access from origin: ${origin}`;
+    return callback(new Error(msg), false);
   },
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'X-Requested-With', 'Accept']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({
   verify: (req: any, res, buf) => {
     req.rawBody = buf;

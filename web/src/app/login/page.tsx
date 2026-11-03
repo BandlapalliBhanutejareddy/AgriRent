@@ -167,7 +167,7 @@ export default function LoginPage() {
           setError('Invalid credentials');
         }
       } catch (err: any) {
-        const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Login failed. Please verify your credentials and try again.';
+        const errorMsg = err.response?.data?.error || err.response?.data?.message || (err.message?.includes('Network Error') ? 'Network error connecting to backend API service. Please try again.' : 'Login failed. Please verify your credentials and try again.');
         setError(errorMsg);
       } finally {
         setLoading(false);
