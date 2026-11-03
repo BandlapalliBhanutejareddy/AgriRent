@@ -31,12 +31,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         if (session && user) {
           api.defaults.headers.common['Authorization'] = `Bearer ${session.access_token}`;
           try {
-            const response = await api.get('/auth/me');
-            setUser(response.data);
+            const response = await api.get('/auth/me', { timeout: 3500 });
+            if (response.data) {
+              setUser(response.data);
+            }
           } catch (err) {
-            console.error('Session validation failed, clearing local auth store:', err);
-            setSession(null);
-            setUser(null as any);
+            console.warn('Session verification background notice (retaining active offline/local session):', err);
           }
         } else {
           // 2. Check Supabase session
@@ -75,10 +75,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   async function fetchProfile(token: string) {
     try {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const response = await api.get('/auth/me');
-      setUser(response.data);
+      const response = await api.get('/auth/me', { timeout: 3500 });
+      if (response.data) {
+        setUser(response.data);
+      }
     } catch (error: any) {
-      console.error('Failed to fetch user profile', error);
+      console.warn('Failed to fetch user profile via API (using auth metadata):', error);
     } finally {
       setLoading(false);
     }
@@ -86,12 +88,19 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const normalizePath = (p: string | null) => {
     if (!p) return '/';
-    let cleaned = p.replace(/^\/AgriRent/, '').replace(/\/+$/, '');
+    let cleaned = p.replace(/^\/AgriRent/i, '').replace(/\/+$/, '');
+    cleaned = cleaned.replace(/\/index\.html$/i, '');
     return cleaned === '' ? '/' : cleaned;
   };
 
   const currentPath = normalizePath(pathname);
-  const isPublicRoute = currentPath === '/' || currentPath === '/login' || currentPath === '/register' || currentPath.startsWith('/auth');
+  const isPublicRoute = 
+    currentPath === '/' || 
+    currentPath === '/login' || 
+    currentPath === '/register' || 
+    currentPath.startsWith('/auth') ||
+    currentPath === '/index.html' ||
+    currentPath === '';
   const hasSession = !!session && !!user;
 
   useEffect(() => {

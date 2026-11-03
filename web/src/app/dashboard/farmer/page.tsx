@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import {
@@ -231,6 +231,19 @@ export default function FarmerDashboard() {
         cropId: cropId || undefined
       });
 
+      const newExpenseRecord = {
+        id: 'exp-' + Date.now(),
+        title: expenseForm.title.trim(),
+        category: expenseForm.category,
+        amount: amt,
+        date: expenseForm.date ? new Date(expenseForm.date).toISOString() : new Date().toISOString(),
+        description: expenseForm.description.trim() || expenseForm.category,
+        isRental: false
+      };
+
+      // Optimistically prepend so UI reflects immediately
+      setRecentExpenses((prev: any[]) => [newExpenseRecord, ...(prev || [])]);
+
       showToast(`Farming expense of ${formatCurrency(amt, selectedLanguage)} recorded successfully!`, 'success');
       setShowExpenseModal(false);
       setExpenseForm({
@@ -248,7 +261,7 @@ export default function FarmerDashboard() {
       api.get(`/farms/${farmId}/financials/expenses`)
         .then(r => setRecentExpenses(r.data?.expenses || []))
         .catch(() => {});
-      api.get(`/analytics/farmer`)
+      api.get(`/analytics/farmer?farmId=${farmId}`)
         .then(r => setAnalytics(r.data))
         .catch(() => {});
     } catch (err: any) {
@@ -403,7 +416,7 @@ export default function FarmerDashboard() {
       })
       .catch(() => setExpensesLoading(false));
 
-    api.get(`/analytics/farmer`)
+    api.get(`/analytics/farmer?farmId=${fId}&cropId=${cId}`)
       .then(r => setAnalytics(r.data))
       .catch(() => setAnalytics(null));
 
@@ -463,6 +476,24 @@ export default function FarmerDashboard() {
 
   const bState = budgetData?.financialState;
   const budgetStatusText = bState ? getStatusLabel(bState.budgetStatus) : '';
+
+  // Dynamic real-time spending and crop budget calculations
+  const totalFarmSpent = useMemo(() => {
+    const manualSum = (recentExpenses || []).reduce((sum: number, exp: any) => sum + (Number(exp.amount) || 0), 0);
+    const rentalSpent = Number(analytics?.rentalSpending) || 0;
+    const backendTotal = Number(analytics?.totalSpending) || 0;
+    return Math.max(backendTotal, rentalSpent + manualSum, manualSum);
+  }, [analytics, recentExpenses]);
+
+  const activeTotalBudget = Number(bState?.totalBudget) || Number(farmProfile?.budget) || 50000;
+  const activeRemainingBudget = Math.max(0, activeTotalBudget - totalFarmSpent);
+  const activeProjectedCost = Math.max(Number(bState?.projectedTotalCost) || 0, totalFarmSpent);
+  const activeBudgetStatus = totalFarmSpent > activeTotalBudget 
+    ? 'BUDGET_OVERRUN' 
+    : totalFarmSpent >= activeTotalBudget * 0.85 
+    ? 'NEAR_LIMIT' 
+    : 'WITHIN_BUDGET';
+  const effectiveBudgetStatusText = getStatusLabel(activeBudgetStatus) || 'Healthy';
 
   if (farmLoading) {
     return (
@@ -981,7 +1012,7 @@ export default function FarmerDashboard() {
                   Total Spent
                 </span>
                 <span className="text-base font-bold text-slate-900 dark:text-white block">
-                  {analytics ? formatCurrency(analytics.totalSpending, selectedLanguage) : formatCurrency(0, selectedLanguage)}
+                  {formatCurrency(totalFarmSpent, selectedLanguage)}
                 </span>
               </div>
 
@@ -1061,27 +1092,27 @@ export default function FarmerDashboard() {
               {t('budget.title', 'Crop Budget Plan')}
             </h2>
 
-            {budgetLoading ? (
+            {budgetLoading && !bState && (recentExpenses || []).length === 0 ? (
               <div className="h-20 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
-            ) : bState ? (
+            ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                     <span className="text-[10px] font-medium text-slate-400 block mb-0.5">Budget</span>
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(bState.totalBudget, selectedLanguage)}
+                      {formatCurrency(activeTotalBudget, selectedLanguage)}
                     </span>
                   </div>
                   <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                    <span className="text-[10px] font-medium text-slate-400 block mb-0.5">Planned</span>
+                    <span className="text-[10px] font-medium text-slate-400 block mb-0.5">Planned / Spent</span>
                     <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(bState.projectedTotalCost, selectedLanguage)}
+                      {formatCurrency(activeProjectedCost, selectedLanguage)}
                     </span>
                   </div>
                   <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                     <span className="text-[10px] font-medium text-slate-400 block mb-0.5">Remaining</span>
                     <span className="text-xs font-bold text-[#16845B] dark:text-[#84CC16]">
-                      {formatCurrency(bState.remainingBudget, selectedLanguage)}
+                      {formatCurrency(activeRemainingBudget, selectedLanguage)}
                     </span>
                   </div>
                 </div>
@@ -1089,25 +1120,21 @@ export default function FarmerDashboard() {
                 <div className="pt-2">
                   <div className="flex justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     <span>Budget Status</span>
-                    <span className={bState.budgetStatus === 'BUDGET_OVERRUN' ? 'text-rose-600' : 'text-[#16845B]'}>
-                      {budgetStatusText || 'Healthy'}
+                    <span className={activeBudgetStatus === 'BUDGET_OVERRUN' ? 'text-rose-600 font-bold' : activeBudgetStatus === 'NEAR_LIMIT' ? 'text-amber-600 font-bold' : 'text-[#16845B] font-bold'}>
+                      {effectiveBudgetStatusText}
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${
-                        bState.budgetStatus === 'BUDGET_OVERRUN' ? 'bg-rose-500' : 'bg-[#16845B]'
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        activeBudgetStatus === 'BUDGET_OVERRUN' ? 'bg-rose-500' : activeBudgetStatus === 'NEAR_LIMIT' ? 'bg-amber-500' : 'bg-[#16845B]'
                       }`}
                       style={{
-                        width: `${Math.min(100, Math.round((bState.projectedTotalCost / (bState.totalBudget || 1)) * 100))}%`
+                        width: `${Math.min(100, Math.round((activeProjectedCost / (activeTotalBudget || 1)) * 100))}%`
                       }}
                     />
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-xs text-slate-500 font-medium py-2">
-                Budget estimates will calculate automatically as machinery bookings are placed.
               </div>
             )}
           </div>

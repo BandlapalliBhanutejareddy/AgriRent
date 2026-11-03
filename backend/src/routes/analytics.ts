@@ -691,9 +691,10 @@ router.get('/farmer', requireAuth, requireRole('FARMER'), async (req: AuthReques
       });
     });
 
-    // Also get manual expenses for the farm
-    const farmActivities = selectedFarmId ? await prisma.farmActivity.findMany({
-      where: { farmId: selectedFarmId, type: 'EXPENSE' }
+    // Also get manual expenses for the farm(s)
+    const farmIdsToQuery = selectedFarmId ? [selectedFarmId] : farms.map(f => f.id);
+    const farmActivities = farmIdsToQuery.length > 0 ? await prisma.farmActivity.findMany({
+      where: { farmId: { in: farmIdsToQuery }, type: 'EXPENSE' }
     }) : [];
 
     const otherExpenses = farmActivities.reduce((sum, act) => {
@@ -875,122 +876,7 @@ router.delete('/admin/equipment/:id', requireAuth, requireRole('ADMIN'), async (
 
 
 
-// Farmer Analytics
-router.get('/farmer', requireAuth, requireRole('FARMER'), async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const farmerId = String(req.prismaUser.id);
-    const bookings = await prisma.booking.findMany({
-      where: { farmerId },
-      include: {
-        equipment: {
-          include: { owner: { select: { name: true } } }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
 
-    const activeRentals = bookings.filter(b => b.status === 'ACCEPTED' || b.status === 'ACTIVE').length;
-    const pendingBookings = bookings.filter(b => b.status === 'PENDING').length;
-    const completedRentals = bookings.filter(b => b.status === 'COMPLETED').length;
-    const totalRentals = bookings.length;
-    const totalSpending = bookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-
-    // Get operations and tasks for farmer's farms
-    const farmerFarms = await prisma.farm.findMany({
-      where: { ownerId: farmerId },
-      include: {
-        crops: {
-          include: {
-            operations: {
-              include: { tasks: true }
-            }
-          }
-        }
-      }
-    });
-
-    let totalOperations = 0;
-    let completedOperations = 0;
-    let totalTasks = 0;
-    let completedTasks = 0;
-
-    for (const farm of farmerFarms) {
-      for (const crop of farm.crops) {
-        for (const op of crop.operations) {
-          totalOperations++;
-          if (op.status === 'COMPLETED') completedOperations++;
-          for (const task of op.tasks) {
-            totalTasks++;
-            if (task.status === 'COMPLETED') completedTasks++;
-          }
-        }
-      }
-    }
-
-    const activeOperations = totalOperations - completedOperations;
-    const pendingTasks = totalTasks - completedTasks;
-
-    // Category breakdown
-    const categoryMap: Record<string, number> = {};
-    for (const b of bookings) {
-      const cat = b.equipment?.category || 'OTHER';
-      categoryMap[cat] = (categoryMap[cat] || 0) + (b.totalPrice || 0);
-    }
-
-    // Monthly breakdown (last 6 months)
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
-    const monthlySpending: { month: string; amount: number; year: number }[] = [];
-
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mName = monthNames[d.getMonth()];
-      const yr = d.getFullYear();
-      const monthBookings = bookings.filter(b => {
-        const bDate = new Date(b.createdAt);
-        return bDate.getMonth() === d.getMonth() && bDate.getFullYear() === yr;
-      });
-      const monthSum = monthBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-      monthlySpending.push({ month: mName, amount: monthSum, year: yr });
-    }
-
-    // Recent activity list
-    const recentActivities: { id: string; title: string; type: string; timestamp: Date }[] = [];
-    for (const b of bookings.slice(0, 5)) {
-      recentActivities.push({
-        id: b.id,
-        title: `${b.equipment?.title || 'Equipment'} booked for rental`,
-        type: 'RENTAL',
-        timestamp: b.createdAt
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        activeRentals,
-        pendingBookings,
-        completedRentals,
-        totalRentals,
-        totalSpending,
-        totalSpent: totalSpending,
-        totalOperations,
-        completedOperations,
-        activeOperations,
-        totalTasks,
-        completedTasks,
-        pendingTasks,
-        categoryBreakdown: categoryMap,
-        monthlySpending,
-        recentBookings: bookings.slice(0, 15),
-        recentActivities
-      }
-    });
-  } catch (error) {
-    console.error('Farmer Analytics Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch farmer analytics' });
-  }
-});
 
 router.get('/farmer/bookings', requireAuth, requireRole('FARMER'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {

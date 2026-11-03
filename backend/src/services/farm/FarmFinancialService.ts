@@ -93,9 +93,40 @@ export class FarmFinancialService {
       });
     }
 
-    // 1. Calculate Financial State
+    // 1. Calculate Financial State (Summing manual expenses + rental payments)
+    const manualExpenses = (aggregate.activities || [])
+      .filter((a: any) => a.type === 'EXPENSE')
+      .reduce((sum: number, act: any) => {
+        let meta: any = {};
+        try { if (act.metadata) meta = JSON.parse(act.metadata); } catch (_) {}
+        return sum + (meta.amount != null ? Number(meta.amount) : 0);
+      }, 0);
+
+    const bookings = await prisma.booking.findMany({
+      where: {
+        farmerId: ownerId,
+        status: { notIn: ['CANCELLED', 'REJECTED'] }
+      }
+    });
+
+    const rentalSpent = bookings.reduce((sum, b) => {
+      const paid = (b.amountPaid != null && b.amountPaid > 0)
+        ? b.amountPaid
+        : (b.paymentStatus === 'PAID' ? (b.totalPrice || 0) : 0);
+      return sum + paid;
+    }, 0);
+
+    const totalCalculatedSpent = Math.max(Number(budgetRecord.spentAmount) || 0, manualExpenses + rentalSpent);
+
+    if (totalCalculatedSpent !== Number(budgetRecord.spentAmount)) {
+      await prisma.farmBudget.update({
+        where: { id: budgetRecord.id },
+        data: { spentAmount: totalCalculatedSpent }
+      }).catch(() => {});
+    }
+
     const totalB = Number(budgetRecord.totalBudget) || 50000;
-    const spentB = Number(budgetRecord.spentAmount) || 0;
+    const spentB = totalCalculatedSpent;
     const reservedB = Number(budgetRecord.reservedAmount) || 0;
     const remainingB = Math.max(0, totalB - (spentB + reservedB));
     const utilization = totalB > 0 ? Math.round(((spentB + reservedB) / totalB) * 100) : 0;
