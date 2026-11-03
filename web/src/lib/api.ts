@@ -64,7 +64,8 @@ api.interceptors.response.use(
             }
           }
           if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login?expired=true';
+            const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+            window.location.href = `${basePath}/login?expired=true`;
           }
         }
       } else if (status >= 500) {

@@ -300,16 +300,19 @@ jobs:
         cache: 'npm'
         cache-dependency-path: 'web/package-lock.json'
 
+    - name: Setup GitHub Pages
+      id: pages
+      uses: actions/configure-pages@v5
+      with:
+        enablement: true
+
     - name: Build Web Application for GitHub Pages
       run: |
         cd web
         npm ci
-        STATIC_EXPORT=true npm run build
-
-    - name: Setup GitHub Pages
-      uses: actions/configure-pages@v5
-      with:
-        enablement: true
+        GITHUB_PAGES=true STATIC_EXPORT=true BASE_PATH=/AgriRent npm run build
+        touch out/.nojekyll
+        cp out/index.html out/404.html
 
     - name: Upload GitHub Pages Artifact
       uses: actions/upload-pages-artifact@v3

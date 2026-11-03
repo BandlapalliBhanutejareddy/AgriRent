@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
 import { useStore, useThemeStore } from '@/store/useStore';
@@ -38,6 +38,7 @@ function MarketplaceContent() {
   const { t } = useTranslation();
   const { user } = useStore();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { showToast } = useToast();
   const { isDarkMode, toggleTheme } = useThemeStore();
 
@@ -777,7 +778,7 @@ function MarketplaceContent() {
                 >
                   <MessageSquare size={14} /> {t('booking.chatWithOwner', 'Chat With Owner')}
                 </button>
-                <button onClick={() => { setSuccessModal(null); window.location.href='/dashboard/rentals'; }} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity">
+                <button onClick={() => { setSuccessModal(null); router.push('/dashboard/rentals'); }} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity">
                   {t('booking.viewRentals', 'View My Rentals')}
                 </button>
                 <button onClick={() => setSuccessModal(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-bold uppercase tracking-widest mt-2">

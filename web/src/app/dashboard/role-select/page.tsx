@@ -18,11 +18,7 @@ export default function RoleSelectPage() {
 
   const selectMode = (mode: 'FARMER' | 'OWNER') => {
     setActiveRole(mode);
-    if (mode === 'FARMER') {
-      window.location.href = '/dashboard/farmer';
-    } else {
-      window.location.href = '/dashboard';
-    }
+    router.push(mode === 'FARMER' ? '/dashboard/farmer' : '/dashboard');
   };
 
   return (

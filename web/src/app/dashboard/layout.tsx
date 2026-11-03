@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
@@ -45,6 +45,7 @@ export default function DashboardLayout({
 }) {
   const { t } = useTranslation();
   const pathname = usePathname();
+  const router = useRouter();
   const { user, activeRole, setActiveRole, logout } = useStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -92,7 +93,7 @@ export default function DashboardLayout({
 
     if (pathname === '/dashboard/role-select') {
       if (user.role !== 'BOTH' || storedActive) {
-        window.location.href = storedActive === 'FARMER' ? '/dashboard/farmer' : '/dashboard';
+        router.push(storedActive === 'FARMER' ? '/dashboard/farmer' : '/dashboard');
       }
       return;
     }
@@ -100,7 +101,7 @@ export default function DashboardLayout({
     const role = currentRole;
 
     if (role === 'ROLE_SELECT') {
-      window.location.href = '/dashboard/role-select';
+      router.push('/dashboard/role-select');
       return;
     }
 
@@ -113,7 +114,7 @@ export default function DashboardLayout({
         pathname === '/dashboard/bank-details' ||
         pathname === '/dashboard/analytics'
       ) {
-        window.location.href = '/dashboard/farmer';
+        router.push('/dashboard/farmer');
       }
     } else if (role === 'OWNER') {
       if (
@@ -121,7 +122,7 @@ export default function DashboardLayout({
         pathname.startsWith('/dashboard/admin') ||
         pathname === '/dashboard/saved'
       ) {
-        window.location.href = '/dashboard';
+        router.push('/dashboard');
       }
     } else if (role === 'ADMIN') {
       if (
@@ -129,10 +130,10 @@ export default function DashboardLayout({
         pathname.startsWith('/dashboard/farmer') ||
         pathname.startsWith('/dashboard/equipment')
       ) {
-        window.location.href = '/dashboard/admin';
+        router.push('/dashboard/admin');
       }
     }
-  }, [user, currentRole, pathname, storedActive]);
+  }, [user, currentRole, pathname, storedActive, router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -144,7 +145,7 @@ export default function DashboardLayout({
       }
     }
     logout();
-    window.location.href = '/login';
+    router.push('/login');
   };
 
   const role = currentRole;
@@ -364,7 +365,7 @@ export default function DashboardLayout({
                   onClick={() => {
                     const nextRole = currentRole === 'FARMER' ? 'OWNER' : 'FARMER';
                     setActiveRole(nextRole);
-                    window.location.href = nextRole === 'FARMER' ? '/dashboard/farmer' : '/dashboard';
+                    router.push(nextRole === 'FARMER' ? '/dashboard/farmer' : '/dashboard');
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-emerald-500 to-indigo-600 text-white shadow-sm hover:opacity-90 transition-all cursor-pointer"
                   title="Switch active portal mode"
