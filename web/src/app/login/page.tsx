@@ -163,10 +163,31 @@ export default function LoginPage() {
         const response = await api.post('/auth/login', { email, password, role: activePortal });
         if (response.data.success) {
           executeLogin(response.data.user, response.data.token);
+          return;
         } else {
           setError('Invalid credentials');
         }
       } catch (err: any) {
+        // Fallback: If backend is unreachable or CORS blocked, authenticate directly via Supabase Auth
+        try {
+          const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          if (sbData?.session && !sbError) {
+            const userObj = {
+              id: sbData.user.id,
+              email: sbData.user.email,
+              name: sbData.user.user_metadata?.name || (activePortal === 'FARMER' ? 'Farmer' : activePortal === 'OWNER' ? 'Fleet Owner' : 'Admin'),
+              role: sbData.user.user_metadata?.role || activePortal,
+              phone: sbData.user.phone || '',
+              authId: sbData.user.id
+            };
+            executeLogin(userObj, sbData.session.access_token);
+            return;
+          }
+        } catch (_) {}
+
         const errorMsg = err.response?.data?.error || err.response?.data?.message || (err.message?.includes('Network Error') ? 'Network error connecting to backend API service. Please try again.' : 'Login failed. Please verify your credentials and try again.');
         setError(errorMsg);
       } finally {
