@@ -4,6 +4,9 @@ const isStaticExport = process.env.STATIC_EXPORT === 'true' || process.env.GITHU
 const basePath = process.env.BASE_PATH || (process.env.GITHUB_PAGES === 'true' ? '/AgriRent' : undefined);
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_BASE_PATH: basePath || '',
+  },
   ...(isStaticExport ? {
     output: 'export',
     images: { unoptimized: true },
@@ -11,7 +14,6 @@ const nextConfig: NextConfig = {
   } : {}),
   ...(basePath ? {
     basePath,
-    assetPrefix: basePath,
   } : {}),
   allowedDevOrigins: ['192.168.1.148', 'localhost']
 };

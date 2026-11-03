@@ -310,7 +310,7 @@ jobs:
       run: |
         cd web
         npm ci
-        GITHUB_PAGES=true STATIC_EXPORT=true BASE_PATH=/AgriRent npm run build
+        GITHUB_PAGES=true STATIC_EXPORT=true BASE_PATH=/AgriRent NEXT_PUBLIC_BASE_PATH=/AgriRent npm run build
         touch out/.nojekyll
         cp out/index.html out/404.html
 

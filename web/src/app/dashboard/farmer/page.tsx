@@ -6,7 +6,8 @@ import { api } from '@/lib/api';
 import {
   Tractor, CheckCircle, Search, MapPin,
   Activity, CheckCircle2, Clock3, AlertTriangle, DollarSign, Calendar,
-  ArrowRight, ShieldCheck, Sparkles, CloudSun, BookOpen, ShieldAlert, X
+  ArrowRight, ShieldCheck, Sparkles, CloudSun, BookOpen, ShieldAlert, X,
+  Sprout, PlusCircle, Receipt, Layers, Edit3, Droplets, Fuel, Users, Wrench, RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 import { useStore } from '@/store/useStore';
@@ -16,6 +17,36 @@ import { formatCurrency } from '@/lib/formatters';
 import DrillDownModal from '@/components/DrillDownModal';
 
 const STAGES = ['SOWING', 'GERMINATION', 'SEEDLING', 'VEGETATIVE', 'FLOWERING', 'FRUITING', 'MATURITY', 'HARVEST'];
+
+const COMMON_CROPS = [
+  'Rice',
+  'Wheat',
+  'Cotton',
+  'Maize',
+  'Chilli',
+  'Sugarcane',
+  'Groundnut',
+  'Soybean',
+  'Pulses',
+  'Tomato',
+  'Onion',
+  'Potato',
+  'Millets'
+];
+
+const SEASONS = ['Kharif', 'Rabi', 'Zaid', 'Perennial'];
+
+const EXPENSE_CATEGORIES = [
+  { id: 'Seeds', label: 'Seeds & Seedlings' },
+  { id: 'Fertilizer', label: 'Fertilizers & Nutrients' },
+  { id: 'Pesticides', label: 'Pesticides & Crop Protection' },
+  { id: 'Fuel', label: 'Diesel & Fuel' },
+  { id: 'Labor', label: 'Farm Labor & Wages' },
+  { id: 'Equipment Rental', label: 'Machinery & Tractor Rental' },
+  { id: 'Irrigation', label: 'Irrigation & Water Charges' },
+  { id: 'Maintenance', label: 'Repairs & Maintenance' },
+  { id: 'Other', label: 'Other Operational Expense' },
+];
 
 export default function FarmerDashboard() {
   const router = useRouter();
@@ -77,29 +108,192 @@ export default function FarmerDashboard() {
     }
   }
 
+  // Crop Cycle Modal state
+  const [showCropCycleModal, setShowCropCycleModal] = useState(false);
+  const [updatingCropCycle, setUpdatingCropCycle] = useState(false);
+  const [cropCycleForm, setCropCycleForm] = useState({
+    cropName: '',
+    variety: '',
+    season: 'Kharif',
+    stage: 'SOWING',
+    sowingDate: '',
+    expectedHarvestDate: '',
+    reason: ''
+  });
+
+  // Farming Expenses state & modal
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [submittingExpense, setSubmittingExpense] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({
+    title: '',
+    category: 'Fertilizer',
+    amount: '',
+    date: new Date().toISOString().slice(0, 10),
+    description: ''
+  });
+  const [recentExpenses, setRecentExpenses] = useState<any[]>([]);
+  const [expensesLoading, setExpensesLoading] = useState(false);
+
+  async function handleUpdateCropCycle(e: React.FormEvent) {
+    e.preventDefault();
+    if (!farmId || !cropId) return;
+    setUpdatingCropCycle(true);
+    try {
+      const payload = {
+        cropName: cropCycleForm.cropName.trim(),
+        variety: cropCycleForm.variety.trim(),
+        season: cropCycleForm.season,
+        stage: cropCycleForm.stage.toUpperCase(),
+        sowingDate: cropCycleForm.sowingDate ? new Date(cropCycleForm.sowingDate).toISOString() : null,
+        expectedHarvestDate: cropCycleForm.expectedHarvestDate ? new Date(cropCycleForm.expectedHarvestDate).toISOString() : null,
+        reason: cropCycleForm.reason.trim() || 'Manual stage update via Farmer Dashboard'
+      };
+
+      await api.put(`/farms/${farmId}/crops/${cropId}`, payload);
+
+      if (cropCycleForm.stage.toUpperCase() !== cropStage.toUpperCase()) {
+        try {
+          await api.post(`/farms/${farmId}/crops/${cropId}/lifecycle/set-stage`, {
+            requestedStage: cropCycleForm.stage.toUpperCase(),
+            reason: cropCycleForm.reason.trim() || 'Stage updated from Farmer Dashboard'
+          });
+        } catch (_) {}
+      }
+
+      setCropStage(cropCycleForm.stage.toUpperCase());
+      setFarmProfile((prev: any) => ({
+        ...prev,
+        crop: cropCycleForm.cropName,
+        variety: cropCycleForm.variety,
+        season: cropCycleForm.season,
+        sowingDate: cropCycleForm.sowingDate,
+        expectedHarvestDate: cropCycleForm.expectedHarvestDate
+      }));
+
+      showToast(`Crop cycle updated to ${cropCycleForm.cropName} (${cropCycleForm.stage}) successfully!`, 'success');
+      setShowCropCycleModal(false);
+      loadDashboardData(farmId, cropId, selectedLanguage);
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to update crop cycle', 'error');
+    } finally {
+      setUpdatingCropCycle(false);
+    }
+  }
+
+  async function handleAdvanceStage() {
+    if (!farmId || !cropId) return;
+    const currentIdx = STAGES.indexOf(cropStage);
+    if (currentIdx === -1 || currentIdx >= STAGES.length - 1) {
+      showToast('Crop is already at final Harvest stage!', 'info');
+      return;
+    }
+    const nextStage = STAGES[currentIdx + 1];
+    setUpdatingCropCycle(true);
+    try {
+      try {
+        await api.post(`/farms/${farmId}/crops/${cropId}/lifecycle/advance`);
+      } catch (_) {
+        await api.post(`/farms/${farmId}/crops/${cropId}/lifecycle/set-stage`, {
+          requestedStage: nextStage,
+          reason: 'Advanced to next growth milestone via Dashboard'
+        });
+      }
+      setCropStage(nextStage);
+      showToast(`Advanced to ${nextStage} stage!`, 'success');
+      loadDashboardData(farmId, cropId, selectedLanguage);
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to advance stage', 'error');
+    } finally {
+      setUpdatingCropCycle(false);
+    }
+  }
+
+  async function handleAddExpense(e: React.FormEvent) {
+    e.preventDefault();
+    if (!farmId) return;
+    const amt = parseFloat(expenseForm.amount);
+    if (!expenseForm.title.trim()) {
+      showToast('Please enter an expense item title', 'error');
+      return;
+    }
+    if (isNaN(amt) || amt <= 0) {
+      showToast('Please enter a valid expense amount in INR (₹)', 'error');
+      return;
+    }
+    setSubmittingExpense(true);
+    try {
+      await api.post(`/farms/${farmId}/financials/expense`, {
+        title: expenseForm.title.trim(),
+        category: expenseForm.category,
+        amount: amt,
+        date: expenseForm.date ? new Date(expenseForm.date).toISOString() : new Date().toISOString(),
+        description: expenseForm.description.trim() || expenseForm.category,
+        cropId: cropId || undefined
+      });
+
+      showToast(`Farming expense of ${formatCurrency(amt, selectedLanguage)} recorded successfully!`, 'success');
+      setShowExpenseModal(false);
+      setExpenseForm({
+        title: '',
+        category: 'Fertilizer',
+        amount: '',
+        date: new Date().toISOString().slice(0, 10),
+        description: ''
+      });
+
+      // Instantly refresh financials & recent expenses
+      api.get(`/farms/${farmId}/financials?lang=${selectedLanguage}`)
+        .then(r => setBudgetData(r.data))
+        .catch(() => {});
+      api.get(`/farms/${farmId}/financials/expenses`)
+        .then(r => setRecentExpenses(r.data?.expenses || []))
+        .catch(() => {});
+      api.get(`/analytics/farmer`)
+        .then(r => setAnalytics(r.data))
+        .catch(() => {});
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to record expense', 'error');
+    } finally {
+      setSubmittingExpense(false);
+    }
+  }
+
   async function fetchDrillDown() {
     try {
-      const res = await api.get('/analytics/farmer/bookings?limit=100');
-      const bookings = res.data;
-      const rows = bookings.map((b: any) => {
-        const start = b.startDate ? new Date(b.startDate).toLocaleDateString() : '-';
-        const end = b.endDate ? new Date(b.endDate).toLocaleDateString() : '-';
-        const period = `${start} to ${end}`;
+      let rows: any[][] = [];
+      if (recentExpenses && recentExpenses.length > 0) {
+        rows = recentExpenses.map((e: any) => [
+          e.date ? new Date(e.date).toLocaleDateString() : 'Recent',
+          e.title || 'Farming Expense',
+          e.category || 'Inputs',
+          e.description || '-',
+          formatCurrency(e.amount || 0, selectedLanguage),
+          e.isRental ? 'Machinery Rental' : 'Direct Farming Expense'
+        ]);
+        setDrillDownHeaders(['Date', 'Expense Item', 'Category', 'Details', 'Amount', 'Type']);
+      } else {
+        const res = await api.get('/analytics/farmer/bookings?limit=100');
+        const bookings = res.data || [];
+        rows = bookings.map((b: any) => {
+          const start = b.startDate ? new Date(b.startDate).toLocaleDateString() : '-';
+          const end = b.endDate ? new Date(b.endDate).toLocaleDateString() : '-';
+          const period = `${start} to ${end}`;
 
-        return [
-          new Date(b.createdAt).toLocaleDateString(),
-          b.equipment?.title || 'Unknown',
-          b.equipment?.owner?.name || 'Unknown',
-          period,
-          b.totalPrice ? formatCurrency(b.totalPrice) : formatCurrency(0),
-          b.status,
-          b.paymentStatus || 'PENDING',
-          b.amountPaid ? formatCurrency(b.amountPaid) : formatCurrency(0)
-        ];
-      });
-      setDrillDownHeaders(['Date', 'Equipment', 'Owner', 'Rental Period', 'Amount', 'Booking Status', 'Payment Status', 'Amount Paid']);
+          return [
+            new Date(b.createdAt).toLocaleDateString(),
+            b.equipment?.title || 'Unknown',
+            b.equipment?.owner?.name || 'Unknown',
+            period,
+            b.totalPrice ? formatCurrency(b.totalPrice, selectedLanguage) : formatCurrency(0, selectedLanguage),
+            b.status,
+            b.paymentStatus || 'PENDING',
+            b.amountPaid ? formatCurrency(b.amountPaid, selectedLanguage) : formatCurrency(0, selectedLanguage)
+          ];
+        });
+        setDrillDownHeaders(['Date', 'Equipment', 'Owner', 'Rental Period', 'Amount', 'Booking Status', 'Payment Status', 'Amount Paid']);
+      }
       setDrillDownRows(rows);
-      setDrillDownTitle('Rental Spending Ledger');
+      setDrillDownTitle('Comprehensive Farm Spending Ledger');
       setIsDrillDownOpen(true);
     } catch (e) {
       showToast('Failed to load spending report', 'warning');
@@ -146,12 +340,16 @@ export default function FarmerDashboard() {
             if (isMounted) {
               setCropId(cid);
               setCropStage(initialStage);
+              const crp = farm.crops[0];
               setFarmProfile({
-                crop: farm.crops[0].cropName,
+                crop: crp.cropName,
+                variety: crp.variety || '',
                 acreage: farm.area,
                 location: farm.location,
-                season: farm.crops[0].season,
-                budget: farm.totalBudget || 0
+                season: crp.season || 'Kharif',
+                budget: farm.totalBudget || 0,
+                sowingDate: crp.sowingDate ? new Date(crp.sowingDate).toISOString().slice(0, 10) : '',
+                expectedHarvestDate: crp.expectedHarvestDate ? new Date(crp.expectedHarvestDate).toISOString().slice(0, 10) : ''
               });
               setFarmLoading(false);
             }
@@ -196,6 +394,14 @@ export default function FarmerDashboard() {
     api.get(`/farms/${fId}/financials?lang=${lang}`)
       .then(r => { setBudgetData(r.data); setBudgetLoading(false); })
       .catch(() => setBudgetLoading(false));
+
+    setExpensesLoading(true);
+    api.get(`/farms/${fId}/financials/expenses`)
+      .then(r => {
+        setRecentExpenses(r.data?.expenses || []);
+        setExpensesLoading(false);
+      })
+      .catch(() => setExpensesLoading(false));
 
     api.get(`/analytics/farmer`)
       .then(r => setAnalytics(r.data))
@@ -312,6 +518,42 @@ export default function FarmerDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0">
+            <button
+              onClick={() => {
+                setCropCycleForm({
+                  cropName: farmProfile.crop || '',
+                  variety: farmProfile.variety || '',
+                  season: farmProfile.season || 'Kharif',
+                  stage: cropStage || 'SOWING',
+                  sowingDate: farmProfile.sowingDate || new Date().toISOString().slice(0, 10),
+                  expectedHarvestDate: farmProfile.expectedHarvestDate || '',
+                  reason: ''
+                });
+                setShowCropCycleModal(true);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-all shadow-sm cursor-pointer"
+            >
+              <Sprout size={15} />
+              <span>Update Crop Cycle</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setExpenseForm({
+                  title: '',
+                  category: 'Fertilizer',
+                  amount: '',
+                  date: new Date().toISOString().slice(0, 10),
+                  description: ''
+                });
+                setShowExpenseModal(true);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all shadow-sm cursor-pointer"
+            >
+              <PlusCircle size={15} />
+              <span>Add Farm Expense</span>
+            </button>
+
             <Link
               href="/dashboard/marketplace"
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#163A2D] hover:bg-[#205140] text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
@@ -417,9 +659,35 @@ export default function FarmerDashboard() {
               Chronological progress through cultivation milestones
             </p>
           </div>
-          <span className="text-xs font-semibold text-[#16845B] dark:text-[#84CC16] bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-md">
-            Stage: {translatedStage(cropStage)}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAdvanceStage}
+              disabled={updatingCropCycle || STAGES.indexOf(cropStage) >= STAGES.length - 1}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-[#16845B] dark:text-[#84CC16] border border-emerald-200 dark:border-emerald-800 text-xs font-semibold rounded-lg transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+              title="Advance to next stage in cycle"
+            >
+              <ArrowRight size={13} />
+              <span>Advance Stage</span>
+            </button>
+            <button
+              onClick={() => {
+                setCropCycleForm({
+                  cropName: farmProfile.crop || '',
+                  variety: farmProfile.variety || '',
+                  season: farmProfile.season || 'Kharif',
+                  stage: cropStage || 'SOWING',
+                  sowingDate: farmProfile.sowingDate || new Date().toISOString().slice(0, 10),
+                  expectedHarvestDate: farmProfile.expectedHarvestDate || '',
+                  reason: ''
+                });
+                setShowCropCycleModal(true);
+              }}
+              className="text-xs font-semibold text-[#16845B] dark:text-[#84CC16] bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 px-2.5 py-1 rounded-md transition-colors border border-emerald-200 dark:border-emerald-800 cursor-pointer flex items-center gap-1"
+            >
+              <Edit3 size={12} />
+              <span>Stage: {translatedStage(cropStage)}</span>
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto pb-2">
@@ -682,10 +950,29 @@ export default function FarmerDashboard() {
           {/* Farm Spending Metrics */}
           <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                {t('spending.title', 'Farm Spending Overview')}
-              </h2>
-              <span className="text-xs text-slate-400 font-medium">Real-time</span>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  {t('spending.title', 'Farm Spending Overview')}
+                </h2>
+                <span className="text-[11px] text-slate-400 font-medium">Real-time Farm Budget</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setExpenseForm({
+                    title: '',
+                    category: 'Fertilizer',
+                    amount: '',
+                    date: new Date().toISOString().slice(0, 10),
+                    description: ''
+                  });
+                  setShowExpenseModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+              >
+                <PlusCircle size={14} />
+                <span>+ Add Expense</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
@@ -716,6 +1003,48 @@ export default function FarmerDashboard() {
                 </span>
               </div>
             </div>
+
+            {/* Recent Farm Expenses List */}
+            {recentExpenses && recentExpenses.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Recent Expenses
+                  </span>
+                  <button
+                    onClick={fetchDrillDown}
+                    className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
+                  >
+                    View All ({recentExpenses.length})
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {recentExpenses.slice(0, 3).map((exp: any, idx: number) => (
+                    <div
+                      key={exp.id || idx}
+                      className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                          <Receipt size={14} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 dark:text-white truncate">
+                            {exp.title || exp.category}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {exp.category} • {exp.date ? new Date(exp.date).toLocaleDateString() : 'Recent'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white shrink-0 ml-2">
+                        {formatCurrency(exp.amount || 0, selectedLanguage)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
               onClick={fetchDrillDown}
@@ -804,6 +1133,286 @@ export default function FarmerDashboard() {
 
         </div>
       </div>
+
+      {/* Update Crop Cycle Modal */}
+      {showCropCycleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
+                  <Sprout size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Update Crop Cycle</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Configure growth milestone, variety & season</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCropCycleModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-bold p-1.5"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCropCycle} className="mt-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Crop Name <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={cropCycleForm.cropName}
+                    onChange={(e) => setCropCycleForm({ ...cropCycleForm, cropName: e.target.value })}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  >
+                    {COMMON_CROPS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Crop Variety
+                  </label>
+                  <input
+                    type="text"
+                    value={cropCycleForm.variety}
+                    onChange={(e) => setCropCycleForm({ ...cropCycleForm, variety: e.target.value })}
+                    placeholder="e.g. Sona Masoori, H-4"
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Farming Season
+                  </label>
+                  <select
+                    value={cropCycleForm.season}
+                    onChange={(e) => setCropCycleForm({ ...cropCycleForm, season: e.target.value })}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {SEASONS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Growth Stage <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={cropCycleForm.stage}
+                    onChange={(e) => setCropCycleForm({ ...cropCycleForm, stage: e.target.value })}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  >
+                    {STAGES.map((st) => (
+                      <option key={st} value={st}>{st} — {translatedStage(st)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Sowing Date
+                  </label>
+                  <input
+                    type="date"
+                    value={cropCycleForm.sowingDate}
+                    onChange={(e) => setCropCycleForm({ ...cropCycleForm, sowingDate: e.target.value })}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Expected Harvest Date
+                  </label>
+                  <input
+                    type="date"
+                    value={cropCycleForm.expectedHarvestDate}
+                    onChange={(e) => setCropCycleForm({ ...cropCycleForm, expectedHarvestDate: e.target.value })}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Change Note / Reason (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={cropCycleForm.reason}
+                  onChange={(e) => setCropCycleForm({ ...cropCycleForm, reason: e.target.value })}
+                  placeholder="e.g. Field inspection completed, entering vegetative tillering"
+                  className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowCropCycleModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingCropCycle}
+                  className="px-5 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {updatingCropCycle ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving Cycle...</span>
+                    </>
+                  ) : (
+                    <span>Save & Update Cycle</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Farming Expense Modal */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
+                  <Receipt size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Record Farming Expense</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Track fertilizers, seeds, labor wages, machinery & fuel</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExpenseModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-bold p-1.5"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddExpense} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Expense Title / Item <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={expenseForm.title}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })}
+                  placeholder="e.g. Urea fertilizer 4 bags, Weeding labor 6 workers"
+                  className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Expense Category <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={expenseForm.category}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  >
+                    {EXPENSE_CATEGORIES.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Amount (₹ INR) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                    placeholder="e.g. 3500"
+                    className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Expense Date
+                </label>
+                <input
+                  type="date"
+                  value={expenseForm.date}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
+                  className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Description / Vendor Notes (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={expenseForm.description}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                  placeholder="Purchased from local dealer, cash payment..."
+                  className="w-full text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowExpenseModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingExpense}
+                  className="px-5 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {submittingExpense ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Recording...</span>
+                    </>
+                  ) : (
+                    <span>Record Expense</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <DrillDownModal
         isOpen={isDrillDownOpen}

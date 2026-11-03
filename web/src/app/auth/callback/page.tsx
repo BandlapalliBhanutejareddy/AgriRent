@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { api } from '@/lib/api';
 import { useStore } from '@/store/useStore';
 import { Tractor, Loader2, Smartphone, ArrowRight } from 'lucide-react';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser, setSession, setActiveRole } = useStore();
@@ -165,5 +165,20 @@ export default function AuthCallbackPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans">
+          <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mb-4" />
+          <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Loading authentication...</p>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

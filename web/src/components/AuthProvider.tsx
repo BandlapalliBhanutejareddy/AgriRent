@@ -121,12 +121,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   }, [session, user, loading, currentPath, router, isPublicRoute]);
 
-  if (loading) {
+  // Only show loading screen for protected routes while verifying session
+  if (loading && !isPublicRoute) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
-          <p className="mt-4 text-gray-500 font-medium">{t('loading_agrorent_ai')}</p>
+          <p className="mt-4 text-gray-500 font-medium">{t('loading_agrorent_ai', 'Loading AgroRent AI...')}</p>
         </div>
       </div>
     );

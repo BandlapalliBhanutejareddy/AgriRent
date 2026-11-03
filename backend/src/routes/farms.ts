@@ -423,6 +423,139 @@ router.post('/:farmId/crops/:cropId/lifecycle/set-stage', async (req: AuthReques
 });
 
 /**
+ * 8.1 Update Crop Details & Lifecycle
+ * PUT /api/farms/:farmId/crops/:cropId
+ */
+router.put('/:farmId/crops/:cropId', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmId = String(req.params.farmId);
+    const cropId = String(req.params.cropId);
+    const ownerId = (req as any).prismaUser.id;
+    const isAdmin = (req as any).prismaUser.role === 'ADMIN';
+
+    const farm = await prisma.farm.findUnique({
+      where: { id: farmId },
+      include: { crops: true }
+    });
+
+    if (!farm || (!isAdmin && farm.ownerId !== ownerId)) {
+      res.status(403).json({ error: 'Forbidden: You do not own this farm.' });
+      return;
+    }
+
+    const crop = farm.crops.find(c => c.id === cropId);
+    if (!crop) {
+      res.status(404).json({ error: 'Crop not found on this farm.' });
+      return;
+    }
+
+    const { cropName, variety, season, stage, sowingDate, expectedHarvestDate, status, reason } = req.body;
+
+    const previousStage = crop.stage;
+    const newStage = stage ? stage.toUpperCase() : crop.stage;
+
+    const updated = await prisma.farmCrop.update({
+      where: { id: cropId },
+      data: {
+        ...(cropName && { cropName }),
+        ...(variety !== undefined && { variety }),
+        ...(season && { season }),
+        ...(stage && { stage: newStage }),
+        ...(sowingDate !== undefined && { sowingDate: sowingDate ? new Date(sowingDate) : null }),
+        ...(expectedHarvestDate !== undefined && { expectedHarvestDate: expectedHarvestDate ? new Date(expectedHarvestDate) : null }),
+        ...(status && { status })
+      }
+    });
+
+    // Record activity log for the update
+    await prisma.farmActivity.create({
+      data: {
+        farmId,
+        actorId: ownerId,
+        type: 'CROP_CYCLE_UPDATED',
+        title: `Crop Cycle Updated: ${updated.cropName}`,
+        description: `Crop ${updated.cropName} (${updated.season}) updated to stage ${updated.stage}. ${reason || ''}`.trim(),
+        metadata: JSON.stringify({
+          cropId,
+          previousStage,
+          newStage: updated.stage,
+          cropName: updated.cropName,
+          season: updated.season,
+          variety: updated.variety,
+          reason: reason || 'Manual update via Farmer Dashboard'
+        })
+      }
+    });
+
+    res.json({ success: true, crop: updated });
+  } catch (error: any) {
+    console.error('Update Crop Error:', error);
+    res.status(400).json({ error: error.message || 'Failed to update crop' });
+  }
+});
+
+/**
+ * 8.2 Add New Crop Cycle to Farm
+ * POST /api/farms/:farmId/crops
+ */
+router.post('/:farmId/crops', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const farmId = String(req.params.farmId);
+    const ownerId = (req as any).prismaUser.id;
+    const isAdmin = (req as any).prismaUser.role === 'ADMIN';
+
+    const farm = await prisma.farm.findUnique({
+      where: { id: farmId }
+    });
+
+    if (!farm || (!isAdmin && farm.ownerId !== ownerId)) {
+      res.status(403).json({ error: 'Forbidden: You do not own this farm.' });
+      return;
+    }
+
+    const { cropName, variety, season, stage, sowingDate, expectedHarvestDate } = req.body;
+    if (!cropName) {
+      res.status(400).json({ error: 'Crop name is required.' });
+      return;
+    }
+
+    const newCrop = await prisma.farmCrop.create({
+      data: {
+        farmId,
+        cropName,
+        variety: variety || null,
+        season: season || 'Kharif',
+        stage: (stage || 'SOWING').toUpperCase(),
+        sowingDate: sowingDate ? new Date(sowingDate) : new Date(),
+        expectedHarvestDate: expectedHarvestDate ? new Date(expectedHarvestDate) : null,
+        status: 'ACTIVE'
+      }
+    });
+
+    await prisma.farmActivity.create({
+      data: {
+        farmId,
+        actorId: ownerId,
+        type: 'NEW_CROP_CYCLE_CREATED',
+        title: `New Crop Cycle: ${newCrop.cropName}`,
+        description: `Started new ${newCrop.cropName} cycle (${newCrop.season}) at ${newCrop.stage} stage.`,
+        metadata: JSON.stringify({
+          cropId: newCrop.id,
+          stage: newCrop.stage,
+          cropName: newCrop.cropName,
+          season: newCrop.season
+        })
+      }
+    });
+
+    res.status(201).json({ success: true, crop: newCrop });
+  } catch (error: any) {
+    console.error('Create Crop Error:', error);
+    res.status(400).json({ error: error.message || 'Failed to create crop cycle' });
+  }
+});
+
+/**
  * 8.5 Get Farm Operations for a Crop
  * GET /api/farms/:farmId/crops/:cropId/operations
  */
