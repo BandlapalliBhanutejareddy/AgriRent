@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { useStore } from '@/store/useStore';
 
 export default function LandingPage() {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const { t } = useTranslation();
   const { session, user } = useStore();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -142,9 +143,9 @@ export default function LandingPage() {
             >
               <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border border-white/20">
                 <img 
-                  src="/equipment/tractor.jpg" 
+                  src={`${basePath}/equipment/tractor.jpg`} 
                   alt="Modern tractor working in field" 
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/equipment/default.jpg'; }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = `${basePath}/equipment/default.jpg`; }}
                   className="w-full object-cover h-[600px]"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent"></div>
@@ -225,16 +226,16 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
-              { name: 'Tractors', count: '124 Listed', img: '/equipment/tractor.jpg' },
-              { name: 'Harvesters', count: '45 Listed', img: '/equipment/harvester.jpg' },
-              { name: 'Implements', count: '89 Listed', img: '/equipment/rotavator.jpg' },
-              { name: 'Cultivators', count: '67 Listed', img: '/equipment/cultivator.jpg' }
+              { name: 'Tractors', count: '124 Listed', img: `${basePath}/equipment/tractor.jpg` },
+              { name: 'Harvesters', count: '45 Listed', img: `${basePath}/equipment/harvester.jpg` },
+              { name: 'Implements', count: '89 Listed', img: `${basePath}/equipment/rotavator.jpg` },
+              { name: 'Cultivators', count: '67 Listed', img: `${basePath}/equipment/cultivator.jpg` }
             ].map((cat, i) => (
               <Link href="/register" key={i} className="group relative h-64 rounded-3xl overflow-hidden cursor-pointer">
                 <img 
                   src={cat.img} 
                   alt={cat.name} 
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/equipment/default.jpg'; }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = `${basePath}/equipment/default.jpg`; }}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-transparent"></div>

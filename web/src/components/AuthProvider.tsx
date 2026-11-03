@@ -84,7 +84,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  const isPublicRoute = pathname === '/' || pathname === '/login' || pathname === '/register';
+  const normalizePath = (p: string | null) => {
+    if (!p) return '/';
+    let cleaned = p.replace(/^\/AgriRent/, '').replace(/\/+$/, '');
+    return cleaned === '' ? '/' : cleaned;
+  };
+
+  const currentPath = normalizePath(pathname);
+  const isPublicRoute = currentPath === '/' || currentPath === '/login' || currentPath === '/register' || currentPath.startsWith('/auth');
   const hasSession = !!session && !!user;
 
   useEffect(() => {
@@ -92,7 +99,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     if (!hasSession && !isPublicRoute) {
       router.replace('/login');
-    } else if (hasSession && (pathname === '/login' || pathname === '/register')) {
+    } else if (hasSession && (currentPath === '/login' || currentPath === '/register')) {
       const storedActive = useStore.getState().activeRole;
 
       if (!storedActive && user?.role === 'BOTH') {
@@ -112,7 +119,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         router.replace('/dashboard/role-select');
       }
     }
-  }, [session, user, loading, pathname, router, isPublicRoute]);
+  }, [session, user, loading, currentPath, router, isPublicRoute]);
 
   if (loading) {
     return (

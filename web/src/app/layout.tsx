@@ -51,7 +51,8 @@ export default function RootLayout({
                   });
                 } else {
                   window.addEventListener('load', function() {
-                    navigator.serviceWorker.register('/sw.js').then(
+                    var basePath = '${process.env.NEXT_PUBLIC_BASE_PATH || ''}';
+                    navigator.serviceWorker.register(basePath + '/sw.js').then(
                       function(registration) {
                         console.log('Service Worker registration successful with scope: ', registration.scope);
                       },

@@ -84,6 +84,13 @@ export default function DashboardLayout({
     syncCanonicalProfile();
   }, [user?.id]);
 
+  const normalizePath = (p: string | null) => {
+    if (!p) return '/';
+    let cleaned = p.replace(/^\/AgriRent/, '').replace(/\/+$/, '');
+    return cleaned === '' ? '/' : cleaned;
+  };
+  const currentPath = normalizePath(pathname);
+
   const storedActive = activeRole;
   const currentRole = storedActive || (user?.role === 'BOTH' ? 'ROLE_SELECT' : user?.role || 'OWNER');
 
@@ -91,7 +98,7 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!user) return;
 
-    if (pathname === '/dashboard/role-select') {
+    if (currentPath === '/dashboard/role-select') {
       if (user.role !== 'BOTH' || storedActive) {
         router.push(storedActive === 'FARMER' ? '/dashboard/farmer' : '/dashboard');
       }
@@ -107,33 +114,33 @@ export default function DashboardLayout({
 
     if (role === 'FARMER') {
       if (
-        pathname === '/dashboard' ||
-        pathname.startsWith('/dashboard/equipment') ||
-        pathname.startsWith('/dashboard/admin') ||
-        pathname === '/dashboard/history' ||
-        pathname === '/dashboard/bank-details' ||
-        pathname === '/dashboard/analytics'
+        currentPath === '/dashboard' ||
+        currentPath.startsWith('/dashboard/equipment') ||
+        currentPath.startsWith('/dashboard/admin') ||
+        currentPath === '/dashboard/history' ||
+        currentPath === '/dashboard/bank-details' ||
+        currentPath === '/dashboard/analytics'
       ) {
         router.push('/dashboard/farmer');
       }
     } else if (role === 'OWNER') {
       if (
-        pathname.startsWith('/dashboard/farmer') ||
-        pathname.startsWith('/dashboard/admin') ||
-        pathname === '/dashboard/saved'
+        currentPath.startsWith('/dashboard/farmer') ||
+        currentPath.startsWith('/dashboard/admin') ||
+        currentPath === '/dashboard/saved'
       ) {
         router.push('/dashboard');
       }
     } else if (role === 'ADMIN') {
       if (
-        pathname === '/dashboard' ||
-        pathname.startsWith('/dashboard/farmer') ||
-        pathname.startsWith('/dashboard/equipment')
+        currentPath === '/dashboard' ||
+        currentPath.startsWith('/dashboard/farmer') ||
+        currentPath.startsWith('/dashboard/equipment')
       ) {
         router.push('/dashboard/admin');
       }
     }
-  }, [user, currentRole, pathname, storedActive, router]);
+  }, [user, currentRole, currentPath, storedActive, router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -175,7 +182,7 @@ export default function DashboardLayout({
   };
 
   const NavLink = ({ href, icon: Icon, label, exact = false }: { href: string, icon: any, label: string, exact?: boolean }) => {
-    const isActive = exact ? pathname === href : pathname.startsWith(href) && (href !== '/dashboard' || pathname === '/dashboard');
+    const isActive = exact ? currentPath === href : currentPath.startsWith(href) && (href !== '/dashboard' || currentPath === '/dashboard');
     return (
       <Link
         href={href}
