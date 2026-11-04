@@ -64,6 +64,77 @@ export async function handleSupabaseFallback(url: string, method: string = 'GET'
     return farm;
   }
 
+  // 1c. POST /farms (Create New Farm)
+  if (cleanUrl === '/farms' && method === 'POST') {
+    const farmId = 'c' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
+    const { data: newFarm, error: fErr } = await supabase
+      .from('Farm')
+      .insert({
+        id: farmId,
+        ownerId: effectiveUserId,
+        name: data?.name || 'My Farm',
+        location: data?.location || '',
+        latitude: data?.latitude ? Number(data.latitude) : null,
+        longitude: data?.longitude ? Number(data.longitude) : null,
+        area: Number(data?.area) || 1,
+        areaUnit: data?.areaUnit || 'acres',
+        soilType: data?.soilType || 'Red',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (fErr) throw fErr;
+
+    // Create default crop
+    const cropId = 'c' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
+    const { data: newCrop } = await supabase
+      .from('FarmCrop')
+      .insert({
+        id: cropId,
+        farmId: newFarm.id,
+        cropName: data?.cropName || 'Crop',
+        variety: data?.variety || '',
+        season: data?.season || 'Kharif',
+        stage: (data?.stage || 'SOWING').toUpperCase(),
+        status: 'ACTIVE',
+        sowingDate: data?.sowingDate ? new Date(data.sowingDate).toISOString() : new Date().toISOString(),
+        expectedHarvestDate: data?.expectedHarvestDate ? new Date(data.expectedHarvestDate).toISOString() : null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    // Create initial budget
+    const budgetId = 'c' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
+    const { data: newBudget } = await supabase
+      .from('FarmBudget')
+      .insert({
+        id: budgetId,
+        farmId: newFarm.id,
+        farmCropId: cropId,
+        totalBudget: Number(data?.totalBudget) || 50000,
+        spentAmount: 0,
+        reservedAmount: 0,
+        currency: 'INR',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    return {
+      success: true,
+      data: {
+        ...newFarm,
+        crops: newCrop ? [newCrop] : [],
+        budgets: newBudget ? [newBudget] : []
+      }
+    };
+  }
+
   // 2. GET /farms/:id/financials/expenses
   if (cleanUrl.match(/\/farms\/[^/]+\/financials\/expenses/) && method === 'GET') {
     const farmId = cleanUrl.split('/')[2];
@@ -134,13 +205,32 @@ export async function handleSupabaseFallback(url: string, method: string = 'GET'
       .select('*')
       .eq('farmId', farmId);
 
-    const b = budgets?.[0] || { totalBudget: 50000, spentAmount: 0 };
+    // Sum true expenses for this specific farm
+    const { data: activities } = await supabase
+      .from('FarmActivity')
+      .select('metadata')
+      .eq('farmId', farmId)
+      .eq('type', 'EXPENSE');
+
+    const manualSpent = (activities || []).reduce((sum: number, a: any) => {
+      try {
+        const meta = typeof a.metadata === 'string' ? JSON.parse(a.metadata) : a.metadata;
+        return sum + (Number(meta.amount) || 0);
+      } catch (_) {
+        return sum;
+      }
+    }, 0);
+
+    const b = budgets?.[0] || { totalBudget: 50000 };
+    const totalBudget = Number(b.totalBudget) || 50000;
+    const spentAmount = manualSpent > 0 ? manualSpent : (Number(b.spentAmount) || 0);
+
     return {
       financialState: {
-        totalBudget: Number(b.totalBudget) || 50000,
-        projectedTotalCost: Number(b.spentAmount) || 0,
-        remainingBudget: Math.max(0, (Number(b.totalBudget) || 50000) - (Number(b.spentAmount) || 0)),
-        budgetStatus: (Number(b.spentAmount) || 0) > (Number(b.totalBudget) || 50000) ? 'BUDGET_OVERRUN' : 'HEALTHY'
+        totalBudget,
+        projectedTotalCost: spentAmount,
+        remainingBudget: Math.max(0, totalBudget - spentAmount),
+        budgetStatus: spentAmount > totalBudget ? 'BUDGET_OVERRUN' : spentAmount >= totalBudget * 0.85 ? 'NEAR_LIMIT' : 'HEALTHY'
       }
     };
   }
@@ -151,21 +241,33 @@ export async function handleSupabaseFallback(url: string, method: string = 'GET'
     let activeRentals = 0;
     let pendingBookings = 0;
 
+    const urlParams = new URLSearchParams(url.includes('?') ? url.split('?')[1] : '');
+    const requestedFarmId = urlParams.get('farmId');
+
     if (effectiveUserId) {
       const { data: bookings } = await supabase
         .from('Booking')
         .select('totalPrice, status')
         .eq('farmerId', effectiveUserId);
 
-      activeRentals = (bookings || []).filter((b: any) => b.status === 'ACCEPTED' || b.status === 'ACTIVE').length;
+      // Only active rentals count as active (ACCEPTED, ACTIVE, DISPATCHED)
+      activeRentals = (bookings || []).filter((b: any) => ['ACCEPTED', 'ACTIVE', 'DISPATCHED'].includes(b.status)).length;
       pendingBookings = (bookings || []).filter((b: any) => b.status === 'PENDING').length;
-      rentalSpending = (bookings || []).reduce((sum: number, b: any) => sum + (Number(b.totalPrice) || 0), 0);
+
+      // Only count genuine finalized/active spending towards rental spending (NOT pending requests or cancelled)
+      const validSpendingStatuses = ['PAID', 'COMPLETED', 'ACTIVE', 'DISPATCHED', 'RETURNED'];
+      rentalSpending = (bookings || [])
+        .filter((b: any) => validSpendingStatuses.includes(b.status))
+        .reduce((sum: number, b: any) => sum + (Number(b.totalPrice) || 0), 0);
     }
 
-    const { data: farms } = effectiveUserId
-      ? await supabase.from('Farm').select('id').eq('ownerId', effectiveUserId)
-      : { data: [] };
-    const farmIds = (farms || []).map((f: any) => f.id);
+    let farmIds: string[] = [];
+    if (requestedFarmId) {
+      farmIds = [requestedFarmId];
+    } else if (effectiveUserId) {
+      const { data: farms } = await supabase.from('Farm').select('id').eq('ownerId', effectiveUserId);
+      farmIds = (farms || []).map((f: any) => f.id);
+    }
 
     let manualExpenses = 0;
     if (farmIds.length > 0) {
@@ -188,7 +290,7 @@ export async function handleSupabaseFallback(url: string, method: string = 'GET'
     return {
       rentalSpending,
       otherExpenses: manualExpenses,
-      totalSpending: rentalSpending + manualExpenses,
+      totalSpending: manualExpenses + (requestedFarmId ? 0 : rentalSpending),
       activeRentals,
       pendingBookings
     };

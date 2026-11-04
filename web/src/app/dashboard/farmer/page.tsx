@@ -532,15 +532,15 @@ export default function FarmerDashboard() {
 
   // Dynamic real-time spending and crop budget calculations
   const totalFarmSpent = useMemo(() => {
-    const manualSum = (recentExpenses || []).reduce((sum: number, exp: any) => sum + (Number(exp.amount) || 0), 0);
-    const rentalSpent = Number(analytics?.rentalSpending) || 0;
+    // True farm spending calculated from the active farm's expenses ledger
+    const expensesSum = (recentExpenses || []).reduce((sum: number, exp: any) => sum + (Number(exp.amount) || 0), 0);
     const backendTotal = Number(analytics?.totalSpending) || 0;
-    return Math.max(backendTotal, rentalSpent + manualSum, manualSum);
+    return expensesSum > 0 ? expensesSum : backendTotal;
   }, [analytics, recentExpenses]);
 
   const activeTotalBudget = Number(bState?.totalBudget) || Number(farmProfile?.budget) || 50000;
   const activeRemainingBudget = Math.max(0, activeTotalBudget - totalFarmSpent);
-  const activeProjectedCost = Math.max(Number(bState?.projectedTotalCost) || 0, totalFarmSpent);
+  const activeProjectedCost = totalFarmSpent;
   const activeBudgetStatus = totalFarmSpent > activeTotalBudget 
     ? 'BUDGET_OVERRUN' 
     : totalFarmSpent >= activeTotalBudget * 0.85 
@@ -587,6 +587,80 @@ export default function FarmerDashboard() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
+
+      {/* Multi-Farm Switcher Ribbon (Mobile Parity) */}
+      <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
+              <Tractor size={18} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Registered Farms ({userFarms.length})</h2>
+              <p className="text-[11px] text-slate-500">Switch active farm or register additional plots</p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/farmer/setup"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all self-start sm:self-auto cursor-pointer"
+          >
+            <PlusCircle size={14} />
+            <span>+ Add New Farm</span>
+          </Link>
+        </div>
+
+        {/* Farm Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {userFarms.map((f: any) => {
+            const isSelected = f.id === farmId;
+            const primaryCrop = f.crops?.[0];
+            return (
+              <div
+                key={f.id}
+                onClick={() => handleSwitchFarm(f.id)}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  isSelected
+                    ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20 shadow-sm'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 bg-slate-50/50 dark:bg-slate-800/40'
+                }`}
+              >
+                <div className="min-w-0 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                      {f.name}
+                    </span>
+                    {isSelected && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                      {primaryCrop?.cropName || 'Field'}
+                    </span>
+                    <span>•</span>
+                    <span>{f.area} {f.areaUnit || 'ac'}</span>
+                    <span>•</span>
+                    <span className="capitalize">{primaryCrop?.stage?.toLowerCase() || 'Sowing'}</span>
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  {isSelected ? (
+                    <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center">
+                      <CheckCircle size={13} />
+                    </div>
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400">
+                      <div className="w-1.5 h-1.5 rounded-full bg-transparent" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Hero Farm Overview Card */}
       <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card transition-all">
