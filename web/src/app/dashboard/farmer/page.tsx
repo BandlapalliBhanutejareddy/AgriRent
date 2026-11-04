@@ -61,6 +61,8 @@ export default function FarmerDashboard() {
   const [cropStage, setCropStage] = useState<string>('');
   const [farmProfile, setFarmProfile] = useState<any>(null);
   const [farmLoading, setFarmLoading] = useState(true);
+  const [userFarms, setUserFarms] = useState<any[]>([]);
+  const [farmError, setFarmError] = useState<string | null>(null);
 
   const [overview, setOverview] = useState<string>('');
   const [overviewLoading, setOverviewLoading] = useState(true);
@@ -338,47 +340,98 @@ export default function FarmerDashboard() {
     return t(`statuses.${status.toUpperCase()}`, status);
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    async function initFarm() {
-      try {
-        const farmsRes = await api.get('/farms');
-        if (farmsRes.data && farmsRes.data.length > 0) {
-          const farm = farmsRes.data[0];
-          if (isMounted) setFarmId(farm.id);
-
-          if (farm.crops && farm.crops.length > 0) {
-            const cid = farm.crops[0].id;
-            const initialStage = farm.crops[0].stage || 'SOWING';
-            if (isMounted) {
-              setCropId(cid);
-              setCropStage(initialStage);
-              const crp = farm.crops[0];
-              setFarmProfile({
-                crop: crp.cropName,
-                variety: crp.variety || '',
-                acreage: farm.area,
-                location: farm.location,
-                season: crp.season || 'Kharif',
-                budget: farm.totalBudget || 0,
-                sowingDate: crp.sowingDate ? new Date(crp.sowingDate).toISOString().slice(0, 10) : '',
-                expectedHarvestDate: crp.expectedHarvestDate ? new Date(crp.expectedHarvestDate).toISOString().slice(0, 10) : ''
-              });
-              setFarmLoading(false);
-            }
-          } else {
-            if (isMounted) router.replace('/dashboard/farmer/setup');
-          }
-        } else {
-          if (isMounted) router.replace('/dashboard/farmer/setup');
-        }
-      } catch (err) {
-        if (isMounted) setFarmLoading(false);
-      }
+  const applyFarm = (farm: any) => {
+    if (!farm) return;
+    setFarmId(farm.id);
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('@selected_farm_id', farm.id); } catch (_) {}
     }
+
+    const crops = farm.crops || [];
+    const activeCrop = crops.find((c: any) => c.status === 'ACTIVE') || crops[0];
+
+    if (activeCrop) {
+      setCropId(activeCrop.id);
+      setCropStage(activeCrop.stage || 'SOWING');
+      setFarmProfile({
+        id: farm.id,
+        name: farm.name,
+        crop: activeCrop.cropName,
+        variety: activeCrop.variety || '',
+        acreage: farm.area,
+        location: farm.location,
+        season: activeCrop.season || 'Kharif',
+        budget: farm.totalBudget || 0,
+        cropId: activeCrop.id,
+        sowingDate: activeCrop.sowingDate ? new Date(activeCrop.sowingDate).toISOString().slice(0, 10) : '',
+        expectedHarvestDate: activeCrop.expectedHarvestDate ? new Date(activeCrop.expectedHarvestDate).toISOString().slice(0, 10) : ''
+      });
+      setFarmLoading(false);
+    } else {
+      router.replace('/dashboard/farmer/setup');
+    }
+  };
+
+  const handleSwitchFarm = (selectedId: string) => {
+    const target = userFarms.find((f: any) => f.id === selectedId);
+    if (target) {
+      applyFarm(target);
+    }
+  };
+
+  async function initFarm() {
+    setFarmLoading(true);
+    setFarmError(null);
+
+    // 1. Try local/offline cached farms first for instant display
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedRaw = localStorage.getItem('@cache_/farms');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          const list = Array.isArray(cached) ? cached : (cached?.data || cached?.farms || []);
+          if (list.length > 0) {
+            setUserFarms(list);
+            const savedId = localStorage.getItem('@selected_farm_id');
+            const initial = list.find((f: any) => f.id === savedId) || list[0];
+            applyFarm(initial);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fetch fresh farms from backend API
+    try {
+      const farmsRes = await api.get('/farms');
+      const list = Array.isArray(farmsRes.data)
+        ? farmsRes.data
+        : (farmsRes.data?.data || farmsRes.data?.farms || []);
+
+      if (list && list.length > 0) {
+        setUserFarms(list);
+        const savedId = typeof window !== 'undefined' ? localStorage.getItem('@selected_farm_id') : null;
+        const targetFarm = list.find((f: any) => f.id === savedId) || list[0];
+        applyFarm(targetFarm);
+        setFarmError(null);
+      } else {
+        setFarmLoading(false);
+        router.replace('/dashboard/farmer/setup');
+      }
+    } catch (err: any) {
+      console.warn('Farms fetch error, retaining cache if available:', err);
+      setFarmProfile((prev: any) => {
+        if (!prev) {
+          setFarmError('Server connecting or waking up. Click retry to refresh.');
+        }
+        return prev;
+      });
+      setFarmLoading(false);
+    }
+  }
+
+  useEffect(() => {
     initFarm();
-    return () => { isMounted = false; };
-  }, [router]);
+  }, [router, user]);
 
   useEffect(() => {
     if (farmId && cropId && cropStage) {
@@ -511,11 +564,23 @@ export default function FarmerDashboard() {
           <Tractor size={24} />
         </div>
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{t('common.noFarmProfile', 'No Registered Farm Found')}</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Set up your crop details, land area, and season to unlock customized equipment schedules.</p>
-        <Link href="/dashboard/farmer/setup" className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-[#163A2D] hover:bg-[#205140] text-white rounded-xl font-semibold text-xs transition-colors">
-          <span>{t('common.setupFarm', 'Configure Farm Profile')}</span>
-          <ArrowRight size={14} />
-        </Link>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+          {farmError || 'Set up your crop details, land area, and season to unlock customized equipment schedules.'}
+        </p>
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <button
+            type="button"
+            onClick={() => initFarm()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+          >
+            <RefreshCw size={14} />
+            <span>Retry Connection</span>
+          </button>
+          <Link href="/dashboard/farmer/setup" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#163A2D] hover:bg-[#205140] text-white rounded-xl font-semibold text-xs transition-colors">
+            <span>{t('common.setupFarm', 'Configure Farm Profile')}</span>
+            <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
     );
   }
@@ -527,9 +592,27 @@ export default function FarmerDashboard() {
       <div className="bg-white dark:bg-slate-900 border border-[#E1E8E2] dark:border-slate-800 rounded-2xl p-6 shadow-card transition-all">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#163A2D]/10 text-[#163A2D] dark:text-[#84CC16] text-[11px] font-semibold mb-2">
-              <ShieldCheck size={14} />
-              <span>Verified Crop Operations Plan</span>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#163A2D]/10 text-[#163A2D] dark:text-[#84CC16] text-[11px] font-semibold">
+                <ShieldCheck size={14} />
+                <span>Verified Crop Operations Plan</span>
+              </div>
+              {userFarms.length > 1 && (
+                <div className="inline-flex items-center gap-1.5 text-xs">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase">Farm:</span>
+                  <select
+                    value={farmId}
+                    onChange={(e) => handleSwitchFarm(e.target.value)}
+                    className="text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-0.5 cursor-pointer focus:outline-none"
+                  >
+                    {userFarms.map((f: any) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.crops?.[0]?.cropName || 'Field'} - {f.area} ac)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               {farmProfile.crop} Cultivation Operations

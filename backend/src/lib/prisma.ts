@@ -7,6 +7,9 @@ const globalForPrisma = globalThis as unknown as {
 const dbUrl = process.env.DATABASE_URL;
 let adjustedUrl = dbUrl;
 if (adjustedUrl) {
+  if (!adjustedUrl.includes('sslaccept=')) {
+    adjustedUrl = `${adjustedUrl}${adjustedUrl.includes('?') ? '&' : '?'}sslaccept=accept_invalid_certs`;
+  }
   if (!adjustedUrl.includes('connect_timeout')) {
     adjustedUrl = `${adjustedUrl}${adjustedUrl.includes('?') ? '&' : '?'}connect_timeout=15`;
   }

@@ -36,7 +36,7 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
         where: {
           OR: [
             { authId: supabaseUser.id },
-            { email: supabaseUser.email }
+            { email: { equals: supabaseUser.email, mode: 'insensitive' } }
           ]
         }
       });
@@ -149,7 +149,7 @@ export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFu
         where: {
           OR: [
             { authId: supabaseUser.id },
-            { email: supabaseUser.email }
+            { email: { equals: supabaseUser.email, mode: 'insensitive' } }
           ]
         }
       });
