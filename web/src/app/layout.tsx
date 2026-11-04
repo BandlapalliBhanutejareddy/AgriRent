@@ -11,8 +11,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AgroRent Admin Dashboard',
-  description: 'Manage your farm equipment and bookings',
+  title: 'AgroRent AI - Smart Farm Equipment Rental & Management',
+  description: 'Rent verified farm machinery and consult AI Farm Advisor',
   manifest: '/manifest.json',
 };
 

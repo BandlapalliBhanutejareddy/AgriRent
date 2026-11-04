@@ -4,6 +4,7 @@ import i18n from '@/lib/i18n';
 
 interface User {
   id: string;
+  authId?: string;
   email: string;
   phone: string;
   name: string | null;

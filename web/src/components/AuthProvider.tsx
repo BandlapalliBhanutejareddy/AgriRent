@@ -94,13 +94,20 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   };
 
   const currentPath = normalizePath(pathname);
-  const isPublicRoute = 
-    currentPath === '/' || 
-    currentPath === '/login' || 
-    currentPath === '/register' || 
-    currentPath.startsWith('/auth') ||
-    currentPath === '/index.html' ||
-    currentPath === '';
+  const browserPath = typeof window !== 'undefined' ? normalizePath(window.location.pathname) : currentPath;
+
+  const checkIsPublic = (path: string) => {
+    return (
+      path === '/' || 
+      path === '/login' || 
+      path === '/register' || 
+      path.startsWith('/auth') ||
+      path === '/index.html' ||
+      path === ''
+    );
+  };
+
+  const isPublicRoute = checkIsPublic(currentPath) || checkIsPublic(browserPath);
   const hasSession = !!session && !!user;
 
   useEffect(() => {
@@ -133,10 +140,21 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   // Only show loading screen for protected routes while verifying session
   if (loading && !isPublicRoute) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
-          <p className="mt-4 text-gray-500 font-medium">{t('loading_agrorent_ai', 'Loading AgroRent AI...')}</p>
+      <div 
+        className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"
+        style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}
+      >
+        <div className="flex flex-col items-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div 
+            className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"
+            style={{ width: '48px', height: '48px', border: '3px solid #e5e7eb', borderTopColor: '#10b981', borderRadius: '50%' }}
+          ></div>
+          <p 
+            className="mt-4 text-gray-500 font-medium"
+            style={{ marginTop: '16px', color: '#6b7280', fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: '14px' }}
+          >
+            {t('loading_agrorent_ai', { defaultValue: 'Loading AgroRent AI...' })}
+          </p>
         </div>
       </div>
     );

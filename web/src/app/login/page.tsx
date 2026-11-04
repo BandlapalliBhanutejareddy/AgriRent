@@ -175,13 +175,22 @@ export default function LoginPage() {
             password
           });
           if (sbData?.session && !sbError) {
+            // Fetch real user record from database to preserve CUID and relations
+            const { data: dbUser } = await supabase
+              .from('User')
+              .select('*')
+              .ilike('email', email)
+              .maybeSingle();
+
             const userObj = {
-              id: sbData.user.id,
-              email: sbData.user.email,
-              name: sbData.user.user_metadata?.name || (activePortal === 'FARMER' ? 'Farmer' : activePortal === 'OWNER' ? 'Fleet Owner' : 'Admin'),
-              role: sbData.user.user_metadata?.role || activePortal,
-              phone: sbData.user.phone || '',
-              authId: sbData.user.id
+              id: dbUser?.id || sbData.user.id,
+              email: dbUser?.email || sbData.user.email,
+              name: dbUser?.name || sbData.user.user_metadata?.name || (activePortal === 'FARMER' ? 'Farmer' : activePortal === 'OWNER' ? 'Fleet Owner' : 'Admin'),
+              role: dbUser?.role || sbData.user.user_metadata?.role || activePortal,
+              phone: dbUser?.phone || sbData.user.phone || '',
+              authId: sbData.user.id,
+              preferredLanguage: dbUser?.preferredLanguage || 'en',
+              profileImage: dbUser?.profileImage || null
             };
             executeLogin(userObj, sbData.session.access_token);
             return;

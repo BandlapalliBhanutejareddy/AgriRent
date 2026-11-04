@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { useStore } from '../store/useStore';
+import { handleSupabaseFallback } from './supabaseAdapter';
 
 const isBrowser = typeof window !== 'undefined';
 const isLocalHost = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const isGitHubPages = isBrowser && window.location.hostname.includes('github.io');
 
 // In local browser, always talk to the local backend on port 4000; in deployed production, use Render.
 let API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://agrirent-5qpx.onrender.com/api';
@@ -14,6 +16,7 @@ if (isLocalHost) {
 
 export const api = axios.create({
   baseURL: API_URL,
+  timeout: isGitHubPages ? 3000 : 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -48,7 +51,40 @@ api.interceptors.response.use(
 
     return finalResponse;
   },
-  (error) => {
+  async (error) => {
+    // Transparent Supabase direct fallback if Render returns CORS 500, timeout, or Network Error
+    const isCorsOrNetwork = 
+      !error.response || 
+      error.response.status >= 500 ||
+      error.code === 'ECONNABORTED' ||
+      error.message?.includes('timeout') ||
+      error.message?.includes('Network Error') ||
+      JSON.stringify(error.response?.data || '').toLowerCase().includes('cors');
+
+    if (isCorsOrNetwork && error.config?.url) {
+      try {
+        let reqData: any = undefined;
+        if (error.config.data) {
+          try { reqData = typeof error.config.data === 'string' ? JSON.parse(error.config.data) : error.config.data; } catch (_) {}
+        }
+        const fallbackResult = await handleSupabaseFallback(
+          error.config.url,
+          error.config.method?.toUpperCase(),
+          reqData
+        );
+        return Promise.resolve({
+          data: fallbackResult,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config: error.config,
+          isDirectDb: true
+        });
+      } catch (fbErr) {
+        console.warn('Supabase direct query fallback notice:', fbErr);
+      }
+    }
+
     if (error.response) {
       const { status, data } = error.response;
 
